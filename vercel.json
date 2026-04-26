@@ -1,6 +1,6 @@
 {
   "framework": "vite",
-  "buildCommand": "npm run build:vercel",
+  "buildCommand": "if [ -n \"$CONVEX_DEPLOY_KEY\" ]; then npm run build:vercel; else echo \"CONVEX_DEPLOY_KEY is not set; running frontend-only Vite build. This deploy is not launch-ready.\"; npm run build; fi",
   "outputDirectory": "dist",
   "rewrites": [
     {
