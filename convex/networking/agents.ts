@@ -11,6 +11,7 @@ import {
 } from './auth';
 
 const DEFAULT_CLAIM_BASE_URL = 'https://town.example/claim';
+const DEFAULT_OWNER_VERIFICATION_METHOD = 'tweet' as const;
 
 export const registerAgent = mutation({
   args: {
@@ -130,7 +131,60 @@ export const claimAgentForTesting = internalMutation({
   handler: claimAgentForTestingHandler,
 });
 
+export const mockClaimAgent = mutation({
+  args: {
+    claimToken: v.string(),
+    verificationCode: v.string(),
+    xHandle: v.string(),
+    owner: v.optional(
+      v.object({
+        displayName: v.optional(v.string()),
+        xProfileUrl: v.optional(v.string()),
+        verificationMethod: v.optional(v.union(v.literal('tweet'), v.literal('oauth'))),
+        websiteUrl: v.optional(v.string()),
+      }),
+    ),
+  },
+  handler: mockClaimAgentHandler,
+});
+
 export async function claimAgentForTestingHandler(
+  ctx: MutationCtx,
+  args: {
+    claimToken: string;
+    verificationCode: string;
+    xHandle: string;
+    xProfileUrl: string;
+    verificationMethod?: 'tweet' | 'oauth';
+  },
+) {
+  return await claimAgentHandler(ctx, args);
+}
+
+export async function mockClaimAgentHandler(
+  ctx: MutationCtx,
+  args: {
+    claimToken: string;
+    verificationCode: string;
+    xHandle: string;
+    owner?: {
+      displayName?: string;
+      xProfileUrl?: string;
+      verificationMethod?: 'tweet' | 'oauth';
+      websiteUrl?: string;
+    };
+  },
+) {
+  return await claimAgentHandler(ctx, {
+    claimToken: args.claimToken,
+    verificationCode: args.verificationCode,
+    xHandle: args.xHandle,
+    xProfileUrl: args.owner?.xProfileUrl ?? defaultProfileUrlForHandle(args.xHandle),
+    verificationMethod: args.owner?.verificationMethod ?? DEFAULT_OWNER_VERIFICATION_METHOD,
+  });
+}
+
+async function claimAgentHandler(
   ctx: MutationCtx,
   args: {
     claimToken: string;
@@ -167,7 +221,7 @@ export async function claimAgentForTestingHandler(
     status: 'verified',
     xHandle: normalizeXHandle(args.xHandle),
     xProfileUrl: args.xProfileUrl,
-    verificationMethod: args.verificationMethod ?? 'tweet',
+    verificationMethod: args.verificationMethod ?? DEFAULT_OWNER_VERIFICATION_METHOD,
     verifiedAt: now,
   });
   await ctx.db.patch(agent._id, {
@@ -195,6 +249,10 @@ function normalizeSlug(slug: string) {
 
 function normalizeXHandle(handle: string) {
   return handle.trim().replace(/^@/, '');
+}
+
+function defaultProfileUrlForHandle(handle: string) {
+  return `https://x.com/${normalizeXHandle(handle)}`;
 }
 
 function arrayBuffersEqual(left: ArrayBuffer, right: ArrayBuffer) {
