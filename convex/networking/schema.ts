@@ -1,5 +1,6 @@
 import { defineTable } from 'convex/server';
 import { v } from 'convex/values';
+import { cardStatusValidator, cardTypeValidator } from './validators';
 
 export const agentStatus = v.union(
   v.literal('pending_claim'),
@@ -57,4 +58,23 @@ export const networkingTables = {
     .index('by_agent', ['agentId'])
     .index('by_claim_token_hash', ['claimTokenHash'])
     .index('by_status', ['status']),
+
+  matchCards: defineTable({
+    agentId: v.id('networkAgents'),
+    type: cardTypeValidator,
+    title: v.string(),
+    summary: v.string(),
+    detailsForMatching: v.string(),
+    tags: v.array(v.string()),
+    domains: v.array(v.string()),
+    desiredOutcome: v.string(),
+    status: cardStatusValidator,
+    agentGeneratedAt: v.number(),
+    ownerConfirmedAt: v.optional(v.number()),
+    updatedAt: v.number(),
+  })
+    .index('by_agent', ['agentId', 'updatedAt'])
+    .index('by_agent_status', ['agentId', 'status'])
+    .index('by_status_type', ['status', 'type'])
+    .index('by_status_updated_at', ['status', 'updatedAt']),
 };

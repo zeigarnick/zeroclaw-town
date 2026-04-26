@@ -3,16 +3,24 @@ import { Doc } from '../_generated/dataModel';
 import { MutationCtx, QueryCtx } from '../_generated/server';
 
 export type NetworkingErrorCode =
+  | 'active_card_limit'
   | 'agent_not_found'
   | 'api_key_revoked'
+  | 'card_access_denied'
+  | 'card_not_found'
   | 'claim_not_found'
   | 'claim_token_mismatch'
+  | 'details_too_long'
   | 'duplicate_agent_slug'
+  | 'empty_card_text'
+  | 'invalid_card_status'
+  | 'invalid_card_type'
   | 'invalid_agent_slug'
   | 'invalid_api_key'
   | 'invalid_claim_status'
   | 'invalid_verification_code'
-  | 'pending_claim';
+  | 'pending_claim'
+  | 'summary_too_long';
 
 const API_KEY_PREFIX = 'town';
 const CLAIM_TOKEN_PREFIX = 'town_claim';
