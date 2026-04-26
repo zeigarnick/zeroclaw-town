@@ -10,7 +10,7 @@ The app is a Vite React static frontend with Convex backend functions and Convex
 Repository config now encodes that contract:
 
 - Vercel framework preset: `vite`
-- Vercel build command: use `npm run build:vercel` when `CONVEX_DEPLOY_KEY` exists; otherwise run a frontend-only Vite build with a warning.
+- Vercel build command: use `npm run build:vercel` when `CONVEX_DEPLOY_KEY` exists; otherwise run a frontend-only Vite build with `VITE_CONVEX_URL` set to the configured Convex production URL.
 - Vercel output directory: `dist`
 - Vercel build script: `convex deploy --cmd 'npm run build' --cmd-url-env-var-name VITE_CONVEX_URL`
 - Static asset base: Vite uses `base: '/ai-town'`, with a Vercel rewrite from `/ai-town/:match*` to `/:match*`
@@ -19,7 +19,7 @@ This prepares the project for Vercel compatibility without treating a frontend-o
 
 ## Convex Deployment Strategy
 
-Use one Vercel project pointing at this app root. The Vercel build command is intentionally conditional: it runs the Convex deploy wrapper when `CONVEX_DEPLOY_KEY` is set, and otherwise runs a frontend-only Vite build so pre-launch preview builds do not fail solely because Convex deploy keys have not been installed yet.
+Use one Vercel project pointing at this app root. The Vercel build command is intentionally conditional: it runs the Convex deploy wrapper when `CONVEX_DEPLOY_KEY` is set, and otherwise runs a frontend-only Vite build against `https://youthful-sockeye-531.convex.cloud` so pre-launch preview builds do not fail solely because Convex deploy keys have not been installed yet.
 
 Set `CONVEX_DEPLOY_KEY` in Vercel with environment scoping:
 
@@ -29,7 +29,7 @@ Set `CONVEX_DEPLOY_KEY` in Vercel with environment scoping:
 
 During full-stack Vercel builds, `convex deploy` reads `CONVEX_DEPLOY_KEY`, deploys functions, sets `VITE_CONVEX_URL` for the nested `npm run build`, and the built frontend connects to that Convex deployment.
 
-When `CONVEX_DEPLOY_KEY` is missing, Vercel only runs `npm run build`. That is acceptable for checking static build compatibility, but it does not deploy Convex functions and must not be used as launch evidence.
+When `CONVEX_DEPLOY_KEY` is missing, Vercel only runs `npm run build` with `VITE_CONVEX_URL` set. That is acceptable for checking static frontend compatibility against the current Convex production deployment, but it does not deploy Convex functions and must not be used as launch evidence.
 
 Preview deployments are expected to use fresh Convex preview backends. They do not share production data. Packet 10 smoke/E2E must either seed preview data or run against a known non-production endpoint.
 
@@ -37,11 +37,11 @@ Preview deployments are expected to use fresh Convex preview backends. They do n
 
 Vercel build environment:
 
-- `CONVEX_DEPLOY_KEY`: required for full-stack preview/production deploys. Use production key for Production and preview key for Preview. If omitted, Vercel runs a frontend-only build and prints a non-launch-ready warning.
+- `CONVEX_DEPLOY_KEY`: required for full-stack preview/production deploys. Use production key for Production and preview key for Preview. If omitted, Vercel runs a frontend-only build against the configured Convex production URL and prints a warning.
 
 Frontend build/runtime:
 
-- `VITE_CONVEX_URL`: required by `src/components/ConvexClientProvider.tsx`, but should be provided by `convex deploy --cmd`; do not manually point production frontend at a dev deployment.
+- `VITE_CONVEX_URL`: required by `src/components/ConvexClientProvider.tsx`. Full-stack builds receive it from `convex deploy --cmd`; fallback frontend-only builds use `https://youthful-sockeye-531.convex.cloud` unless Vercel provides an override.
 - `VITE_NETWORKING_API_BASE_URL`: optional override for dashboard HTTP calls. Leave unset for normal Vercel builds so the app derives the Convex HTTP Actions host from `VITE_CONVEX_URL`.
 - `VITE_SHOW_DEBUG_UI`: optional debug flag.
 
