@@ -3,6 +3,10 @@ import { v } from 'convex/values';
 import {
   cardStatusValidator,
   cardTypeValidator,
+  conversationStatusValidator,
+  inboxEventStatusValidator,
+  inboxItemTypeValidator,
+  meetingStatusValidator,
   recommendationStatusValidator,
   recommendationSuppressionReasonValidator,
 } from './validators';
@@ -137,4 +141,77 @@ export const networkingTables = {
     .index('by_card_pair', ['cardPairKey'])
     .index('by_recipient_created_at', ['recipientAgentId', 'createdAt'])
     .index('by_recipient_card_pair', ['recipientCardId', 'providerCardId']),
+
+  meetings: defineTable({
+    recommendationId: v.id('recommendations'),
+    requesterAgentId: v.id('networkAgents'),
+    requesterCardId: v.id('matchCards'),
+    responderAgentId: v.id('networkAgents'),
+    responderCardId: v.id('matchCards'),
+    cardPairKey: v.string(),
+    status: meetingStatusValidator,
+    requestMessage: v.optional(v.string()),
+    outreachContext: v.object({
+      requesterCardSummary: v.string(),
+      responderCardTitle: v.string(),
+      requestedOutcome: v.string(),
+    }),
+    conversationId: v.optional(v.id('agentConversations')),
+    declinedByAgentId: v.optional(v.id('networkAgents')),
+    respondedAt: v.optional(v.number()),
+    expiresAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index('by_recommendation', ['recommendationId'])
+    .index('by_requester_status_created_at', ['requesterAgentId', 'status', 'createdAt'])
+    .index('by_responder_status_created_at', ['responderAgentId', 'status', 'createdAt'])
+    .index('by_status_created_at', ['status', 'createdAt']),
+
+  agentConversations: defineTable({
+    meetingId: v.id('meetings'),
+    participantOneAgentId: v.id('networkAgents'),
+    participantTwoAgentId: v.id('networkAgents'),
+    status: conversationStatusValidator,
+    closedByAgentId: v.optional(v.id('networkAgents')),
+    closedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index('by_meeting', ['meetingId'])
+    .index('by_participant_one_status_updated_at', ['participantOneAgentId', 'status', 'updatedAt'])
+    .index('by_participant_two_status_updated_at', ['participantTwoAgentId', 'status', 'updatedAt']),
+
+  agentMessages: defineTable({
+    conversationId: v.id('agentConversations'),
+    authorAgentId: v.id('networkAgents'),
+    recipientAgentId: v.id('networkAgents'),
+    clientMessageId: v.string(),
+    body: v.string(),
+    createdAt: v.number(),
+  })
+    .index('by_conversation_created_at', ['conversationId', 'createdAt'])
+    .index('by_conversation_client_message_id', ['conversationId', 'clientMessageId'])
+    .index('by_recipient_created_at', ['recipientAgentId', 'createdAt']),
+
+  inboxEvents: defineTable({
+    recipientAgentId: v.id('networkAgents'),
+    actorAgentId: v.optional(v.id('networkAgents')),
+    type: inboxItemTypeValidator,
+    status: inboxEventStatusValidator,
+    dedupeKey: v.optional(v.string()),
+    recommendationId: v.optional(v.id('recommendations')),
+    meetingId: v.optional(v.id('meetings')),
+    conversationId: v.optional(v.id('agentConversations')),
+    messageId: v.optional(v.id('agentMessages')),
+    introCandidateId: v.optional(v.string()),
+    payload: v.optional(v.any()),
+    readAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index('by_recipient_created_at', ['recipientAgentId', 'createdAt'])
+    .index('by_recipient_status_created_at', ['recipientAgentId', 'status', 'createdAt'])
+    .index('by_recipient_type_created_at', ['recipientAgentId', 'type', 'createdAt'])
+    .index('by_recipient_dedupe_key', ['recipientAgentId', 'dedupeKey']),
 };

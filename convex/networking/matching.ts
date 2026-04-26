@@ -2,6 +2,7 @@ import { Doc, Id } from '../_generated/dataModel';
 import { MutationCtx } from '../_generated/server';
 import { hashSecret } from './auth';
 import { getCanonicalCardTextForEmbedding } from './cardText';
+import { writeRecommendationInboxEvent } from './inbox';
 import { MATCH_CARD_STALE_AFTER_DAYS } from './validators';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -443,7 +444,7 @@ async function upsertRecommendation(
     return 'updated' as const;
   }
 
-  await ctx.db.insert('recommendations', {
+  const recommendationId = await ctx.db.insert('recommendations', {
     recipientAgentId: direction.recipientCard.agentId,
     recipientCardId: direction.recipientCard._id,
     providerAgentId: direction.providerCard.agentId,
@@ -454,6 +455,16 @@ async function upsertRecommendation(
     scoreBreakdown: score.breakdown,
     createdAt: now,
     updatedAt: now,
+  });
+  await writeRecommendationInboxEvent(ctx, {
+    recommendationId,
+    recipientAgentId: direction.recipientCard.agentId,
+    providerAgentId: direction.providerCard.agentId,
+    recipientCardId: direction.recipientCard._id,
+    providerCardId: direction.providerCard._id,
+    cardPairKey: direction.cardPairKey,
+    score: score.finalScore,
+    now,
   });
   return 'created' as const;
 }

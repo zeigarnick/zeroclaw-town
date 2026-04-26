@@ -72,6 +72,14 @@ export const inboxItemTypeValidator = v.union(
   v.literal('intro_candidate'),
 );
 
+export const inboxEventStatuses = ['unread', 'read', 'archived'] as const;
+export type InboxEventStatus = (typeof inboxEventStatuses)[number];
+export const inboxEventStatusValidator = v.union(
+  v.literal('unread'),
+  v.literal('read'),
+  v.literal('archived'),
+);
+
 export const MAX_ACTIVE_MATCH_CARDS_PER_AGENT = 3;
 export const MATCH_CARD_STALE_AFTER_DAYS = 30;
 export const MAX_CARD_TITLE_LENGTH = 140;
@@ -84,6 +92,8 @@ export const MAX_CARD_TAG_OR_DOMAIN_LENGTH = 64;
 
 export const MAX_MESSAGE_LENGTH = 2000;
 export const MAX_SUMMARY_LENGTH = 1200;
+export const MAX_MEETING_REQUEST_MESSAGE_LENGTH = 600;
+export const MAX_CLIENT_MESSAGE_ID_LENGTH = 128;
 
 export function isCardType(value: string): value is CardType {
   return cardTypes.includes(value as CardType);
@@ -107,4 +117,8 @@ export function isRecommendationStatus(value: string): value is RecommendationSt
 
 export function isInboxItemType(value: string): value is InboxItemType {
   return inboxItemTypes.includes(value as InboxItemType);
+}
+
+export function isInboxEventStatus(value: string): value is InboxEventStatus {
+  return inboxEventStatuses.includes(value as InboxEventStatus);
 }

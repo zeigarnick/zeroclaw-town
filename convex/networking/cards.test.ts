@@ -17,7 +17,8 @@ type TableName =
   | 'matchCards'
   | 'cardEmbeddings'
   | 'recommendations'
-  | 'recommendationSuppressions';
+  | 'recommendationSuppressions'
+  | 'inboxEvents';
 type Row = Record<string, any> & { _id: string };
 
 function createMockCtx() {
@@ -29,6 +30,7 @@ function createMockCtx() {
     cardEmbeddings: [],
     recommendations: [],
     recommendationSuppressions: [],
+    inboxEvents: [],
   };
   const counters: Record<TableName, number> = {
     networkAgents: 0,
@@ -38,6 +40,7 @@ function createMockCtx() {
     cardEmbeddings: 0,
     recommendations: 0,
     recommendationSuppressions: 0,
+    inboxEvents: 0,
   };
 
   const db = {

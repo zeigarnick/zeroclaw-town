@@ -9,7 +9,8 @@ type TableName =
   | 'matchCards'
   | 'cardEmbeddings'
   | 'recommendations'
-  | 'recommendationSuppressions';
+  | 'recommendationSuppressions'
+  | 'inboxEvents';
 type Row = Record<string, any> & { _id: string };
 
 function createMockCtx() {
@@ -21,6 +22,7 @@ function createMockCtx() {
     cardEmbeddings: [],
     recommendations: [],
     recommendationSuppressions: [],
+    inboxEvents: [],
   };
   const counters: Record<TableName, number> = {
     networkAgents: 0,
@@ -30,6 +32,7 @@ function createMockCtx() {
     cardEmbeddings: 0,
     recommendations: 0,
     recommendationSuppressions: 0,
+    inboxEvents: 0,
   };
 
   const db = {
@@ -200,6 +203,12 @@ describe('networking matching handlers', () => {
         (recommendation) => recommendation.recipientAgentId === offerCard.agentId,
       ),
     ).toHaveLength(0);
+    expect(tables.inboxEvents).toHaveLength(1);
+    expect(tables.inboxEvents[0]).toMatchObject({
+      recipientAgentId: needCard.agentId,
+      type: 'match_recommendation',
+      recommendationId: tables.recommendations[0]._id,
+    });
   });
 
   test('creates recommendation for need->exchange pair', async () => {
