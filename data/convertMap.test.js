@@ -149,4 +149,83 @@ describe('convertMap', () => {
     expect(module.serializedWorldMap.visualLayers).toHaveLength(3);
     expect(module.serializedWorldMap.collisionTiles[1][0]).toBe(2);
   });
+
+  test('rejects maps without an explicit background tile layer', () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'convert-map-'));
+    const fixturePath = path.join(tmpDir, 'fixture.tmj');
+    const outputPath = path.join(tmpDir, 'fixture-map.mjs');
+    fs.writeFileSync(
+      fixturePath,
+      JSON.stringify({
+        width: 1,
+        height: 1,
+        tilewidth: 32,
+        tileheight: 32,
+        layers: [
+          {
+            name: 'Props',
+            type: 'tilelayer',
+            width: 1,
+            height: 1,
+            data: [1],
+            properties: [tiledProperty('role', 'object')],
+          },
+        ],
+      }),
+    );
+
+    expect(() =>
+      execFileSync(
+        'node',
+        [
+          path.resolve('data/convertMap.js'),
+          fixturePath,
+          '/ai-town/assets/founder-village/test.png',
+          '64',
+          '64',
+          outputPath,
+        ],
+        { cwd: path.resolve('.'), stdio: 'pipe' },
+      ),
+    ).toThrow(/background tile layer/);
+  });
+
+  test('does not infer background role from layer names', () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'convert-map-'));
+    const fixturePath = path.join(tmpDir, 'fixture.tmj');
+    const outputPath = path.join(tmpDir, 'fixture-map.mjs');
+    fs.writeFileSync(
+      fixturePath,
+      JSON.stringify({
+        width: 1,
+        height: 1,
+        tilewidth: 32,
+        tileheight: 32,
+        layers: [
+          {
+            name: 'Ground',
+            type: 'tilelayer',
+            width: 1,
+            height: 1,
+            data: [1],
+          },
+        ],
+      }),
+    );
+
+    expect(() =>
+      execFileSync(
+        'node',
+        [
+          path.resolve('data/convertMap.js'),
+          fixturePath,
+          '/ai-town/assets/founder-village/test.png',
+          '64',
+          '64',
+          outputPath,
+        ],
+        { cwd: path.resolve('.'), stdio: 'pipe' },
+      ),
+    ).toThrow(/background tile layer/);
+  });
 });

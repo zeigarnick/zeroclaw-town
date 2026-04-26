@@ -237,15 +237,6 @@ function resolveVisualLayerRole(layer, rawRole) {
   ) {
     return 'aboveCharacter';
   }
-  if (
-    normalizedName.includes('background') ||
-    normalizedName.includes('ground') ||
-    normalizedName.includes('floor') ||
-    normalizedName.includes('terrain') ||
-    normalizedName.includes('bg')
-  ) {
-    return 'background';
-  }
   return 'object';
 }
 
@@ -406,11 +397,8 @@ const collisionTiles = mergeCollisionLayers(collisionLayerCandidates);
 let bgTiles = visualLayers
   .filter((layer) => layer.role === 'background')
   .map((layer) => layer.tiles);
-if (bgTiles.length === 0 && visualLayers.length > 0) {
-  bgTiles = [visualLayers[0].tiles];
-}
 if (bgTiles.length === 0) {
-  throw new Error('Map must include at least one tile layer for bgtiles.');
+  throw new Error('Map must include at least one background tile layer for bgtiles.');
 }
 const objectTiles = visualLayers
   .filter((layer) => layer.role === 'object')
