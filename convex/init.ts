@@ -37,7 +37,7 @@ type SeedMapModule = {
 
 type SeedMapSelection = 'gentle' | 'founderCafe';
 
-const DEFAULT_SEED_MAP_SELECTION: SeedMapSelection = 'gentle';
+const DEFAULT_SEED_MAP_SELECTION: SeedMapSelection = 'founderCafe';
 
 function getSeedMapSelection(): SeedMapSelection {
   const configuredSelection = process.env.AI_TOWN_MAP_SLICE;

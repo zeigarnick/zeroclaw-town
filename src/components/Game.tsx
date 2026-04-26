@@ -40,7 +40,11 @@ export default function Game() {
   return (
     <>
       {SHOW_DEBUG_UI && <DebugTimeManager timeManager={timeManager} width={200} height={100} />}
-      <div className="relative h-dvh w-full overflow-hidden bg-brown-900" ref={gameWrapperRef}>
+      <div
+        className="relative w-full overflow-hidden bg-brown-900"
+        ref={gameWrapperRef}
+        style={{ height: '100dvh' }}
+      >
         <div className="absolute inset-0">
           <Stage width={width} height={height} options={{ backgroundColor: 0x7ab5ff }}>
             {/* Re-propagate context because contexts are not shared between renderers.

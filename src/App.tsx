@@ -16,7 +16,7 @@ type AppView = 'town' | 'dashboard';
 export default function Home() {
   const [currentView, setCurrentView] = useState<AppView>('town');
   return (
-    <main className="relative h-dvh overflow-hidden bg-black font-body">
+    <main className="relative overflow-hidden bg-black font-body" style={{ height: '100dvh' }}>
       {/*<div className="p-3 absolute top-0 right-0 z-10 text-2xl">
         <Authenticated>
           <UserButton afterSignOutUrl="/ai-town" />
