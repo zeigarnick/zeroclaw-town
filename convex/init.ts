@@ -2,12 +2,78 @@ import { v } from 'convex/values';
 import { internal } from './_generated/api';
 import { DatabaseReader, MutationCtx, mutation } from './_generated/server';
 import { Descriptions } from '../data/characters';
-import * as map from '../data/gentle';
+import * as founderCafeMap from '../data/founderVillageCafe';
+import * as gentleMap from '../data/gentle';
 import { insertInput } from './aiTown/insertInput';
 import { Id } from './_generated/dataModel';
 import { createEngine } from './aiTown/main';
 import { ENGINE_ACTION_DURATION } from './constants';
 import { detectMismatchedLLMProvider } from './util/llm';
+import type {
+  AboveCharacterLayer,
+  AnimatedSprite,
+  SemanticZone,
+  SpawnPoint,
+  TileLayer,
+  VisualLayer,
+} from './aiTown/worldMap';
+
+type SeedMapModule = {
+  mapwidth: number;
+  mapheight: number;
+  tilesetpath: string;
+  tilesetpxw: number;
+  tilesetpxh: number;
+  tiledim: number;
+  bgtiles: TileLayer[];
+  objmap: TileLayer[];
+  animatedsprites: AnimatedSprite[];
+  visualLayers?: VisualLayer[];
+  collisionTiles?: TileLayer;
+  aboveCharacterLayers?: AboveCharacterLayer[];
+  spawnPoints?: SpawnPoint[];
+  semanticZones?: SemanticZone[];
+};
+
+type SeedMapSelection = 'gentle' | 'founderCafe';
+
+const DEFAULT_SEED_MAP_SELECTION: SeedMapSelection = 'gentle';
+
+function getSeedMapSelection(): SeedMapSelection {
+  const configuredSelection = process.env.AI_TOWN_MAP_SLICE;
+  if (configuredSelection === 'founderCafe') {
+    return 'founderCafe';
+  }
+  return DEFAULT_SEED_MAP_SELECTION;
+}
+
+function hasRequiredSeedMapFields(mapModule: Partial<SeedMapModule>): mapModule is SeedMapModule {
+  return (
+    typeof mapModule.mapwidth === 'number' &&
+    typeof mapModule.mapheight === 'number' &&
+    typeof mapModule.tilesetpath === 'string' &&
+    typeof mapModule.tilesetpxw === 'number' &&
+    typeof mapModule.tilesetpxh === 'number' &&
+    typeof mapModule.tiledim === 'number' &&
+    Array.isArray(mapModule.bgtiles) &&
+    Array.isArray(mapModule.objmap) &&
+    Array.isArray(mapModule.animatedsprites)
+  );
+}
+
+function loadSeedMapModule(): SeedMapModule {
+  if (getSeedMapSelection() !== 'founderCafe') {
+    return gentleMap as SeedMapModule;
+  }
+
+  if (hasRequiredSeedMapFields(founderCafeMap)) {
+    return founderCafeMap;
+  }
+  console.warn(
+    `AI_TOWN_MAP_SLICE=founderCafe loaded but missing required map fields; falling back to ${DEFAULT_SEED_MAP_SELECTION}.`,
+  );
+  return gentleMap as SeedMapModule;
+}
 
 const init = mutation({
   args: {
@@ -53,6 +119,7 @@ async function getOrCreateDefaultWorld(ctx: MutationCtx) {
 
   const engineId = await createEngine(ctx);
   const engine = (await ctx.db.get(engineId))!;
+  const map = loadSeedMapModule();
   const worldId = await ctx.db.insert('worlds', {
     nextId: 0,
     agents: [],
@@ -78,6 +145,13 @@ async function getOrCreateDefaultWorld(ctx: MutationCtx) {
     bgTiles: map.bgtiles,
     objectTiles: map.objmap,
     animatedSprites: map.animatedsprites,
+    ...(map.visualLayers !== undefined ? { visualLayers: map.visualLayers } : {}),
+    ...(map.collisionTiles !== undefined ? { collisionTiles: map.collisionTiles } : {}),
+    ...(map.aboveCharacterLayers !== undefined
+      ? { aboveCharacterLayers: map.aboveCharacterLayers }
+      : {}),
+    ...(map.spawnPoints !== undefined ? { spawnPoints: map.spawnPoints } : {}),
+    ...(map.semanticZones !== undefined ? { semanticZones: map.semanticZones } : {}),
   });
   await ctx.scheduler.runAfter(0, internal.aiTown.main.runStep, {
     worldId,
