@@ -46,9 +46,7 @@ if (
   width <= 0 ||
   height <= 0
 ) {
-  throw new Error(
-    'Map file must provide positive numeric tilewidth, width, and height fields.',
-  );
+  throw new Error('Map file must provide positive numeric tilewidth, width, and height fields.');
 }
 
 function exportConst(name, value) {
@@ -95,7 +93,14 @@ function createEmptyTileGrid(mapWidth, mapHeight) {
   return Array.from({ length: mapWidth }, () => Array(mapHeight).fill(-1));
 }
 
-function writeLayerDataIntoGrid(grid, rawData, sourceWidth, sourceHeight, offsetX = 0, offsetY = 0) {
+function writeLayerDataIntoGrid(
+  grid,
+  rawData,
+  sourceWidth,
+  sourceHeight,
+  offsetX = 0,
+  offsetY = 0,
+) {
   if (!Array.isArray(rawData) || !Number.isFinite(sourceWidth) || !Number.isFinite(sourceHeight)) {
     return;
   }
@@ -130,22 +135,14 @@ function convertTileLayerToGrid(layer) {
       const chunkHeight = Number.isFinite(chunk.height) ? chunk.height : 0;
       const chunkX = Number.isFinite(chunk.x) ? chunk.x : 0;
       const chunkY = Number.isFinite(chunk.y) ? chunk.y : 0;
-      writeLayerDataIntoGrid(
-        grid,
-        chunk.data,
-        chunkWidth,
-        chunkHeight,
-        chunkX,
-        chunkY,
-      );
+      writeLayerDataIntoGrid(grid, chunk.data, chunkWidth, chunkHeight, chunkX, chunkY);
     }
   }
   return grid;
 }
 
 function readLayerRole(layer, properties) {
-  const fromProperties =
-    properties.role ?? properties.layerRole ?? properties.layer_role;
+  const fromProperties = properties.role ?? properties.layerRole ?? properties.layer_role;
   return toOptionalString(fromProperties) ?? toOptionalString(layer.class);
 }
 
@@ -183,7 +180,18 @@ function normalizeVisualLayerRole(rawRole) {
   if (['abovecharacter', 'overlay', 'foreground', 'roof', 'canopy'].includes(normalized)) {
     return 'aboveCharacter';
   }
-  if (['collision', 'collisions', 'blocked', 'blocking', 'obstacle', 'obstacles', 'wall', 'walls'].includes(normalized)) {
+  if (
+    [
+      'collision',
+      'collisions',
+      'blocked',
+      'blocking',
+      'obstacle',
+      'obstacles',
+      'wall',
+      'walls',
+    ].includes(normalized)
+  ) {
     return 'collision';
   }
   return null;
@@ -373,11 +381,9 @@ for (const { layer, inheritedRole } of allLayers) {
     }
     if (objectGroupRole === 'animatedSprites') {
       const sheet =
-        toOptionalString(objectProperties.sheet) ??
-        toOptionalString(objectProperties.spritesheet);
+        toOptionalString(objectProperties.sheet) ?? toOptionalString(objectProperties.spritesheet);
       const animation =
-        toOptionalString(objectProperties.animation) ??
-        toOptionalString(objectProperties.clip);
+        toOptionalString(objectProperties.animation) ?? toOptionalString(objectProperties.clip);
       if (!sheet || !animation) {
         continue;
       }
