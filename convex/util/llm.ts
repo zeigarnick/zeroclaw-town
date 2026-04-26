@@ -7,6 +7,19 @@ const OLLAMA_EMBEDDING_DIMENSION = 1024;
 export const EMBEDDING_DIMENSION: number = OPENAI_EMBEDDING_DIMENSION;
 
 export function detectMismatchedLLMProvider() {
+  const provider = process.env.LLM_PROVIDER;
+  if (provider === 'custom') {
+    if (!process.env.LLM_API_URL) {
+      throw new Error(
+        "Are you trying to use a custom cloud-hosted LLM? If so, run: npx convex env set LLM_API_URL 'your-url'",
+      );
+    }
+    return;
+  }
+  if (!provider && process.env.LLM_API_URL) {
+    return;
+  }
+
   switch (EMBEDDING_DIMENSION) {
     case OPENAI_EMBEDDING_DIMENSION:
       if (!process.env.OPENAI_API_KEY) {
