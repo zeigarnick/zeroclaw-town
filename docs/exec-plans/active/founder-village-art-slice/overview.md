@@ -177,6 +177,28 @@ Covered acceptance criteria: AC-7, AC-8, AC-9
 | Convex logs | `node /Users/nick/.config/opencode/scripts/check-convex-logs.mjs --history 200` | No new task-related Convex errors if Convex code changed. | AC-8 |
 | Manual visual QA | Load the app without starting/restarting user-managed servers unless approved | Map is nonblank, readable, pathable, and correctly layered. | AC-1, AC-2, AC-5, AC-9 |
 
+## Final Verification Evidence
+
+Date: 2026-04-26
+
+Packet 5 status: **conditional**. Implementation packets are complete, but AC-8 and AC-9 are not fully closed because the Convex log helper is incompatible with the installed CLI and no AI Town dev server was already running for in-game visual QA.
+
+| Check | Result | Evidence |
+|-------|--------|----------|
+| Clean build | Pass | `npm run build` passed in a temporary clean worktree at `HEAD` (`b9ffb4b`) with existing `node_modules` symlinked in. The active worktree build later failed because of unrelated uncommitted `src/networking/OwnerDashboard.tsx` and `src/networking/api.ts` API-shape edits. |
+| Focused tests | Pass | `npm test -- data/convertMap.test.js convex/aiTown/movement.test.ts --runInBand` passed 6 tests. |
+| Converter smoke | Pass | `node data/convertMap.js data/maps/founder-village-cafe.tmj /ai-town/assets/founder-village/founder-village-tileset.png 256 256 /tmp/founderVillageCafe.verify.js` emitted `visual: 3`, `collision: true`, `above: 1`, `spawns: 3`, `zones: 3`, and `founder-cafe-sign.json` animation `glow`. |
+| Convex log check | Blocked by tooling | `node /Users/nick/.config/opencode/scripts/check-convex-logs.mjs --history 200` ran, but the installed Convex CLI rejected the helper's `convex logs --jsonl` option. |
+| Convex logs fallback | Partial | `npx convex logs --history 200` connected to dev deployment `tough-caiman-515` and printed no history lines before the watcher was stopped. This is not equivalent to the required baseline-aware helper. |
+| Visual QA | Static/offline pass only | No AI Town app server was already running. Existing listeners on ports `3000`, `3333`, and `4321` belonged to Waterroutes and FLRPL. Rendered `data/maps/founder-village-cafe.tmj` into `/tmp/founder-village-cafe-preview.png` without starting a dev server. The preview is nonblank, shows the Founder Cafe landmark, benches, tables, planters, notice board, walkable square/path areas, and above-character roof/sign layer over a player marker. In-game browser QA remains pending because dev servers are user-managed and were not started/restarted. |
+
+## Follow-Up Tech Debt
+
+| ID | Item | Reason |
+|----|------|--------|
+| FV-ART-1 | Run an in-game visual QA pass with `AI_TOWN_MAP_SLICE=founderCafe` on the next approved/user-managed dev-server session. | Static map rendering verifies asset and layer data, but runtime Pixi texture loading, console warnings, click pathing, and default camera readability need an actual app session. |
+| FV-ART-2 | Repair or version-gate `/Users/nick/.config/opencode/scripts/check-convex-logs.mjs` for the installed Convex CLI, or update the CLI to one that supports `convex logs --jsonl`. | The required Convex log gate could be invoked but could not complete due CLI option mismatch. |
+
 ## Execution Quality Policy
 
 | gate | stage | required | trigger | executor | command/method | evidence |
@@ -199,14 +221,14 @@ Covered acceptance criteria: AC-7, AC-8, AC-9
 
 ## Deferred Cleanup / Tech Debt
 
-Tech Debt Tracker: not required
+Tech Debt Tracker: FV-ART-1, FV-ART-2
 
-This plan does not intentionally require temporary rollout code. If implementation keeps legacy compatibility code beyond the current map switch or ships placeholder art in the final slice, register that before completion.
+This plan keeps legacy map compatibility intentionally. The remaining follow-ups are verification/tooling items rather than runtime rollout code.
 
 ## Execution Checklist
 
-- [ ] Packet 1: Expand map contract and converter.
-- [ ] Packet 2: Add Pixi below/above character layer rendering.
-- [ ] Packet 3: Wire explicit collision and selectable slice initialization.
-- [ ] Packet 4: Add Founder Cafe final-art slice assets and generated map module.
-- [ ] Packet 5: Run build, Convex log check if required, and visual QA.
+- [x] Packet 1: Expand map contract and converter.
+- [x] Packet 2: Add Pixi below/above character layer rendering.
+- [x] Packet 3: Wire explicit collision and selectable slice initialization.
+- [x] Packet 4: Add Founder Cafe final-art slice assets and generated map module.
+- [ ] Packet 5: Run build, Convex log check if required, and visual QA. Static/offline evidence recorded; in-game QA and baseline-aware Convex log check remain pending.
