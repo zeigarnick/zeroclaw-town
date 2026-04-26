@@ -228,11 +228,6 @@ type LocalStorage = {
 export class LocalApiAdapter implements IApiAdapter {
   private store: LocalStorage;
   private agentCounter = 0;
-  private cardCounter = 0;
-  private inboxCounter = 0;
-  private meetingCounter = 0;
-  private conversationCounter = 0;
-  private introCounter = 0;
 
   constructor() {
     this.store = {

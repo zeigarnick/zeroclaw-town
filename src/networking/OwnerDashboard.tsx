@@ -13,9 +13,10 @@
  * When Packet 6 HTTP routes are ready, swap the adapter to call /api/v1/* endpoints.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   IApiAdapter,
+  ApiResponse,
   Agent,
   Card,
   InboxResponse,
@@ -25,8 +26,8 @@ import {
   ApiError,
 } from './api';
 
-function isError(response: unknown): response is ApiError {
-  return typeof response === 'object' && response !== null && 'error' in response;
+function isError<T>(response: ApiResponse<T>): response is ApiError {
+  return 'error' in response;
 }
 
 interface OwnerDashboardProps {
@@ -45,7 +46,9 @@ export function OwnerDashboard({ apiAdapter }: OwnerDashboardProps) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [intros, setIntros] = useState<IntroCandidateCard[]>([]);
 
-  const [targetAgentId, setTargetAgentId] = useState('');
+  const [cardTargetAgentId, setCardTargetAgentId] = useState('');
+  const [meetingTargetAgentId, setMeetingTargetAgentId] = useState('');
+  const [introTargetAgentId, setIntroTargetAgentId] = useState('');
   const [cardReason, setCardReason] = useState('');
   const [messageText, setMessageText] = useState('');
   const [selectedConversationId, setSelectedConversationId] = useState('');
@@ -115,11 +118,12 @@ export function OwnerDashboard({ apiAdapter }: OwnerDashboardProps) {
       if (isError(response)) {
         showError(response.error);
       } else {
-        setCurrentAgent(response.data);
+        const claimed = response.data;
+        setCurrentAgent(claimed);
         setClaimToken('');
         setVerificationCode('');
         showSuccess('Mock claim successful');
-        await refreshDashboard();
+        if (claimed.apiKey) await refreshDashboard(claimed.apiKey);
       }
     } catch (e) {
       showError(`Mock claim failed: ${String(e)}`);
@@ -132,20 +136,17 @@ export function OwnerDashboard({ apiAdapter }: OwnerDashboardProps) {
   // CARDS
   // ========================================================================
 
-  const refreshCards = async () => {
-    if (!currentAgent?.apiKey) return;
+  const refreshCards = useCallback(async (apiKey: string) => {
     try {
-      const response = await apiAdapter.getCards(currentAgent.apiKey);
-      if (!isError(response)) {
-        setCards(response.data);
-      }
+      const response = await apiAdapter.getCards(apiKey);
+      if (!isError(response)) setCards(response.data);
     } catch (e) {
       console.error('Failed to fetch cards:', e);
     }
-  };
+  }, [apiAdapter]);
 
   const handleCreateCard = async () => {
-    if (!currentAgent?.apiKey || !targetAgentId) {
+    if (!currentAgent?.apiKey || !cardTargetAgentId) {
       showError('Agent and target agent required');
       return;
     }
@@ -153,17 +154,17 @@ export function OwnerDashboard({ apiAdapter }: OwnerDashboardProps) {
     try {
       const response = await apiAdapter.createCard({
         apiKey: currentAgent.apiKey,
-        targetAgentId,
+        targetAgentId: cardTargetAgentId,
         reason: cardReason || undefined,
       });
       if (isError(response)) {
         showError(response.error);
       } else {
-        setTargetAgentId('');
+        setCardTargetAgentId('');
         setCardReason('');
         showSuccess('Card created');
-        await refreshCards();
-        await refreshInbox();
+        await refreshCards(currentAgent.apiKey);
+        await refreshInbox(currentAgent.apiKey);
       }
     } catch (e) {
       showError(`Failed to create card: ${String(e)}`);
@@ -188,7 +189,7 @@ export function OwnerDashboard({ apiAdapter }: OwnerDashboardProps) {
         showError(response.error);
       } else {
         showSuccess('Card updated');
-        await refreshCards();
+        await refreshCards(currentAgent.apiKey);
       }
     } catch (e) {
       showError(`Failed to update card: ${String(e)}`);
@@ -201,36 +202,30 @@ export function OwnerDashboard({ apiAdapter }: OwnerDashboardProps) {
   // INBOX
   // ========================================================================
 
-  const refreshInbox = async () => {
-    if (!currentAgent?.apiKey) return;
+  const refreshInbox = useCallback(async (apiKey: string) => {
     try {
-      const response = await apiAdapter.getInbox(currentAgent.apiKey);
-      if (!isError(response)) {
-        setInbox(response.data);
-      }
+      const response = await apiAdapter.getInbox(apiKey);
+      if (!isError(response)) setInbox(response.data);
     } catch (e) {
       console.error('Failed to fetch inbox:', e);
     }
-  };
+  }, [apiAdapter]);
 
   // ========================================================================
   // MEETINGS
   // ========================================================================
 
-  const refreshMeetings = async () => {
-    if (!currentAgent?.apiKey) return;
+  const refreshMeetings = useCallback(async (apiKey: string) => {
     try {
-      const response = await apiAdapter.getMeetings(currentAgent.apiKey);
-      if (!isError(response)) {
-        setMeetings(response.data);
-      }
+      const response = await apiAdapter.getMeetings(apiKey);
+      if (!isError(response)) setMeetings(response.data);
     } catch (e) {
       console.error('Failed to fetch meetings:', e);
     }
-  };
+  }, [apiAdapter]);
 
   const handleRequestMeeting = async () => {
-    if (!currentAgent?.apiKey || !targetAgentId) {
+    if (!currentAgent?.apiKey || !meetingTargetAgentId) {
       showError('Agent and target agent required');
       return;
     }
@@ -238,14 +233,14 @@ export function OwnerDashboard({ apiAdapter }: OwnerDashboardProps) {
     try {
       const response = await apiAdapter.requestMeeting({
         apiKey: currentAgent.apiKey,
-        targetAgentId,
+        targetAgentId: meetingTargetAgentId,
       });
       if (isError(response)) {
         showError(response.error);
       } else {
-        setTargetAgentId('');
+        setMeetingTargetAgentId('');
         showSuccess('Meeting request sent');
-        await refreshMeetings();
+        await refreshMeetings(currentAgent.apiKey);
       }
     } catch (e) {
       showError(`Failed to request meeting: ${String(e)}`);
@@ -270,10 +265,8 @@ export function OwnerDashboard({ apiAdapter }: OwnerDashboardProps) {
         showError(response.error);
       } else {
         showSuccess(accept ? 'Meeting accepted' : 'Meeting rejected');
-        await refreshMeetings();
-        if (accept) {
-          await refreshConversations();
-        }
+        await refreshMeetings(currentAgent.apiKey);
+        if (accept) await refreshConversations(currentAgent.apiKey);
       }
     } catch (e) {
       showError(`Failed to respond to meeting: ${String(e)}`);
@@ -286,17 +279,14 @@ export function OwnerDashboard({ apiAdapter }: OwnerDashboardProps) {
   // CONVERSATIONS
   // ========================================================================
 
-  const refreshConversations = async () => {
-    if (!currentAgent?.apiKey) return;
+  const refreshConversations = useCallback(async (apiKey: string) => {
     try {
-      const response = await apiAdapter.getConversations(currentAgent.apiKey);
-      if (!isError(response)) {
-        setConversations(response.data);
-      }
+      const response = await apiAdapter.getConversations(apiKey);
+      if (!isError(response)) setConversations(response.data);
     } catch (e) {
       console.error('Failed to fetch conversations:', e);
     }
-  };
+  }, [apiAdapter]);
 
   const handleSendMessage = async () => {
     if (!currentAgent?.apiKey || !selectedConversationId || !messageText.trim()) {
@@ -315,7 +305,7 @@ export function OwnerDashboard({ apiAdapter }: OwnerDashboardProps) {
       } else {
         setMessageText('');
         showSuccess('Message sent');
-        await refreshConversations();
+        await refreshConversations(currentAgent.apiKey);
       }
     } catch (e) {
       showError(`Failed to send message: ${String(e)}`);
@@ -339,10 +329,8 @@ export function OwnerDashboard({ apiAdapter }: OwnerDashboardProps) {
         showError(response.error);
       } else {
         showSuccess('Conversation closed');
-        if (selectedConversationId === conversationId) {
-          setSelectedConversationId('');
-        }
-        await refreshConversations();
+        if (selectedConversationId === conversationId) setSelectedConversationId('');
+        await refreshConversations(currentAgent.apiKey);
       }
     } catch (e) {
       showError(`Failed to close conversation: ${String(e)}`);
@@ -355,20 +343,17 @@ export function OwnerDashboard({ apiAdapter }: OwnerDashboardProps) {
   // INTROS
   // ========================================================================
 
-  const refreshIntros = async () => {
-    if (!currentAgent?.apiKey) return;
+  const refreshIntros = useCallback(async (apiKey: string) => {
     try {
-      const response = await apiAdapter.getIntros(currentAgent.apiKey);
-      if (!isError(response)) {
-        setIntros(response.data);
-      }
+      const response = await apiAdapter.getIntros(apiKey);
+      if (!isError(response)) setIntros(response.data);
     } catch (e) {
       console.error('Failed to fetch intros:', e);
     }
-  };
+  }, [apiAdapter]);
 
   const handleCreateIntro = async () => {
-    if (!currentAgent?.apiKey || !targetAgentId) {
+    if (!currentAgent?.apiKey || !introTargetAgentId) {
       showError('Agent and target agent required');
       return;
     }
@@ -376,14 +361,14 @@ export function OwnerDashboard({ apiAdapter }: OwnerDashboardProps) {
     try {
       const response = await apiAdapter.createIntro({
         apiKey: currentAgent.apiKey,
-        targetAgentId,
+        targetAgentId: introTargetAgentId,
       });
       if (isError(response)) {
         showError(response.error);
       } else {
-        setTargetAgentId('');
+        setIntroTargetAgentId('');
         showSuccess('Intro candidate created');
-        await refreshIntros();
+        await refreshIntros(currentAgent.apiKey);
       }
     } catch (e) {
       showError(`Failed to create intro: ${String(e)}`);
@@ -396,15 +381,21 @@ export function OwnerDashboard({ apiAdapter }: OwnerDashboardProps) {
   // REFRESH & INITIALIZATION
   // ========================================================================
 
-  const refreshDashboard = async () => {
-    await Promise.all([refreshCards(), refreshInbox(), refreshMeetings(), refreshConversations(), refreshIntros()]);
-  };
+  const refreshDashboard = useCallback(async (apiKey: string) => {
+    await Promise.all([
+      refreshCards(apiKey),
+      refreshInbox(apiKey),
+      refreshMeetings(apiKey),
+      refreshConversations(apiKey),
+      refreshIntros(apiKey),
+    ]);
+  }, [refreshCards, refreshInbox, refreshMeetings, refreshConversations, refreshIntros]);
 
   useEffect(() => {
     if (currentAgent?.apiKey) {
-      refreshDashboard();
+      refreshDashboard(currentAgent.apiKey);
     }
-  }, [currentAgent?.apiKey]);
+  }, [currentAgent?.apiKey, refreshDashboard]);
 
   // ========================================================================
   // RENDER
@@ -440,7 +431,7 @@ export function OwnerDashboard({ apiAdapter }: OwnerDashboardProps) {
               />
               <button
                 onClick={handleRegisterAgent}
-                disabled={loading}
+                disabled={loading || !agentName.trim()}
                 className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 px-6 py-2 rounded font-bold"
               >
                 Register
@@ -506,8 +497,8 @@ export function OwnerDashboard({ apiAdapter }: OwnerDashboardProps) {
                     <input
                       type="text"
                       placeholder="Target agent ID"
-                      value={targetAgentId}
-                      onChange={e => setTargetAgentId(e.target.value)}
+                      value={cardTargetAgentId}
+                      onChange={e => setCardTargetAgentId(e.target.value)}
                       className="bg-gray-700 border border-gray-600 px-3 py-2 rounded text-white text-sm"
                     />
                     <input
@@ -599,8 +590,8 @@ export function OwnerDashboard({ apiAdapter }: OwnerDashboardProps) {
                     <input
                       type="text"
                       placeholder="Target agent ID for meeting"
-                      value={targetAgentId}
-                      onChange={e => setTargetAgentId(e.target.value)}
+                      value={meetingTargetAgentId}
+                      onChange={e => setMeetingTargetAgentId(e.target.value)}
                       className="bg-gray-700 border border-gray-600 px-3 py-2 rounded text-white text-sm"
                     />
                     <button
@@ -669,7 +660,7 @@ export function OwnerDashboard({ apiAdapter }: OwnerDashboardProps) {
                       className="bg-gray-700 border border-gray-600 px-3 py-2 rounded text-white w-full"
                     >
                       <option value="">Select a conversation</option>
-                      {conversations.map(conv => (
+                      {conversations.filter(c => c.status === 'active').map(conv => (
                         <option key={conv.id} value={conv.id}>
                           {conv.agentNames.join(', ')} ({conv.messages.length} messages)
                         </option>
@@ -729,8 +720,8 @@ export function OwnerDashboard({ apiAdapter }: OwnerDashboardProps) {
                     <input
                       type="text"
                       placeholder="Target agent ID for intro"
-                      value={targetAgentId}
-                      onChange={e => setTargetAgentId(e.target.value)}
+                      value={introTargetAgentId}
+                      onChange={e => setIntroTargetAgentId(e.target.value)}
                       className="bg-gray-700 border border-gray-600 px-3 py-2 rounded text-white text-sm"
                     />
                     <button
