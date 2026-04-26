@@ -18,6 +18,8 @@ import {
   isCardStatus,
   isCardType,
 } from './validators';
+import { getCanonicalCardTextForEmbedding } from './cardText';
+import { markRecommendationsStaleForCard, runMatchingForCard } from './matching';
 
 type CreateCardInput = {
   apiKey: string;
@@ -101,6 +103,9 @@ export async function createCardHandler(ctx: MutationCtx, args: CreateCardInput)
   if (!card) {
     throw networkingError('card_not_found', 'The created card could not be loaded.');
   }
+  if (card.status === 'active') {
+    await runMatchingForCard(ctx, card);
+  }
   return card;
 }
 
@@ -164,6 +169,9 @@ export async function updateCardHandler(ctx: MutationCtx, args: UpdateCardInput)
 
   validateCardText(nextCard);
   validateTagAndDomainLimits(nextCard.tags, nextCard.domains);
+  const existingCanonical = getCanonicalCardTextForEmbedding(existing);
+  const nextCanonical = getCanonicalCardTextForEmbedding(nextCard);
+  const meaningChanged = existingCanonical !== nextCanonical;
 
   await ctx.db.patch(existing._id, {
     ...nextCard,
@@ -173,6 +181,16 @@ export async function updateCardHandler(ctx: MutationCtx, args: UpdateCardInput)
   const updated = await ctx.db.get(existing._id);
   if (!updated) {
     throw networkingError('card_not_found', 'The updated card could not be loaded.');
+  }
+  if (existing.status === 'active' && (updated.status !== 'active' || meaningChanged)) {
+    await markRecommendationsStaleForCard(
+      ctx,
+      updated._id,
+      updated.status === 'active' ? 'card_meaning_changed' : 'card_no_longer_active',
+    );
+  }
+  if (updated.status === 'active') {
+    await runMatchingForCard(ctx, updated);
   }
   return updated;
 }
@@ -210,6 +228,17 @@ export async function deleteCardHandler(
 ) {
   const { agent } = await authenticateAgent(ctx, args.apiKey);
   const existing = await getOwnedCardOrThrow(ctx, args.cardId, agent._id);
+  if (existing.status === 'active') {
+    await markRecommendationsStaleForCard(ctx, existing._id, 'card_deleted');
+  }
+
+  const embedding = await ctx.db
+    .query('cardEmbeddings')
+    .withIndex('by_card', (q) => q.eq('cardId', existing._id))
+    .first();
+  if (embedding) {
+    await ctx.db.delete(embedding._id);
+  }
   await ctx.db.delete(existing._id);
   return { deleted: true as const, cardId: existing._id };
 }
@@ -241,30 +270,7 @@ export async function listCardsHandler(
     .sort((left, right) => right.updatedAt - left.updatedAt);
 }
 
-export function getCanonicalCardTextForEmbedding(card: {
-  type: CardType;
-  title: string;
-  summary: string;
-  detailsForMatching: string;
-  tags: string[];
-  domains: string[];
-  desiredOutcome: string;
-}) {
-  const sections = [
-    `Type: ${card.type}`,
-    `Title: ${normalizeText(card.title)}`,
-    `Summary: ${normalizeText(card.summary)}`,
-    `Details: ${normalizeText(card.detailsForMatching)}`,
-    `Desired outcome: ${normalizeText(card.desiredOutcome)}`,
-  ];
-  if (card.tags.length > 0) {
-    sections.push(`Tags: ${card.tags.map((tag) => tag.trim()).join(', ')}`);
-  }
-  if (card.domains.length > 0) {
-    sections.push(`Domains: ${card.domains.map((domain) => domain.trim()).join(', ')}`);
-  }
-  return sections.join('\n');
-}
+export { getCanonicalCardTextForEmbedding };
 
 async function getOwnedCardOrThrow(
   ctx: MutationCtx | QueryCtx,

@@ -1,6 +1,11 @@
 import { defineTable } from 'convex/server';
 import { v } from 'convex/values';
-import { cardStatusValidator, cardTypeValidator } from './validators';
+import {
+  cardStatusValidator,
+  cardTypeValidator,
+  recommendationStatusValidator,
+  recommendationSuppressionReasonValidator,
+} from './validators';
 
 export const agentStatus = v.union(
   v.literal('pending_claim'),
@@ -77,4 +82,59 @@ export const networkingTables = {
     .index('by_agent_status', ['agentId', 'status'])
     .index('by_status_type', ['status', 'type'])
     .index('by_status_updated_at', ['status', 'updatedAt']),
+
+  cardEmbeddings: defineTable({
+    cardId: v.id('matchCards'),
+    agentId: v.id('networkAgents'),
+    textHash: v.bytes(),
+    embedding: v.array(v.float64()),
+    model: v.string(),
+    updatedAt: v.number(),
+  })
+    .index('by_card', ['cardId'])
+    .index('by_agent_updated_at', ['agentId', 'updatedAt'])
+    .index('by_text_hash', ['textHash']),
+
+  recommendations: defineTable({
+    recipientAgentId: v.id('networkAgents'),
+    recipientCardId: v.id('matchCards'),
+    providerAgentId: v.id('networkAgents'),
+    providerCardId: v.id('matchCards'),
+    cardPairKey: v.string(),
+    status: recommendationStatusValidator,
+    score: v.number(),
+    scoreBreakdown: v.object({
+      embeddingSimilarity: v.number(),
+      typeCompatibility: v.number(),
+      overlap: v.number(),
+      desiredOutcomeFit: v.number(),
+      freshness: v.number(),
+      suppressionPenalty: v.number(),
+    }),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    staleReason: v.optional(v.string()),
+  })
+    .index('by_recipient_status_created_at', ['recipientAgentId', 'status', 'createdAt'])
+    .index('by_recipient_created_at', ['recipientAgentId', 'createdAt'])
+    .index('by_card_pair_status', ['cardPairKey', 'status'])
+    .index('by_card_pair_created_at', ['cardPairKey', 'createdAt'])
+    .index('by_status_created_at', ['status', 'createdAt'])
+    .index('by_recipient_card_status', ['recipientCardId', 'status'])
+    .index('by_provider_card_status', ['providerCardId', 'status']),
+
+  recommendationSuppressions: defineTable({
+    recipientAgentId: v.id('networkAgents'),
+    recipientCardId: v.id('matchCards'),
+    providerAgentId: v.id('networkAgents'),
+    providerCardId: v.id('matchCards'),
+    cardPairKey: v.string(),
+    reason: recommendationSuppressionReasonValidator,
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    sourceRecommendationId: v.optional(v.id('recommendations')),
+  })
+    .index('by_card_pair', ['cardPairKey'])
+    .index('by_recipient_created_at', ['recipientAgentId', 'createdAt'])
+    .index('by_recipient_card_pair', ['recipientCardId', 'providerCardId']),
 };

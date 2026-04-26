@@ -30,6 +30,30 @@ export const conversationStatuses = ['open', 'closed'] as const;
 export type ConversationStatus = (typeof conversationStatuses)[number];
 export const conversationStatusValidator = v.union(v.literal('open'), v.literal('closed'));
 
+export const recommendationStatuses = [
+  'active',
+  'stale',
+  'dismissed',
+  'declined',
+  'consumed',
+] as const;
+export type RecommendationStatus = (typeof recommendationStatuses)[number];
+export const recommendationStatusValidator = v.union(
+  v.literal('active'),
+  v.literal('stale'),
+  v.literal('dismissed'),
+  v.literal('declined'),
+  v.literal('consumed'),
+);
+
+export const recommendationSuppressionReasons = ['dismissed', 'declined'] as const;
+export type RecommendationSuppressionReason =
+  (typeof recommendationSuppressionReasons)[number];
+export const recommendationSuppressionReasonValidator = v.union(
+  v.literal('dismissed'),
+  v.literal('declined'),
+);
+
 export const inboxItemTypes = [
   'match_recommendation',
   'meeting_request',
@@ -75,6 +99,10 @@ export function isMeetingStatus(value: string): value is MeetingStatus {
 
 export function isConversationStatus(value: string): value is ConversationStatus {
   return conversationStatuses.includes(value as ConversationStatus);
+}
+
+export function isRecommendationStatus(value: string): value is RecommendationStatus {
+  return recommendationStatuses.includes(value as RecommendationStatus);
 }
 
 export function isInboxItemType(value: string): value is InboxItemType {

@@ -10,7 +10,14 @@ import {
 } from './cards';
 import { MAX_CARD_DETAILS_LENGTH, MAX_CARD_SUMMARY_LENGTH } from './validators';
 
-type TableName = 'networkAgents' | 'networkAgentApiKeys' | 'ownerClaims' | 'matchCards';
+type TableName =
+  | 'networkAgents'
+  | 'networkAgentApiKeys'
+  | 'ownerClaims'
+  | 'matchCards'
+  | 'cardEmbeddings'
+  | 'recommendations'
+  | 'recommendationSuppressions';
 type Row = Record<string, any> & { _id: string };
 
 function createMockCtx() {
@@ -19,12 +26,18 @@ function createMockCtx() {
     networkAgentApiKeys: [],
     ownerClaims: [],
     matchCards: [],
+    cardEmbeddings: [],
+    recommendations: [],
+    recommendationSuppressions: [],
   };
   const counters: Record<TableName, number> = {
     networkAgents: 0,
     networkAgentApiKeys: 0,
     ownerClaims: 0,
     matchCards: 0,
+    cardEmbeddings: 0,
+    recommendations: 0,
+    recommendationSuppressions: 0,
   };
 
   const db = {
@@ -101,6 +114,12 @@ function buffersEqual(left: ArrayBuffer, right: ArrayBuffer) {
 function compareRowsByIndex(indexName: string, left: Row, right: Row) {
   if (indexName === 'by_agent' || indexName === 'by_status_updated_at') {
     return (left.updatedAt ?? 0) - (right.updatedAt ?? 0);
+  }
+  if (indexName.includes('updated_at')) {
+    return (left.updatedAt ?? 0) - (right.updatedAt ?? 0);
+  }
+  if (indexName.includes('created_at')) {
+    return (left.createdAt ?? 0) - (right.createdAt ?? 0);
   }
   return 0;
 }
