@@ -12,7 +12,7 @@ import { WorldMap, serializedWorldMap } from './worldMap';
 import { PlayerDescription, serializedPlayerDescription } from './playerDescription';
 import { Location, locationFields, playerLocation } from './location';
 import { runAgentOperation } from './agent';
-import { GameId, IdTypes, allocGameId } from './ids';
+import { GameId, IdTypes, allocGameId, playerId } from './ids';
 import { InputArgs, InputNames, inputs } from './inputs';
 import {
   AbstractGame,
@@ -40,6 +40,12 @@ const gameStateDiff = v.object({
   agentDescriptions: v.optional(v.array(v.object(serializedAgentDescription))),
   worldMap: v.optional(v.object(serializedWorldMap)),
   agentOperations: v.array(v.object({ name: v.string(), args: v.any() })),
+  networkingAvatarLinks: v.array(
+    v.object({
+      networkAgentId: v.id('networkAgents'),
+      playerId,
+    }),
+  ),
 });
 type GameStateDiff = Infer<typeof gameStateDiff>;
 
@@ -59,6 +65,10 @@ export class Game extends AbstractGame {
   agentDescriptions: Map<GameId<'agents'>, AgentDescription>;
 
   pendingOperations: Array<{ name: string; args: any }> = [];
+  pendingNetworkingAvatarLinks: Array<{
+    networkAgentId: Id<'networkAgents'>;
+    playerId: GameId<'players'>;
+  }> = [];
 
   numPathfinds: number;
 
@@ -154,6 +164,10 @@ export class Game extends AbstractGame {
     this.pendingOperations.push({ name, args });
   }
 
+  linkNetworkingAvatar(networkAgentId: Id<'networkAgents'>, playerId: GameId<'players'>) {
+    this.pendingNetworkingAvatarLinks.push({ networkAgentId, playerId });
+  }
+
   handleInput<Name extends InputNames>(now: number, name: Name, args: InputArgs<Name>) {
     const handler = inputs[name]?.handler;
     if (!handler) {
@@ -236,8 +250,10 @@ export class Game extends AbstractGame {
     const result: GameStateDiff = {
       world: { ...this.world.serialize(), historicalLocations },
       agentOperations: this.pendingOperations,
+      networkingAvatarLinks: this.pendingNetworkingAvatarLinks,
     };
     this.pendingOperations = [];
+    this.pendingNetworkingAvatarLinks = [];
     if (this.descriptionsModified) {
       result.playerDescriptions = serializeMap(this.playerDescriptions);
       result.agentDescriptions = serializeMap(this.agentDescriptions);
@@ -298,6 +314,17 @@ export class Game extends AbstractGame {
     }
     // Update the world state.
     await ctx.db.replace(worldId, newWorld);
+
+    for (const link of diff.networkingAvatarLinks) {
+      const networkAgent = await ctx.db.get(link.networkAgentId);
+      if (!networkAgent) {
+        continue;
+      }
+      await ctx.db.patch(networkAgent._id, {
+        townPlayerId: link.playerId,
+        updatedAt: Date.now(),
+      });
+    }
 
     // Update the larger description tables if they changed.
     const { playerDescriptions, agentDescriptions, worldMap } = diff;

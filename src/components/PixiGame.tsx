@@ -146,6 +146,9 @@ export const PixiGame = (props: {
           isViewer={p.id === humanPlayerId}
           onClick={props.setSelectedElement}
           historicalTime={props.historicalTime}
+          isNetworkingTalking={
+            (props.networkingProjection?.agentsByPlayerId[p.id]?.counts.talking ?? 0) > 0
+          }
         />
       ))}
       {players.map((p) => {

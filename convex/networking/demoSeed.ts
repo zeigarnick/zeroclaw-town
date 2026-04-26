@@ -2,6 +2,7 @@ import { v } from 'convex/values';
 import { Doc, Id } from '../_generated/dataModel';
 import { MutationCtx, mutation } from '../_generated/server';
 import { getKeyPrefix, hashSecret } from './auth';
+import { ensureNetworkingTownAvatar } from './agents';
 import {
   writeConversationMessageInboxEvent,
   writeIntroCandidateInboxEvent,
@@ -85,6 +86,8 @@ export async function seedDemoHandler(
 
   const needAgent = await upsertClaimedAgent(ctx, DEMO_AGENTS[0], now);
   const offerAgent = await upsertClaimedAgent(ctx, DEMO_AGENTS[1], now);
+  await ensureNetworkingTownAvatar(ctx, needAgent.agent, now);
+  await ensureNetworkingTownAvatar(ctx, offerAgent.agent, now);
   const needCard = await upsertCard(ctx, needAgent.agent._id, DEMO_CARDS.need, DEMO_BASE_TIME);
   const offerCard = await upsertCard(
     ctx,

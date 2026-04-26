@@ -344,6 +344,7 @@ function resolveTownPlayerId(
   playerIdsByName: Map<string, GameId<'players'>>,
 ) {
   return (
+    (agent.townPlayerId as GameId<'players'> | undefined) ??
     playerIdsByName.get(normalizeAgentLookupKey(agent.displayName)) ??
     playerIdsByName.get(normalizeAgentLookupKey(agent.slug)) ??
     playerIdsByName.get(DEMO_TOWN_PLAYER_NAME_BY_AGENT_SLUG[agent.slug] ?? '')

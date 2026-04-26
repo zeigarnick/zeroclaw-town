@@ -38,6 +38,7 @@ export const networkingTables = {
     updatedAt: v.number(),
     claimedAt: v.optional(v.number()),
     ownerClaimId: v.optional(v.id('ownerClaims')),
+    townPlayerId: v.optional(v.string()),
   })
     .index('by_slug', ['slug'])
     .index('by_display_name', ['displayName'])

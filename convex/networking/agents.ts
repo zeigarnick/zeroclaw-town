@@ -1,5 +1,7 @@
 import { v } from 'convex/values';
 import { MutationCtx, QueryCtx, internalMutation, mutation, query } from '../_generated/server';
+import { Doc } from '../_generated/dataModel';
+import { insertInput } from '../aiTown/insertInput';
 import {
   formatClaimUrl,
   generateApiKey,
@@ -230,6 +232,7 @@ async function claimAgentHandler(
     claimedAt: now,
     updatedAt: now,
   });
+  await ensureNetworkingTownAvatar(ctx, { ...agent, status: 'active', updatedAt: now }, now);
 
   return {
     agentId: agent._id,
@@ -237,6 +240,57 @@ async function claimAgentHandler(
     status: 'active' as const,
     ownerClaimId: claim._id,
   };
+}
+
+export async function ensureNetworkingTownAvatar(
+  ctx: MutationCtx,
+  agent: Doc<'networkAgents'>,
+  now = Date.now(),
+) {
+  if (agent.townPlayerId || agent.status !== 'active') {
+    return null;
+  }
+
+  const worldStatus = await ctx.db
+    .query('worldStatus')
+    .withIndex('isDefault', (q) => q.eq('isDefault', true))
+    .first();
+  if (!worldStatus) {
+    return null;
+  }
+
+  const pendingInputs = await ctx.db
+    .query('inputs')
+    .withIndex('byInputNumber', (q) => q.eq('engineId', worldStatus.engineId))
+    .order('desc')
+    .take(100);
+  const existingInput = pendingInputs.find(
+    (input) =>
+      input.name === 'createNetworkingAgent' &&
+      !input.returnValue &&
+      input.args?.networkAgentId === agent._id,
+  );
+  if (existingInput) {
+    return existingInput._id;
+  }
+
+  const inputId = await insertInput(ctx, worldStatus.worldId, 'createNetworkingAgent', {
+    networkAgentId: agent._id,
+    displayName: agent.displayName,
+    description: agent.description,
+    character: characterForAgent(agent.slug),
+  });
+  await ctx.db.patch(agent._id, { updatedAt: now });
+  return inputId;
+}
+
+function characterForAgent(slug: string) {
+  const characters = ['f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8'];
+  let hash = 0;
+  for (const char of slug) {
+    hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+  }
+  return characters[hash % characters.length];
 }
 
 function normalizeSlug(slug: string) {

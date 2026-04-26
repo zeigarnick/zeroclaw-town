@@ -8,6 +8,7 @@ import { point } from '../util/types';
 import { Descriptions } from '../../data/characters';
 import { AgentDescription } from './agentDescription';
 import { Agent } from './agent';
+import { Id } from '../_generated/dataModel';
 
 export const agentInputs = {
   finishRememberConversation: inputHandler({
@@ -150,6 +151,51 @@ export const agentInputs = {
         }),
       );
       return { agentId };
+    },
+  }),
+  createNetworkingAgent: inputHandler({
+    args: {
+      networkAgentId: v.id('networkAgents'),
+      displayName: v.string(),
+      description: v.optional(v.string()),
+      character: v.string(),
+    },
+    handler: (game, now, args) => {
+      const existingDescription = [...game.playerDescriptions.values()].find(
+        (description) => description.name === args.displayName,
+      );
+      if (existingDescription) {
+        game.linkNetworkingAvatar(
+          args.networkAgentId as Id<'networkAgents'>,
+          existingDescription.playerId,
+        );
+        return { playerId: existingDescription.playerId };
+      }
+
+      const identity = args.description ?? `${args.displayName} is a networking agent.`;
+      const playerId = Player.join(game, now, args.displayName, args.character, identity);
+      const agentId = game.allocId('agents');
+      game.world.agents.set(
+        agentId,
+        new Agent({
+          id: agentId,
+          playerId,
+          inProgressOperation: undefined,
+          lastConversation: undefined,
+          lastInviteAttempt: undefined,
+          toRemember: undefined,
+        }),
+      );
+      game.agentDescriptions.set(
+        agentId,
+        new AgentDescription({
+          agentId,
+          identity,
+          plan: 'Wander the town and represent active networking conversations.',
+        }),
+      );
+      game.linkNetworkingAvatar(args.networkAgentId as Id<'networkAgents'>, playerId);
+      return { agentId, playerId };
     },
   }),
 };

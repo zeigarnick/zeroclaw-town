@@ -6,6 +6,7 @@ type TableName =
   | 'networkAgents'
   | 'networkAgentApiKeys'
   | 'ownerClaims'
+  | 'worldStatus'
   | 'matchCards'
   | 'cardEmbeddings'
   | 'recommendations'
@@ -18,6 +19,7 @@ function createMockCtx() {
     networkAgents: [],
     networkAgentApiKeys: [],
     ownerClaims: [],
+    worldStatus: [],
     matchCards: [],
     cardEmbeddings: [],
     recommendations: [],
@@ -28,6 +30,7 @@ function createMockCtx() {
     networkAgents: 0,
     networkAgentApiKeys: 0,
     ownerClaims: 0,
+    worldStatus: 0,
     matchCards: 0,
     cardEmbeddings: 0,
     recommendations: 0,

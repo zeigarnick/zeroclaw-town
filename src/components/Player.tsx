@@ -21,6 +21,7 @@ export const Player = ({
   player,
   onClick,
   historicalTime,
+  isNetworkingTalking = false,
 }: {
   game: ServerGame;
   isViewer: boolean;
@@ -28,6 +29,7 @@ export const Player = ({
 
   onClick: SelectElement;
   historicalTime?: number;
+  isNetworkingTalking?: boolean;
 }) => {
   const playerCharacter = game.playerDescriptions.get(player.id)?.character;
   if (!playerCharacter) {
@@ -54,9 +56,9 @@ export const Player = ({
     return null;
   }
 
-  const isSpeaking = !![...game.world.conversations.values()].find(
-    (c) => c.isTyping?.playerId === player.id,
-  );
+  const isSpeaking =
+    isNetworkingTalking ||
+    !![...game.world.conversations.values()].find((c) => c.isTyping?.playerId === player.id);
   const isThinking =
     !isSpeaking &&
     !![...game.world.agents.values()].find(

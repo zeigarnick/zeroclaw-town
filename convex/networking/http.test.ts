@@ -2,7 +2,7 @@ import { ConvexError } from 'convex/values';
 import { registerAgentHandler, mockClaimAgentHandler } from './agents';
 import { handleNetworkingHttpRequest, parseBearerAuthorizationHeader } from './http';
 
-type TableName = 'networkAgents' | 'networkAgentApiKeys' | 'ownerClaims';
+type TableName = 'networkAgents' | 'networkAgentApiKeys' | 'ownerClaims' | 'worldStatus';
 type Row = Record<string, any> & { _id: string };
 
 function createMockCtx() {
@@ -10,11 +10,13 @@ function createMockCtx() {
     networkAgents: [],
     networkAgentApiKeys: [],
     ownerClaims: [],
+    worldStatus: [],
   };
   const counters: Record<TableName, number> = {
     networkAgents: 0,
     networkAgentApiKeys: 0,
     ownerClaims: 0,
+    worldStatus: 0,
   };
 
   const db = {
