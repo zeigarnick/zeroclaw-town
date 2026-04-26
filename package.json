@@ -14,6 +14,8 @@
     "test": "NODE_OPTIONS=--experimental-vm-modules jest --verbose",
     "test:networking": "NODE_OPTIONS=--experimental-vm-modules jest --verbose convex/networking",
     "demo:networking": "node scripts/networking-demo.mjs",
+    "smoke:networking": "node scripts/networking-smoke.mjs",
+    "e2e:networking": "playwright test e2e/networking/mvp.spec.ts",
     "level-editor": "vite src/editor/",
     "le": "vite src/editor/"
   },
@@ -45,6 +47,7 @@
   },
   "devDependencies": {
     "@flydotio/dockerfile": "^0.2.14",
+    "@playwright/test": "^1.59.1",
     "@types/css-font-loading-module": "^0.0.8",
     "@types/jest": "^29.5.4",
     "@types/react-modal": "^3.16.0",

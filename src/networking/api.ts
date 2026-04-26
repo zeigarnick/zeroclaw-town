@@ -402,7 +402,7 @@ export class HttpApiAdapter implements IApiAdapter {
   private readonly baseUrl: string;
   private readonly fetchImpl: FetchLike;
 
-  constructor(baseUrl = defaultApiBaseUrl(), fetchImpl: FetchLike = fetch) {
+  constructor(baseUrl = defaultApiBaseUrl(), fetchImpl: FetchLike = globalThis.fetch.bind(globalThis)) {
     this.baseUrl = baseUrl.replace(/\/+$/, '');
     this.fetchImpl = fetchImpl;
   }
