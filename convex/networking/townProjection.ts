@@ -59,6 +59,11 @@ const STATUS_PRIORITY: NetworkingTownStatus[] = [
   'matched',
 ];
 
+const DEMO_TOWN_PLAYER_NAME_BY_AGENT_SLUG: Record<string, string> = {
+  'demo-capital-scout': 'lucky',
+  'demo-growth-operator': 'bob',
+};
+
 export const get = query({
   args: {
     worldId: v.id('worlds'),
@@ -340,7 +345,8 @@ function resolveTownPlayerId(
 ) {
   return (
     playerIdsByName.get(normalizeAgentLookupKey(agent.displayName)) ??
-    playerIdsByName.get(normalizeAgentLookupKey(agent.slug))
+    playerIdsByName.get(normalizeAgentLookupKey(agent.slug)) ??
+    playerIdsByName.get(DEMO_TOWN_PLAYER_NAME_BY_AGENT_SLUG[agent.slug] ?? '')
   );
 }
 

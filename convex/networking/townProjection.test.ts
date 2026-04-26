@@ -107,6 +107,45 @@ describe('networking town projection', () => {
       intro_ready: 2,
     });
   });
+
+  test('maps Packet 9 demo agents onto default AI Town players', async () => {
+    const ctx = createMockCtx({
+      networkAgents: [
+        agent('networkAgents:1', 'demo-capital-scout', 'Capital Scout', 1),
+        agent('networkAgents:2', 'demo-growth-operator', 'Growth Operator', 2),
+      ],
+      playerDescriptions: [
+        playerDescription('worlds:1', 'p:1', 'Lucky'),
+        playerDescription('worlds:1', 'p:2', 'Bob'),
+      ],
+      matchCards: [
+        card('matchCards:1', 'networkAgents:1', 'Need warm fintech investor intros', 10),
+        card('matchCards:2', 'networkAgents:2', 'Offer fintech GTM and investor network', 11),
+      ],
+      recommendations: [
+        recommendation(
+          'recommendations:1',
+          'networkAgents:1',
+          'matchCards:1',
+          'networkAgents:2',
+          'matchCards:2',
+          20,
+        ),
+      ],
+      meetings: [meeting('meetings:1', 'accepted', 'networkAgents:1', 'networkAgents:2', 30)],
+      agentConversations: [],
+      introCandidates: [
+        introCandidate('introCandidates:1', 'networkAgents:1', 'networkAgents:2', 40),
+      ],
+    });
+
+    const projection = await getTownProjectionHandler(ctx as any, { worldId: 'worlds:1' as any });
+
+    expect(projection.agentsByPlayerId['p:1'].slug).toBe('demo-capital-scout');
+    expect(projection.agentsByPlayerId['p:2'].slug).toBe('demo-growth-operator');
+    expect(projection.agentsByPlayerId['p:1'].primaryStatus).toBe('intro_ready');
+    expect(projection.agentsByPlayerId['p:2'].primaryStatus).toBe('intro_ready');
+  });
 });
 
 function agent(_id: string, slug: string, displayName: string, updatedAt: number) {
