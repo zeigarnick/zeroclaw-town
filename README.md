@@ -459,7 +459,15 @@ npx convex env set CLERK_ISSUER_URL # e.g. https://your-issuer-url.clerk.account
 - **If you are using Github Codespaces**: You will need to
   [install the Vercel CLI](https://vercel.com/docs/cli) and authenticate from your codespaces cli by
   running `vercel login`.
-- Deploy the app to Vercel with `vercel --prod`.
+- Configure Vercel to use the repository's `vercel.json` settings:
+  - Framework preset: `vite`
+  - Build command: `npm run build:vercel`
+  - Output directory: `dist`
+- Add `CONVEX_DEPLOY_KEY` in Vercel. Use a production deploy key only for Production and a preview
+  deploy key only for Preview.
+- The Vercel build command runs `convex deploy --cmd 'npm run build'` so the frontend receives
+  `VITE_CONVEX_URL` for the matching Convex deployment during the build.
+- See [docs/vercel-deployment-readiness.md](docs/vercel-deployment-readiness.md) before deploying.
 
 ## Using local inference from a cloud deployment
 
