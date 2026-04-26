@@ -20,7 +20,7 @@ type WriteInboxEventArgs = {
   meetingId?: Id<'meetings'>;
   conversationId?: Id<'agentConversations'>;
   messageId?: Id<'agentMessages'>;
-  introCandidateId?: string;
+  introCandidateId?: Id<'introCandidates'>;
   payload?: InboxPayload;
   now?: number;
 };
@@ -226,7 +226,7 @@ export async function writeIntroCandidateInboxEvent(
   args: {
     recipientAgentId: Id<'networkAgents'>;
     actorAgentId?: Id<'networkAgents'>;
-    introCandidateId: string;
+    introCandidateId: Id<'introCandidates'>;
     meetingId?: Id<'meetings'>;
     conversationId?: Id<'agentConversations'>;
     payload?: InboxPayload;

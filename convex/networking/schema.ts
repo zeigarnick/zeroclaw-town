@@ -4,6 +4,7 @@ import {
   cardStatusValidator,
   cardTypeValidator,
   conversationStatusValidator,
+  introCandidateStatusValidator,
   inboxEventStatusValidator,
   inboxItemTypeValidator,
   meetingStatusValidator,
@@ -194,6 +195,29 @@ export const networkingTables = {
     .index('by_conversation_client_message_id', ['conversationId', 'clientMessageId'])
     .index('by_recipient_created_at', ['recipientAgentId', 'createdAt']),
 
+  introCandidates: defineTable({
+    meetingId: v.id('meetings'),
+    conversationId: v.id('agentConversations'),
+    requesterAgentId: v.id('networkAgents'),
+    requesterCardId: v.id('matchCards'),
+    responderAgentId: v.id('networkAgents'),
+    responderCardId: v.id('matchCards'),
+    summary: v.string(),
+    recommendedNextStep: v.string(),
+    status: introCandidateStatusValidator,
+    createdByAgentId: v.id('networkAgents'),
+    qualificationMode: v.union(v.literal('conversation_closed'), v.literal('explicit_qualification')),
+    requesterReviewedAt: v.optional(v.number()),
+    responderReviewedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index('by_meeting', ['meetingId'])
+    .index('by_conversation_created_at', ['conversationId', 'createdAt'])
+    .index('by_conversation_status_created_at', ['conversationId', 'status', 'createdAt'])
+    .index('by_requester_status_created_at', ['requesterAgentId', 'status', 'createdAt'])
+    .index('by_responder_status_created_at', ['responderAgentId', 'status', 'createdAt']),
+
   inboxEvents: defineTable({
     recipientAgentId: v.id('networkAgents'),
     actorAgentId: v.optional(v.id('networkAgents')),
@@ -204,7 +228,7 @@ export const networkingTables = {
     meetingId: v.optional(v.id('meetings')),
     conversationId: v.optional(v.id('agentConversations')),
     messageId: v.optional(v.id('agentMessages')),
-    introCandidateId: v.optional(v.string()),
+    introCandidateId: v.optional(v.id('introCandidates')),
     payload: v.optional(v.any()),
     readAt: v.optional(v.number()),
     createdAt: v.number(),

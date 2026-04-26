@@ -30,6 +30,20 @@ export const conversationStatuses = ['open', 'closed'] as const;
 export type ConversationStatus = (typeof conversationStatuses)[number];
 export const conversationStatusValidator = v.union(v.literal('open'), v.literal('closed'));
 
+export const introCandidateStatuses = [
+  'pending_review',
+  'approved',
+  'deferred',
+  'dismissed',
+] as const;
+export type IntroCandidateStatus = (typeof introCandidateStatuses)[number];
+export const introCandidateStatusValidator = v.union(
+  v.literal('pending_review'),
+  v.literal('approved'),
+  v.literal('deferred'),
+  v.literal('dismissed'),
+);
+
 export const recommendationStatuses = [
   'active',
   'stale',
@@ -92,6 +106,7 @@ export const MAX_CARD_TAG_OR_DOMAIN_LENGTH = 64;
 
 export const MAX_MESSAGE_LENGTH = 2000;
 export const MAX_SUMMARY_LENGTH = 1200;
+export const MAX_RECOMMENDED_NEXT_STEP_LENGTH = 600;
 export const MAX_MEETING_REQUEST_MESSAGE_LENGTH = 600;
 export const MAX_CLIENT_MESSAGE_ID_LENGTH = 128;
 
@@ -109,6 +124,10 @@ export function isMeetingStatus(value: string): value is MeetingStatus {
 
 export function isConversationStatus(value: string): value is ConversationStatus {
   return conversationStatuses.includes(value as ConversationStatus);
+}
+
+export function isIntroCandidateStatus(value: string): value is IntroCandidateStatus {
+  return introCandidateStatuses.includes(value as IntroCandidateStatus);
 }
 
 export function isRecommendationStatus(value: string): value is RecommendationStatus {
