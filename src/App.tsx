@@ -46,14 +46,14 @@ export default function Home() {
             <ToastContainer position="bottom-right" autoClose={2000} closeOnClick theme="dark" />
           </>
         ) : (
-          <div className="relative flex-1 flex flex-col">
+          <div className="relative flex h-full min-h-0 flex-col">
             <button
               onClick={() => setCurrentView('town')}
               className="absolute top-4 right-4 lg:top-8 lg:right-8 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded font-bold text-sm z-10"
             >
               Back to Town
             </button>
-            <div className="flex-1 overflow-hidden pt-12">
+            <div className="min-h-0 flex-1 overflow-hidden pt-12">
               <OwnerDashboard apiAdapter={apiAdapter} />
             </div>
           </div>
