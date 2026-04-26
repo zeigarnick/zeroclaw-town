@@ -1,57 +1,96 @@
-/**
- * MVP Owner Dashboard for Packet 7.
- *
- * Provides a compact, operational control surface for the agentic networking loop:
- * - Mock claim agents without real X/Twitter auth
- * - Create and manage recommendation cards
- * - View inbox of received recommendations
- * - Request and respond to meetings
- * - Participate in conversations
- * - Manage intro candidates
- *
- * All data flows through the LocalApiAdapter (mocked for Packet 7).
- * When Packet 6 HTTP routes are ready, swap the adapter to call /api/v1/* endpoints.
- */
-
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  IApiAdapter,
-  ApiResponse,
   Agent,
   Card,
-  InboxResponse,
-  Meeting,
   Conversation,
-  IntroCandidateCard,
-  ApiError,
+  CreateIntroRequest,
+  CreateCardRequest,
+  IApiAdapter,
+  InboxEvent,
+  IntroCandidate,
+  Meeting,
+  Message,
+  getClaimTokenFromUrl,
+  isError,
 } from './api';
 
-function isError<T>(response: ApiResponse<T>): response is ApiError {
-  return 'error' in response;
+type OwnerDashboardProps = {
+  apiAdapter: IApiAdapter;
+};
+
+type DemoCredential = {
+  label: string;
+  apiKey: string;
+};
+
+const DEMO_CREDENTIALS: DemoCredential[] = [
+  {
+    label: 'Capital Scout',
+    apiKey: 'town_demo_capital_scout_2026',
+  },
+  {
+    label: 'Growth Operator',
+    apiKey: 'town_demo_growth_operator_2026',
+  },
+];
+
+function splitCsv(value: string) {
+  return Array.from(
+    new Set(
+      value
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean),
+    ),
+  );
 }
 
-interface OwnerDashboardProps {
-  apiAdapter: IApiAdapter;
+function makeClientMessageId() {
+  return `client_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
 export function OwnerDashboard({ apiAdapter }: OwnerDashboardProps) {
-  const [currentAgent, setCurrentAgent] = useState<Agent | null>(null);
-  const [agentName, setAgentName] = useState('');
+  const [registeredAgent, setRegisteredAgent] = useState<Agent | null>(null);
+
+  const [agentSlug, setAgentSlug] = useState('');
+  const [agentDisplayName, setAgentDisplayName] = useState('');
+  const [agentDescription, setAgentDescription] = useState('');
+
   const [claimToken, setClaimToken] = useState('');
   const [verificationCode, setVerificationCode] = useState('');
+  const [xHandle, setXHandle] = useState('');
+  const [ownerDisplayName, setOwnerDisplayName] = useState('');
+
+  const [manualApiKey, setManualApiKey] = useState('');
+  const [activeApiKey, setActiveApiKey] = useState('');
+  const [activeOwnerLabel, setActiveOwnerLabel] = useState('');
 
   const [cards, setCards] = useState<Card[]>([]);
-  const [inbox, setInbox] = useState<InboxResponse | null>(null);
+  const [inboxEvents, setInboxEvents] = useState<InboxEvent[]>([]);
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [intros, setIntros] = useState<IntroCandidateCard[]>([]);
+  const [intros, setIntros] = useState<IntroCandidate[]>([]);
+  const [messagesByConversation, setMessagesByConversation] = useState<Record<string, Message[]>>({});
 
-  const [cardTargetAgentId, setCardTargetAgentId] = useState('');
-  const [meetingTargetAgentId, setMeetingTargetAgentId] = useState('');
-  const [introTargetAgentId, setIntroTargetAgentId] = useState('');
-  const [cardReason, setCardReason] = useState('');
-  const [messageText, setMessageText] = useState('');
+  const [cardType, setCardType] = useState<'need' | 'offer' | 'exchange'>('need');
+  const [cardTitle, setCardTitle] = useState('');
+  const [cardSummary, setCardSummary] = useState('');
+  const [cardDetailsForMatching, setCardDetailsForMatching] = useState('');
+  const [cardDesiredOutcome, setCardDesiredOutcome] = useState('');
+  const [cardTagsCsv, setCardTagsCsv] = useState('');
+  const [cardDomainsCsv, setCardDomainsCsv] = useState('');
+  const [cardStatus, setCardStatus] = useState<'draft' | 'active' | 'paused' | 'expired'>('active');
+
+  const [meetingRecommendationId, setMeetingRecommendationId] = useState('');
+  const [meetingRequestMessage, setMeetingRequestMessage] = useState('');
+
   const [selectedConversationId, setSelectedConversationId] = useState('');
+  const [messageBody, setMessageBody] = useState('');
+
+  const [introConversationId, setIntroConversationId] = useState('');
+  const [introSummary, setIntroSummary] = useState('');
+  const [introRecommendedNextStep, setIntroRecommendedNextStep] = useState('');
+  const [introExplicitlyQualified, setIntroExplicitlyQualified] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -62,701 +101,1005 @@ export function OwnerDashboard({ apiAdapter }: OwnerDashboardProps) {
     setSuccess('');
   };
 
-  const showError = (msg: string) => {
+  const showError = (message: string) => {
     clearMessages();
-    setError(msg);
+    setError(message);
   };
 
-  const showSuccess = (msg: string) => {
+  const showSuccess = (message: string) => {
     clearMessages();
-    setSuccess(msg);
+    setSuccess(message);
   };
 
-  // ========================================================================
-  // AGENT REGISTRATION & CLAIM
-  // ========================================================================
+  const refreshDashboard = useCallback(
+    async (apiKey: string) => {
+      const [cardsResponse, inboxResponse, meetingsResponse, conversationsResponse, introsResponse] =
+        await Promise.all([
+          apiAdapter.getCards(apiKey),
+          apiAdapter.getInbox(apiKey),
+          apiAdapter.getMeetings(apiKey),
+          apiAdapter.getConversations(apiKey),
+          apiAdapter.getIntros(apiKey),
+        ]);
 
-  const handleRegisterAgent = async () => {
-    if (!agentName.trim()) {
-      showError('Agent name required');
+      let firstError = '';
+
+      if (isError(cardsResponse)) {
+        firstError ||= cardsResponse.error.message;
+      } else {
+        setCards(cardsResponse.data);
+      }
+
+      if (isError(inboxResponse)) {
+        firstError ||= inboxResponse.error.message;
+      } else {
+        setInboxEvents(inboxResponse.data);
+      }
+
+      if (isError(meetingsResponse)) {
+        firstError ||= meetingsResponse.error.message;
+      } else {
+        setMeetings(meetingsResponse.data);
+      }
+
+      if (isError(conversationsResponse)) {
+        firstError ||= conversationsResponse.error.message;
+      } else {
+        setConversations(conversationsResponse.data);
+      }
+
+      if (isError(introsResponse)) {
+        firstError ||= introsResponse.error.message;
+      } else {
+        setIntros(introsResponse.data);
+      }
+
+      if (firstError) {
+        showError(firstError);
+        return false;
+      }
+
+      return true;
+    },
+    [apiAdapter],
+  );
+
+  const loadApiKey = useCallback(
+    async (apiKey: string, ownerLabel: string) => {
+      if (!apiKey.trim()) {
+        showError('API key is required');
+        return;
+      }
+      setLoading(true);
+      try {
+        const cleanKey = apiKey.trim();
+        setActiveApiKey(cleanKey);
+        setActiveOwnerLabel(ownerLabel);
+        const ok = await refreshDashboard(cleanKey);
+        if (ok) {
+          showSuccess(`Loaded ${ownerLabel || 'API key'} dashboard data`);
+        }
+      } catch (cause) {
+        showError(`Failed to load dashboard data: ${String(cause)}`);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [refreshDashboard],
+  );
+
+  const refreshMessagesForConversation = useCallback(
+    async (apiKey: string, conversationId: string) => {
+      if (!conversationId) {
+        return;
+      }
+      const response = await apiAdapter.getConversationMessages(apiKey, conversationId);
+      if (isError(response)) {
+        showError(response.error.message);
+        return;
+      }
+      setMessagesByConversation((current) => ({
+        ...current,
+        [conversationId]: response.data,
+      }));
+    },
+    [apiAdapter],
+  );
+
+  useEffect(() => {
+    if (!activeApiKey || !selectedConversationId) {
       return;
     }
+    refreshMessagesForConversation(activeApiKey, selectedConversationId).catch((cause) => {
+      showError(`Failed to fetch conversation messages: ${String(cause)}`);
+    });
+  }, [activeApiKey, selectedConversationId, refreshMessagesForConversation]);
+
+  const handleRegisterAgent = async () => {
+    const normalizedSlug = agentSlug.trim();
+    const normalizedDisplayName = agentDisplayName.trim();
+
+    if (!normalizedSlug || !normalizedDisplayName) {
+      showError('Slug and display name are required');
+      return;
+    }
+
     setLoading(true);
     try {
-      const response = await apiAdapter.registerAgent({ name: agentName });
+      const response = await apiAdapter.registerAgent({
+        slug: normalizedSlug,
+        displayName: normalizedDisplayName,
+        description: agentDescription.trim() || undefined,
+      });
       if (isError(response)) {
-        showError(response.error);
+        showError(response.error.message);
       } else {
-        const agent = response.data;
-        setCurrentAgent(agent);
-        setAgentName('');
-        showSuccess(`Agent "${agent.name}" registered. API key: ${agent.apiKey}`);
+        setRegisteredAgent(response.data);
+        setManualApiKey(response.data.apiKey ?? '');
+        setClaimToken(response.data.claimUrl ? getClaimTokenFromUrl(response.data.claimUrl) : '');
+        setVerificationCode(response.data.verificationCode ?? '');
+        setAgentDescription('');
+        showSuccess('Agent registered. Complete mock claim to unlock active APIs.');
       }
-    } catch (e) {
-      showError(`Registration failed: ${String(e)}`);
+    } catch (cause) {
+      showError(`Registration failed: ${String(cause)}`);
     } finally {
       setLoading(false);
     }
   };
 
   const handleMockClaim = async () => {
-    if (!currentAgent?.apiKey) {
-      showError('No agent selected');
+    if (!claimToken.trim() || !verificationCode.trim() || !xHandle.trim()) {
+      showError('Claim token, verification code, and X handle are required');
       return;
     }
-    if (!claimToken.trim() || !verificationCode.trim()) {
-      showError('Claim token and verification code required');
-      return;
-    }
+
     setLoading(true);
     try {
       const response = await apiAdapter.mockClaim({
-        apiKey: currentAgent.apiKey,
-        claimToken,
-        verificationCode,
+        claimToken: claimToken.trim(),
+        verificationCode: verificationCode.trim(),
+        xHandle: xHandle.trim(),
+        owner: ownerDisplayName.trim()
+          ? {
+              displayName: ownerDisplayName.trim(),
+            }
+          : undefined,
       });
+
       if (isError(response)) {
-        showError(response.error);
-      } else {
-        const claimed = response.data;
-        setCurrentAgent(claimed);
-        setClaimToken('');
-        setVerificationCode('');
-        showSuccess('Mock claim successful');
-        if (claimed.apiKey) await refreshDashboard(claimed.apiKey);
+        showError(response.error.message);
+        return;
       }
-    } catch (e) {
-      showError(`Mock claim failed: ${String(e)}`);
+
+      const nextAgent: Agent = {
+        ...response.data,
+        apiKey: registeredAgent?.apiKey,
+        claimUrl: registeredAgent?.claimUrl,
+        verificationCode: registeredAgent?.verificationCode,
+      };
+
+      setRegisteredAgent(nextAgent);
+
+      if (!registeredAgent?.apiKey) {
+        showSuccess('Mock claim succeeded. Load an API key to view dashboard data.');
+        return;
+      }
+
+      await loadApiKey(registeredAgent.apiKey, registeredAgent.agentSlug || 'Registered Agent');
+    } catch (cause) {
+      showError(`Mock claim failed: ${String(cause)}`);
     } finally {
       setLoading(false);
     }
   };
-
-  // ========================================================================
-  // CARDS
-  // ========================================================================
-
-  const refreshCards = useCallback(async (apiKey: string) => {
-    try {
-      const response = await apiAdapter.getCards(apiKey);
-      if (!isError(response)) setCards(response.data);
-    } catch (e) {
-      console.error('Failed to fetch cards:', e);
-    }
-  }, [apiAdapter]);
 
   const handleCreateCard = async () => {
-    if (!currentAgent?.apiKey || !cardTargetAgentId) {
-      showError('Agent and target agent required');
+    if (!activeApiKey) {
+      showError('Load an API key first');
       return;
     }
+    if (
+      !cardTitle.trim() ||
+      !cardSummary.trim() ||
+      !cardDetailsForMatching.trim() ||
+      !cardDesiredOutcome.trim()
+    ) {
+      showError('Card title, summary, details for matching, and desired outcome are required');
+      return;
+    }
+
+    const request: CreateCardRequest = {
+      apiKey: activeApiKey,
+      type: cardType,
+      title: cardTitle.trim(),
+      summary: cardSummary.trim(),
+      detailsForMatching: cardDetailsForMatching.trim(),
+      desiredOutcome: cardDesiredOutcome.trim(),
+      tags: splitCsv(cardTagsCsv),
+      domains: splitCsv(cardDomainsCsv),
+      status: cardStatus,
+    };
+
     setLoading(true);
     try {
-      const response = await apiAdapter.createCard({
-        apiKey: currentAgent.apiKey,
-        targetAgentId: cardTargetAgentId,
-        reason: cardReason || undefined,
-      });
+      const response = await apiAdapter.createCard(request);
       if (isError(response)) {
-        showError(response.error);
+        showError(response.error.message);
       } else {
-        setCardTargetAgentId('');
-        setCardReason('');
+        setCardTitle('');
+        setCardSummary('');
+        setCardDetailsForMatching('');
+        setCardDesiredOutcome('');
+        setCardTagsCsv('');
+        setCardDomainsCsv('');
         showSuccess('Card created');
-        await refreshCards(currentAgent.apiKey);
-        await refreshInbox(currentAgent.apiKey);
+        await refreshDashboard(activeApiKey);
       }
-    } catch (e) {
-      showError(`Failed to create card: ${String(e)}`);
+    } catch (cause) {
+      showError(`Failed to create card: ${String(cause)}`);
     } finally {
       setLoading(false);
     }
   };
-
-  const handleUpdateCard = async (cardId: string, status: 'active' | 'matched' | 'closed') => {
-    if (!currentAgent?.apiKey) {
-      showError('No agent selected');
-      return;
-    }
-    setLoading(true);
-    try {
-      const response = await apiAdapter.updateCard({
-        apiKey: currentAgent.apiKey,
-        cardId,
-        status,
-      });
-      if (isError(response)) {
-        showError(response.error);
-      } else {
-        showSuccess('Card updated');
-        await refreshCards(currentAgent.apiKey);
-      }
-    } catch (e) {
-      showError(`Failed to update card: ${String(e)}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // ========================================================================
-  // INBOX
-  // ========================================================================
-
-  const refreshInbox = useCallback(async (apiKey: string) => {
-    try {
-      const response = await apiAdapter.getInbox(apiKey);
-      if (!isError(response)) setInbox(response.data);
-    } catch (e) {
-      console.error('Failed to fetch inbox:', e);
-    }
-  }, [apiAdapter]);
-
-  // ========================================================================
-  // MEETINGS
-  // ========================================================================
-
-  const refreshMeetings = useCallback(async (apiKey: string) => {
-    try {
-      const response = await apiAdapter.getMeetings(apiKey);
-      if (!isError(response)) setMeetings(response.data);
-    } catch (e) {
-      console.error('Failed to fetch meetings:', e);
-    }
-  }, [apiAdapter]);
 
   const handleRequestMeeting = async () => {
-    if (!currentAgent?.apiKey || !meetingTargetAgentId) {
-      showError('Agent and target agent required');
+    if (!activeApiKey) {
+      showError('Load an API key first');
       return;
     }
+    if (!meetingRecommendationId.trim()) {
+      showError('Recommendation ID is required');
+      return;
+    }
+
     setLoading(true);
     try {
       const response = await apiAdapter.requestMeeting({
-        apiKey: currentAgent.apiKey,
-        targetAgentId: meetingTargetAgentId,
+        apiKey: activeApiKey,
+        recommendationId: meetingRecommendationId.trim(),
+        requestMessage: meetingRequestMessage.trim() || undefined,
       });
       if (isError(response)) {
-        showError(response.error);
+        showError(response.error.message);
       } else {
-        setMeetingTargetAgentId('');
+        setMeetingRecommendationId('');
+        setMeetingRequestMessage('');
         showSuccess('Meeting request sent');
-        await refreshMeetings(currentAgent.apiKey);
+        await refreshDashboard(activeApiKey);
       }
-    } catch (e) {
-      showError(`Failed to request meeting: ${String(e)}`);
+    } catch (cause) {
+      showError(`Failed to request meeting: ${String(cause)}`);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleRespondMeeting = async (meetingId: string, accept: boolean) => {
-    if (!currentAgent?.apiKey) {
-      showError('No agent selected');
+  const handleRespondToMeeting = async (meetingId: string, accept: boolean) => {
+    if (!activeApiKey) {
+      showError('Load an API key first');
       return;
     }
+
     setLoading(true);
     try {
       const response = await apiAdapter.respondToMeeting({
-        apiKey: currentAgent.apiKey,
+        apiKey: activeApiKey,
         meetingId,
         accept,
       });
       if (isError(response)) {
-        showError(response.error);
+        showError(response.error.message);
       } else {
-        showSuccess(accept ? 'Meeting accepted' : 'Meeting rejected');
-        await refreshMeetings(currentAgent.apiKey);
-        if (accept) await refreshConversations(currentAgent.apiKey);
+        showSuccess(accept ? 'Meeting accepted' : 'Meeting declined');
+        await refreshDashboard(activeApiKey);
       }
-    } catch (e) {
-      showError(`Failed to respond to meeting: ${String(e)}`);
+    } catch (cause) {
+      showError(`Failed to respond to meeting: ${String(cause)}`);
     } finally {
       setLoading(false);
     }
   };
 
-  // ========================================================================
-  // CONVERSATIONS
-  // ========================================================================
-
-  const refreshConversations = useCallback(async (apiKey: string) => {
-    try {
-      const response = await apiAdapter.getConversations(apiKey);
-      if (!isError(response)) setConversations(response.data);
-    } catch (e) {
-      console.error('Failed to fetch conversations:', e);
-    }
-  }, [apiAdapter]);
-
   const handleSendMessage = async () => {
-    if (!currentAgent?.apiKey || !selectedConversationId || !messageText.trim()) {
-      showError('Conversation and message text required');
+    if (!activeApiKey) {
+      showError('Load an API key first');
       return;
     }
+    if (!selectedConversationId || !messageBody.trim()) {
+      showError('Select a conversation and enter a message');
+      return;
+    }
+
     setLoading(true);
     try {
       const response = await apiAdapter.sendMessage({
-        apiKey: currentAgent.apiKey,
+        apiKey: activeApiKey,
         conversationId: selectedConversationId,
-        text: messageText,
+        clientMessageId: makeClientMessageId(),
+        body: messageBody.trim(),
       });
       if (isError(response)) {
-        showError(response.error);
+        showError(response.error.message);
       } else {
-        setMessageText('');
+        setMessageBody('');
         showSuccess('Message sent');
-        await refreshConversations(currentAgent.apiKey);
+        await Promise.all([
+          refreshDashboard(activeApiKey),
+          refreshMessagesForConversation(activeApiKey, selectedConversationId),
+        ]);
       }
-    } catch (e) {
-      showError(`Failed to send message: ${String(e)}`);
+    } catch (cause) {
+      showError(`Failed to send message: ${String(cause)}`);
     } finally {
       setLoading(false);
     }
   };
 
   const handleCloseConversation = async (conversationId: string) => {
-    if (!currentAgent?.apiKey) {
-      showError('No agent selected');
+    if (!activeApiKey) {
+      showError('Load an API key first');
       return;
     }
+
     setLoading(true);
     try {
       const response = await apiAdapter.closeConversation({
-        apiKey: currentAgent.apiKey,
+        apiKey: activeApiKey,
         conversationId,
       });
       if (isError(response)) {
-        showError(response.error);
+        showError(response.error.message);
       } else {
         showSuccess('Conversation closed');
-        if (selectedConversationId === conversationId) setSelectedConversationId('');
-        await refreshConversations(currentAgent.apiKey);
+        await refreshDashboard(activeApiKey);
+        if (conversationId === selectedConversationId) {
+          await refreshMessagesForConversation(activeApiKey, conversationId);
+        }
       }
-    } catch (e) {
-      showError(`Failed to close conversation: ${String(e)}`);
+    } catch (cause) {
+      showError(`Failed to close conversation: ${String(cause)}`);
     } finally {
       setLoading(false);
     }
   };
-
-  // ========================================================================
-  // INTROS
-  // ========================================================================
-
-  const refreshIntros = useCallback(async (apiKey: string) => {
-    try {
-      const response = await apiAdapter.getIntros(apiKey);
-      if (!isError(response)) setIntros(response.data);
-    } catch (e) {
-      console.error('Failed to fetch intros:', e);
-    }
-  }, [apiAdapter]);
 
   const handleCreateIntro = async () => {
-    if (!currentAgent?.apiKey || !introTargetAgentId) {
-      showError('Agent and target agent required');
+    if (!activeApiKey) {
+      showError('Load an API key first');
       return;
     }
+    if (!introConversationId.trim() || !introSummary.trim() || !introRecommendedNextStep.trim()) {
+      showError('Conversation ID, summary, and recommended next step are required');
+      return;
+    }
+
+    const request: CreateIntroRequest = {
+      apiKey: activeApiKey,
+      conversationId: introConversationId.trim(),
+      summary: introSummary.trim(),
+      recommendedNextStep: introRecommendedNextStep.trim(),
+      explicitlyQualified: introExplicitlyQualified,
+    };
+
     setLoading(true);
     try {
-      const response = await apiAdapter.createIntro({
-        apiKey: currentAgent.apiKey,
-        targetAgentId: introTargetAgentId,
-      });
+      const response = await apiAdapter.createIntro(request);
       if (isError(response)) {
-        showError(response.error);
+        showError(response.error.message);
       } else {
-        setIntroTargetAgentId('');
+        setIntroConversationId('');
+        setIntroSummary('');
+        setIntroRecommendedNextStep('');
+        setIntroExplicitlyQualified(false);
         showSuccess('Intro candidate created');
-        await refreshIntros(currentAgent.apiKey);
+        await refreshDashboard(activeApiKey);
       }
-    } catch (e) {
-      showError(`Failed to create intro: ${String(e)}`);
+    } catch (cause) {
+      showError(`Failed to create intro candidate: ${String(cause)}`);
     } finally {
       setLoading(false);
     }
   };
 
-  // ========================================================================
-  // REFRESH & INITIALIZATION
-  // ========================================================================
-
-  const refreshDashboard = useCallback(async (apiKey: string) => {
-    await Promise.all([
-      refreshCards(apiKey),
-      refreshInbox(apiKey),
-      refreshMeetings(apiKey),
-      refreshConversations(apiKey),
-      refreshIntros(apiKey),
-    ]);
-  }, [refreshCards, refreshInbox, refreshMeetings, refreshConversations, refreshIntros]);
-
-  useEffect(() => {
-    if (currentAgent?.apiKey) {
-      refreshDashboard(currentAgent.apiKey);
+  const handleReviewIntro = async (
+    introCandidateId: string,
+    action: 'approve' | 'defer' | 'dismiss',
+  ) => {
+    if (!activeApiKey) {
+      showError('Load an API key first');
+      return;
     }
-  }, [currentAgent?.apiKey, refreshDashboard]);
 
-  // ========================================================================
-  // RENDER
-  // ========================================================================
+    setLoading(true);
+    try {
+      const response = await apiAdapter.reviewIntro({
+        apiKey: activeApiKey,
+        introCandidateId,
+        action,
+      });
+      if (isError(response)) {
+        showError(response.error.message);
+      } else {
+        showSuccess(`Intro ${action}d`);
+        await refreshDashboard(activeApiKey);
+      }
+    } catch (cause) {
+      showError(`Failed to ${action} intro candidate: ${String(cause)}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const selectedConversation = useMemo(
+    () => conversations.find((conversation) => conversation.id === selectedConversationId),
+    [conversations, selectedConversationId],
+  );
+
+  const selectedConversationMessages = selectedConversationId
+    ? (messagesByConversation[selectedConversationId] ?? [])
+    : [];
 
   return (
     <div className="w-full h-full bg-gray-900 text-white p-4 overflow-y-auto">
-      <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold mb-6">Owner Dashboard</h1>
+      <div className="max-w-7xl mx-auto space-y-6">
+        <h1 className="text-3xl font-bold">Owner Dashboard</h1>
 
         {error && (
-          <div className="bg-red-900 border border-red-600 text-red-100 px-4 py-3 rounded mb-4">
-            {error}
-          </div>
+          <div className="bg-red-900 border border-red-600 text-red-100 px-4 py-3 rounded">{error}</div>
         )}
         {success && (
-          <div className="bg-green-900 border border-green-600 text-green-100 px-4 py-3 rounded mb-4">
+          <div className="bg-green-900 border border-green-600 text-green-100 px-4 py-3 rounded">
             {success}
           </div>
         )}
 
-        {!currentAgent ? (
-          // REGISTRATION SECTION
-          <div className="bg-gray-800 border border-gray-700 p-4 rounded mb-6">
-            <h2 className="text-xl font-bold mb-4">Register Agent</h2>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                placeholder="Agent name"
-                value={agentName}
-                onChange={e => setAgentName(e.target.value)}
-                className="flex-1 bg-gray-700 border border-gray-600 px-3 py-2 rounded text-white"
-              />
+        <section className="bg-gray-800 border border-gray-700 p-4 rounded space-y-4">
+          <h2 className="text-xl font-bold">Load Demo Credentials</h2>
+          <div className="flex flex-wrap gap-2">
+            {DEMO_CREDENTIALS.map((credential) => (
               <button
-                onClick={handleRegisterAgent}
-                disabled={loading || !agentName.trim()}
-                className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 px-6 py-2 rounded font-bold"
+                key={credential.apiKey}
+                type="button"
+                onClick={() => {
+                  setManualApiKey(credential.apiKey);
+                  loadApiKey(credential.apiKey, credential.label).catch((cause) => {
+                    showError(`Failed to load demo credential: ${String(cause)}`);
+                  });
+                }}
+                disabled={loading}
+                className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 px-4 py-2 rounded font-bold text-sm"
               >
-                Register
+                {credential.label}
               </button>
-            </div>
+            ))}
           </div>
-        ) : (
-          <>
-            {/* AGENT STATUS */}
-            <div className="bg-gray-800 border border-gray-700 p-4 rounded mb-6">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h2 className="text-xl font-bold">{currentAgent.name}</h2>
-                  <p className="text-sm text-gray-400">Status: {currentAgent.status}</p>
-                  <p className="text-xs text-gray-500 mt-2 break-all">API Key: {currentAgent.apiKey}</p>
-                </div>
-                <button
-                  onClick={() => setCurrentAgent(null)}
-                  className="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded text-sm"
-                >
-                  Switch Agent
-                </button>
-              </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+            <input
+              type="text"
+              placeholder="Paste API key (town_*)"
+              value={manualApiKey}
+              onChange={(event) => setManualApiKey(event.target.value)}
+              className="md:col-span-3 bg-gray-700 border border-gray-600 px-3 py-2 rounded text-sm"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                loadApiKey(manualApiKey, 'Custom key').catch((cause) => {
+                  showError(`Failed to load API key: ${String(cause)}`);
+                });
+              }}
+              disabled={loading || !manualApiKey.trim()}
+              className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-600 px-4 py-2 rounded font-bold text-sm"
+            >
+              Load API Key
+            </button>
+          </div>
+
+          {activeApiKey && (
+            <div className="text-xs text-gray-300 break-all">
+              Active: {activeOwnerLabel || 'Owner'} | {activeApiKey}
             </div>
+          )}
+        </section>
 
-            {/* MOCK CLAIM SECTION */}
-            {currentAgent.status === 'pending' && (
-              <div className="bg-gray-800 border border-gray-700 p-4 rounded mb-6">
-                <h2 className="text-xl font-bold mb-4">Mock Claim (Demo)</h2>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-4">
-                  <input
-                    type="text"
-                    placeholder="Claim token"
-                    value={claimToken}
-                    onChange={e => setClaimToken(e.target.value)}
-                    className="bg-gray-700 border border-gray-600 px-3 py-2 rounded text-white text-sm"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Verification code"
-                    value={verificationCode}
-                    onChange={e => setVerificationCode(e.target.value)}
-                    className="bg-gray-700 border border-gray-600 px-3 py-2 rounded text-white text-sm"
-                  />
-                  <button
-                    onClick={handleMockClaim}
-                    disabled={loading}
-                    className="bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-600 px-4 py-2 rounded font-bold text-sm"
-                  >
-                    Claim
-                  </button>
-                </div>
+        <section className="bg-gray-800 border border-gray-700 p-4 rounded space-y-4">
+          <h2 className="text-xl font-bold">Register Agent</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+            <input
+              type="text"
+              placeholder="slug (e.g. demo-capital-scout)"
+              value={agentSlug}
+              onChange={(event) => setAgentSlug(event.target.value)}
+              className="bg-gray-700 border border-gray-600 px-3 py-2 rounded text-sm"
+            />
+            <input
+              type="text"
+              placeholder="display name"
+              value={agentDisplayName}
+              onChange={(event) => setAgentDisplayName(event.target.value)}
+              className="bg-gray-700 border border-gray-600 px-3 py-2 rounded text-sm"
+            />
+            <input
+              type="text"
+              placeholder="description (optional)"
+              value={agentDescription}
+              onChange={(event) => setAgentDescription(event.target.value)}
+              className="bg-gray-700 border border-gray-600 px-3 py-2 rounded text-sm"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={handleRegisterAgent}
+            disabled={loading || !agentSlug.trim() || !agentDisplayName.trim()}
+            className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 px-4 py-2 rounded font-bold text-sm"
+          >
+            Register via /api/v1/agents/register
+          </button>
+
+          {registeredAgent && (
+            <div className="text-sm text-gray-200 border border-gray-700 rounded p-3 space-y-1">
+              <p>agentId: {registeredAgent.agentId}</p>
+              <p>agentSlug: {registeredAgent.agentSlug}</p>
+              <p>status: {registeredAgent.status}</p>
+              {registeredAgent.apiKey && <p className="break-all">apiKey: {registeredAgent.apiKey}</p>}
+              {registeredAgent.claimUrl && <p className="break-all">claimUrl: {registeredAgent.claimUrl}</p>}
+              {registeredAgent.verificationCode && (
+                <p>verificationCode: {registeredAgent.verificationCode}</p>
+              )}
+            </div>
+          )}
+        </section>
+
+        <section className="bg-gray-800 border border-gray-700 p-4 rounded space-y-4">
+          <h2 className="text-xl font-bold">Mock Claim</h2>
+          <p className="text-xs text-gray-400">
+            Uses POST /api/v1/agents/mock-claim with claimToken, verificationCode, xHandle, and optional
+            owner metadata.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            <input
+              type="text"
+              placeholder="claimToken"
+              value={claimToken}
+              onChange={(event) => setClaimToken(event.target.value)}
+              className="bg-gray-700 border border-gray-600 px-3 py-2 rounded text-sm"
+            />
+            <input
+              type="text"
+              placeholder="verificationCode"
+              value={verificationCode}
+              onChange={(event) => setVerificationCode(event.target.value)}
+              className="bg-gray-700 border border-gray-600 px-3 py-2 rounded text-sm"
+            />
+            <input
+              type="text"
+              placeholder="xHandle (required)"
+              value={xHandle}
+              onChange={(event) => setXHandle(event.target.value)}
+              className="bg-gray-700 border border-gray-600 px-3 py-2 rounded text-sm"
+            />
+            <input
+              type="text"
+              placeholder="owner.displayName (optional)"
+              value={ownerDisplayName}
+              onChange={(event) => setOwnerDisplayName(event.target.value)}
+              className="bg-gray-700 border border-gray-600 px-3 py-2 rounded text-sm"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={handleMockClaim}
+            disabled={loading || !claimToken.trim() || !verificationCode.trim() || !xHandle.trim()}
+            className="bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-600 px-4 py-2 rounded font-bold text-sm"
+          >
+            Claim to Active
+          </button>
+        </section>
+
+        {activeApiKey && (
+          <>
+            <section className="bg-gray-800 border border-gray-700 p-4 rounded space-y-4">
+              <h2 className="text-xl font-bold">Cards</h2>
+              <p className="text-xs text-gray-400">
+                Create real need/offer/exchange cards with title, summary, detailsForMatching,
+                desiredOutcome, and optional tags/domains/status.
+              </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <select
+                  value={cardType}
+                  onChange={(event) => setCardType(event.target.value as 'need' | 'offer' | 'exchange')}
+                  className="bg-gray-700 border border-gray-600 px-3 py-2 rounded text-sm"
+                >
+                  <option value="need">need</option>
+                  <option value="offer">offer</option>
+                  <option value="exchange">exchange</option>
+                </select>
+                <select
+                  value={cardStatus}
+                  onChange={(event) =>
+                    setCardStatus(event.target.value as 'draft' | 'active' | 'paused' | 'expired')
+                  }
+                  className="bg-gray-700 border border-gray-600 px-3 py-2 rounded text-sm"
+                >
+                  <option value="draft">draft</option>
+                  <option value="active">active</option>
+                  <option value="paused">paused</option>
+                  <option value="expired">expired</option>
+                </select>
+                <input
+                  type="text"
+                  placeholder="title"
+                  value={cardTitle}
+                  onChange={(event) => setCardTitle(event.target.value)}
+                  className="md:col-span-2 bg-gray-700 border border-gray-600 px-3 py-2 rounded text-sm"
+                />
+                <textarea
+                  placeholder="summary"
+                  value={cardSummary}
+                  onChange={(event) => setCardSummary(event.target.value)}
+                  className="md:col-span-2 bg-gray-700 border border-gray-600 px-3 py-2 rounded text-sm"
+                  rows={2}
+                />
+                <textarea
+                  placeholder="detailsForMatching"
+                  value={cardDetailsForMatching}
+                  onChange={(event) => setCardDetailsForMatching(event.target.value)}
+                  className="md:col-span-2 bg-gray-700 border border-gray-600 px-3 py-2 rounded text-sm"
+                  rows={3}
+                />
+                <textarea
+                  placeholder="desiredOutcome"
+                  value={cardDesiredOutcome}
+                  onChange={(event) => setCardDesiredOutcome(event.target.value)}
+                  className="md:col-span-2 bg-gray-700 border border-gray-600 px-3 py-2 rounded text-sm"
+                  rows={2}
+                />
+                <input
+                  type="text"
+                  placeholder="tags (comma separated)"
+                  value={cardTagsCsv}
+                  onChange={(event) => setCardTagsCsv(event.target.value)}
+                  className="bg-gray-700 border border-gray-600 px-3 py-2 rounded text-sm"
+                />
+                <input
+                  type="text"
+                  placeholder="domains (comma separated)"
+                  value={cardDomainsCsv}
+                  onChange={(event) => setCardDomainsCsv(event.target.value)}
+                  className="bg-gray-700 border border-gray-600 px-3 py-2 rounded text-sm"
+                />
               </div>
-            )}
 
-            {currentAgent.status === 'claimed' && (
-              <>
-                {/* CARDS SECTION */}
-                <div className="bg-gray-800 border border-gray-700 p-4 rounded mb-6">
-                  <h2 className="text-xl font-bold mb-4">Cards (Recommendations)</h2>
+              <button
+                type="button"
+                onClick={handleCreateCard}
+                disabled={loading}
+                className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 px-4 py-2 rounded font-bold text-sm"
+              >
+                Create Card
+              </button>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-4">
-                    <input
-                      type="text"
-                      placeholder="Target agent ID"
-                      value={cardTargetAgentId}
-                      onChange={e => setCardTargetAgentId(e.target.value)}
-                      className="bg-gray-700 border border-gray-600 px-3 py-2 rounded text-white text-sm"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Reason (optional)"
-                      value={cardReason}
-                      onChange={e => setCardReason(e.target.value)}
-                      className="bg-gray-700 border border-gray-600 px-3 py-2 rounded text-white text-sm"
-                    />
-                  </div>
-                  <button
-                    onClick={handleCreateCard}
-                    disabled={loading}
-                    className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 px-4 py-2 rounded font-bold text-sm mb-4"
-                  >
-                    Create Card
-                  </button>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm border border-gray-700">
+                  <thead className="bg-gray-700">
+                    <tr>
+                      <th className="border border-gray-600 px-2 py-1 text-left">Title</th>
+                      <th className="border border-gray-600 px-2 py-1 text-left">Type</th>
+                      <th className="border border-gray-600 px-2 py-1 text-left">Summary</th>
+                      <th className="border border-gray-600 px-2 py-1 text-left">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cards.map((card) => (
+                      <tr key={card.id} className="hover:bg-gray-700">
+                        <td className="border border-gray-600 px-2 py-1">{card.title}</td>
+                        <td className="border border-gray-600 px-2 py-1">{card.type}</td>
+                        <td className="border border-gray-600 px-2 py-1 text-xs">{card.summary}</td>
+                        <td className="border border-gray-600 px-2 py-1">{card.status}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
 
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm border border-gray-700">
-                      <thead className="bg-gray-700">
-                        <tr>
-                          <th className="border border-gray-600 px-2 py-1 text-left">To</th>
-                          <th className="border border-gray-600 px-2 py-1 text-left">Reason</th>
-                          <th className="border border-gray-600 px-2 py-1">Status</th>
-                          <th className="border border-gray-600 px-2 py-1">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {cards.map(card => (
-                          <tr key={card.id} className="hover:bg-gray-700">
-                            <td className="border border-gray-600 px-2 py-1">{card.targetAgentName}</td>
-                            <td className="border border-gray-600 px-2 py-1 text-xs">{card.reason}</td>
-                            <td className="border border-gray-600 px-2 py-1 text-center text-xs">{card.status}</td>
-                            <td className="border border-gray-600 px-2 py-1 text-center">
-                              <select
-                                value={card.status}
-                                onChange={e =>
-                                  handleUpdateCard(card.id, e.target.value as 'active' | 'matched' | 'closed')
-                                }
-                                className="bg-gray-600 border border-gray-500 px-2 py-1 rounded text-xs"
+              {cards.length === 0 && <p className="text-sm text-gray-400">No cards yet</p>}
+            </section>
+
+            <section className="bg-gray-800 border border-gray-700 p-4 rounded space-y-4">
+              <h2 className="text-xl font-bold">Inbox Events ({inboxEvents.length})</h2>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm border border-gray-700">
+                  <thead className="bg-gray-700">
+                    <tr>
+                      <th className="border border-gray-600 px-2 py-1 text-left">Type</th>
+                      <th className="border border-gray-600 px-2 py-1 text-left">Status</th>
+                      <th className="border border-gray-600 px-2 py-1 text-left">Recommendation</th>
+                      <th className="border border-gray-600 px-2 py-1 text-left">Meeting</th>
+                      <th className="border border-gray-600 px-2 py-1 text-left">Conversation</th>
+                      <th className="border border-gray-600 px-2 py-1 text-left">Intro</th>
+                      <th className="border border-gray-600 px-2 py-1 text-left">Payload</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {inboxEvents.map((event) => (
+                      <tr key={event.id} className="hover:bg-gray-700">
+                        <td className="border border-gray-600 px-2 py-1">{event.type}</td>
+                        <td className="border border-gray-600 px-2 py-1">{event.status}</td>
+                        <td className="border border-gray-600 px-2 py-1 text-xs">{event.recommendationId || '—'}</td>
+                        <td className="border border-gray-600 px-2 py-1 text-xs">{event.meetingId || '—'}</td>
+                        <td className="border border-gray-600 px-2 py-1 text-xs">{event.conversationId || '—'}</td>
+                        <td className="border border-gray-600 px-2 py-1 text-xs">{event.introCandidateId || '—'}</td>
+                        <td className="border border-gray-600 px-2 py-1 text-xs">
+                          {event.payload ? JSON.stringify(event.payload) : '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {inboxEvents.length === 0 && <p className="text-sm text-gray-400">No inbox events</p>}
+            </section>
+
+            <section className="bg-gray-800 border border-gray-700 p-4 rounded space-y-4">
+              <h2 className="text-xl font-bold">Meetings</h2>
+              <p className="text-xs text-gray-400">
+                Request meetings by recommendationId. Accept/decline actions are sent by meetingId.
+              </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <input
+                  type="text"
+                  placeholder="recommendationId"
+                  value={meetingRecommendationId}
+                  onChange={(event) => setMeetingRecommendationId(event.target.value)}
+                  className="bg-gray-700 border border-gray-600 px-3 py-2 rounded text-sm"
+                />
+                <input
+                  type="text"
+                  placeholder="requestMessage (optional)"
+                  value={meetingRequestMessage}
+                  onChange={(event) => setMeetingRequestMessage(event.target.value)}
+                  className="bg-gray-700 border border-gray-600 px-3 py-2 rounded text-sm"
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={handleRequestMeeting}
+                disabled={loading}
+                className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 px-4 py-2 rounded font-bold text-sm"
+              >
+                Request Meeting
+              </button>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm border border-gray-700">
+                  <thead className="bg-gray-700">
+                    <tr>
+                      <th className="border border-gray-600 px-2 py-1 text-left">Meeting ID</th>
+                      <th className="border border-gray-600 px-2 py-1 text-left">Recommendation</th>
+                      <th className="border border-gray-600 px-2 py-1 text-left">Status</th>
+                      <th className="border border-gray-600 px-2 py-1 text-left">Conversation</th>
+                      <th className="border border-gray-600 px-2 py-1 text-left">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {meetings.map((meeting) => (
+                      <tr key={meeting.id} className="hover:bg-gray-700">
+                        <td className="border border-gray-600 px-2 py-1 text-xs">{meeting.id}</td>
+                        <td className="border border-gray-600 px-2 py-1 text-xs">{meeting.recommendationId}</td>
+                        <td className="border border-gray-600 px-2 py-1">{meeting.status}</td>
+                        <td className="border border-gray-600 px-2 py-1 text-xs">{meeting.conversationId || '—'}</td>
+                        <td className="border border-gray-600 px-2 py-1">
+                          {meeting.status === 'pending' ? (
+                            <div className="flex gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handleRespondToMeeting(meeting.id, true)}
+                                disabled={loading}
+                                className="bg-green-600 hover:bg-green-700 disabled:bg-gray-600 px-2 py-1 rounded text-xs"
                               >
-                                <option value="active">Active</option>
-                                <option value="matched">Matched</option>
-                                <option value="closed">Closed</option>
-                              </select>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                                Accept
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleRespondToMeeting(meeting.id, false)}
+                                disabled={loading}
+                                className="bg-red-600 hover:bg-red-700 disabled:bg-gray-600 px-2 py-1 rounded text-xs"
+                              >
+                                Decline
+                              </button>
+                            </div>
+                          ) : (
+                            '—'
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {meetings.length === 0 && <p className="text-sm text-gray-400">No meetings</p>}
+            </section>
+
+            <section className="bg-gray-800 border border-gray-700 p-4 rounded space-y-4">
+              <h2 className="text-xl font-bold">Conversations</h2>
+              <p className="text-xs text-gray-400">
+                Conversations use open/closed status. Messages are fetched via
+                /api/v1/conversations/:id/messages.
+              </p>
+
+              <select
+                value={selectedConversationId}
+                onChange={(event) => setSelectedConversationId(event.target.value)}
+                className="bg-gray-700 border border-gray-600 px-3 py-2 rounded text-sm w-full"
+              >
+                <option value="">Select conversation</option>
+                {conversations.map((conversation) => (
+                  <option key={conversation.id} value={conversation.id}>
+                    {conversation.id} ({conversation.status})
+                  </option>
+                ))}
+              </select>
+
+              {selectedConversation && (
+                <div className="space-y-3">
+                  <div className="text-xs text-gray-300">
+                    conversationId: {selectedConversation.id} | status: {selectedConversation.status}
                   </div>
-                  {cards.length === 0 && <p className="text-gray-400 mt-4 text-sm">No cards created yet</p>}
-                </div>
 
-                {/* INBOX SECTION */}
-                <div className="bg-gray-800 border border-gray-700 p-4 rounded mb-6">
-                  <h2 className="text-xl font-bold mb-4">Inbox ({inbox?.total || 0})</h2>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm border border-gray-700">
-                      <thead className="bg-gray-700">
-                        <tr>
-                          <th className="border border-gray-600 px-2 py-1 text-left">From</th>
-                          <th className="border border-gray-600 px-2 py-1 text-left">Recommendation</th>
-                          <th className="border border-gray-600 px-2 py-1">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {inbox?.items.map(item => (
-                          <tr key={item.id} className="hover:bg-gray-700">
-                            <td className="border border-gray-600 px-2 py-1">{item.fromAgentName}</td>
-                            <td className="border border-gray-600 px-2 py-1 text-xs">{item.recommendation}</td>
-                            <td className="border border-gray-600 px-2 py-1 text-center text-xs">{item.status}</td>
-                          </tr>
+                  <div className="bg-gray-700 border border-gray-600 rounded p-3 h-52 overflow-y-auto">
+                    {selectedConversationMessages.length === 0 ? (
+                      <p className="text-sm text-gray-400">No messages</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {selectedConversationMessages.map((message) => (
+                          <div key={message.id} className="text-sm">
+                            <span className="text-gray-300">{message.authorAgentId}</span>: {message.body}
+                          </div>
                         ))}
-                      </tbody>
-                    </table>
+                      </div>
+                    )}
                   </div>
-                  {(!inbox || inbox.items.length === 0) && (
-                    <p className="text-gray-400 mt-4 text-sm">No recommendations in inbox</p>
-                  )}
-                </div>
 
-                {/* MEETINGS SECTION */}
-                <div className="bg-gray-800 border border-gray-700 p-4 rounded mb-6">
-                  <h2 className="text-xl font-bold mb-4">Meetings</h2>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-4">
-                    <input
-                      type="text"
-                      placeholder="Target agent ID for meeting"
-                      value={meetingTargetAgentId}
-                      onChange={e => setMeetingTargetAgentId(e.target.value)}
-                      className="bg-gray-700 border border-gray-600 px-3 py-2 rounded text-white text-sm"
+                  <div className="flex gap-2">
+                    <textarea
+                      value={messageBody}
+                      onChange={(event) => setMessageBody(event.target.value)}
+                      placeholder="message body"
+                      className="flex-1 bg-gray-700 border border-gray-600 px-3 py-2 rounded text-sm"
+                      rows={2}
                     />
                     <button
-                      onClick={handleRequestMeeting}
+                      type="button"
+                      onClick={handleSendMessage}
                       disabled={loading}
-                      className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 px-4 py-2 rounded font-bold text-sm"
+                      className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 px-4 py-2 rounded font-bold text-sm h-fit"
                     >
-                      Request Meeting
+                      Send
                     </button>
                   </div>
 
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm border border-gray-700">
-                      <thead className="bg-gray-700">
-                        <tr>
-                          <th className="border border-gray-600 px-2 py-1 text-left">With</th>
-                          <th className="border border-gray-600 px-2 py-1">Status</th>
-                          <th className="border border-gray-600 px-2 py-1">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {meetings.map(meeting => (
-                          <tr key={meeting.id} className="hover:bg-gray-700">
-                            <td className="border border-gray-600 px-2 py-1">
-                              {meeting.initiatorAgentId === currentAgent.id
-                                ? meeting.targetAgentName
-                                : meeting.initiatorAgentName}
-                            </td>
-                            <td className="border border-gray-600 px-2 py-1 text-center text-xs">{meeting.status}</td>
-                            <td className="border border-gray-600 px-2 py-1 text-center">
-                              {meeting.status === 'pending' && meeting.targetAgentId === currentAgent.id && (
-                                <>
-                                  <button
-                                    onClick={() => handleRespondMeeting(meeting.id, true)}
-                                    disabled={loading}
-                                    className="bg-green-600 hover:bg-green-700 disabled:bg-gray-600 px-2 py-1 rounded text-xs mr-1"
-                                  >
-                                    Accept
-                                  </button>
-                                  <button
-                                    onClick={() => handleRespondMeeting(meeting.id, false)}
-                                    disabled={loading}
-                                    className="bg-red-600 hover:bg-red-700 disabled:bg-gray-600 px-2 py-1 rounded text-xs"
-                                  >
-                                    Decline
-                                  </button>
-                                </>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  {meetings.length === 0 && <p className="text-gray-400 mt-4 text-sm">No meetings</p>}
+                  <button
+                    type="button"
+                    onClick={() => handleCloseConversation(selectedConversation.id)}
+                    disabled={loading || selectedConversation.status === 'closed'}
+                    className="bg-red-600 hover:bg-red-700 disabled:bg-gray-600 px-4 py-2 rounded text-sm"
+                  >
+                    Close Conversation
+                  </button>
                 </div>
+              )}
 
-                {/* CONVERSATIONS SECTION */}
-                <div className="bg-gray-800 border border-gray-700 p-4 rounded mb-6">
-                  <h2 className="text-xl font-bold mb-4">Conversations</h2>
+              {conversations.length === 0 && <p className="text-sm text-gray-400">No conversations</p>}
+            </section>
 
-                  <div className="mb-4">
-                    <select
-                      value={selectedConversationId}
-                      onChange={e => setSelectedConversationId(e.target.value)}
-                      className="bg-gray-700 border border-gray-600 px-3 py-2 rounded text-white w-full"
-                    >
-                      <option value="">Select a conversation</option>
-                      {conversations.filter(c => c.status === 'active').map(conv => (
-                        <option key={conv.id} value={conv.id}>
-                          {conv.agentNames.join(', ')} ({conv.messages.length} messages)
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+            <section className="bg-gray-800 border border-gray-700 p-4 rounded space-y-4">
+              <h2 className="text-xl font-bold">Intro Candidates</h2>
+              <p className="text-xs text-gray-400">
+                Create intros with conversationId + summary + recommendedNextStep. Review actions
+                approve/defer/dismiss are available per intro.
+              </p>
 
-                  {selectedConversationId && (
-                    <>
-                      <div className="bg-gray-700 border border-gray-600 rounded p-3 h-64 overflow-y-auto mb-4">
-                        <div className="space-y-2">
-                          {conversations
-                            .find(c => c.id === selectedConversationId)
-                            ?.messages.map(msg => (
-                              <div key={msg.id} className="text-sm">
-                                <strong>{msg.senderAgentName}:</strong> {msg.text}
-                              </div>
-                            ))}
-                        </div>
-                      </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <input
+                  type="text"
+                  placeholder="conversationId"
+                  value={introConversationId}
+                  onChange={(event) => setIntroConversationId(event.target.value)}
+                  className="bg-gray-700 border border-gray-600 px-3 py-2 rounded text-sm"
+                />
+                <label className="flex items-center gap-2 text-sm border border-gray-600 rounded px-3 py-2 bg-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={introExplicitlyQualified}
+                    onChange={(event) => setIntroExplicitlyQualified(event.target.checked)}
+                  />
+                  explicitlyQualified
+                </label>
+                <textarea
+                  placeholder="summary"
+                  value={introSummary}
+                  onChange={(event) => setIntroSummary(event.target.value)}
+                  className="md:col-span-2 bg-gray-700 border border-gray-600 px-3 py-2 rounded text-sm"
+                  rows={2}
+                />
+                <textarea
+                  placeholder="recommendedNextStep"
+                  value={introRecommendedNextStep}
+                  onChange={(event) => setIntroRecommendedNextStep(event.target.value)}
+                  className="md:col-span-2 bg-gray-700 border border-gray-600 px-3 py-2 rounded text-sm"
+                  rows={2}
+                />
+              </div>
 
-                      <div className="flex gap-2 mb-4">
-                        <textarea
-                          value={messageText}
-                          onChange={e => setMessageText(e.target.value)}
-                          placeholder="Type message..."
-                          className="flex-1 bg-gray-700 border border-gray-600 px-3 py-2 rounded text-white text-sm"
-                          rows={2}
-                        />
-                        <button
-                          onClick={handleSendMessage}
-                          disabled={loading}
-                          className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 px-4 py-2 rounded font-bold text-sm h-fit"
-                        >
-                          Send
-                        </button>
-                      </div>
+              <button
+                type="button"
+                onClick={handleCreateIntro}
+                disabled={loading}
+                className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 px-4 py-2 rounded font-bold text-sm"
+              >
+                Create Intro
+              </button>
 
-                      <button
-                        onClick={() => handleCloseConversation(selectedConversationId)}
-                        disabled={loading}
-                        className="bg-red-600 hover:bg-red-700 disabled:bg-gray-600 px-4 py-2 rounded text-sm"
-                      >
-                        Close Conversation
-                      </button>
-                    </>
-                  )}
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm border border-gray-700">
+                  <thead className="bg-gray-700">
+                    <tr>
+                      <th className="border border-gray-600 px-2 py-1 text-left">Intro ID</th>
+                      <th className="border border-gray-600 px-2 py-1 text-left">Status</th>
+                      <th className="border border-gray-600 px-2 py-1 text-left">Conversation</th>
+                      <th className="border border-gray-600 px-2 py-1 text-left">Summary</th>
+                      <th className="border border-gray-600 px-2 py-1 text-left">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {intros.map((intro) => (
+                      <tr key={intro.id} className="hover:bg-gray-700">
+                        <td className="border border-gray-600 px-2 py-1 text-xs">{intro.id}</td>
+                        <td className="border border-gray-600 px-2 py-1">{intro.status}</td>
+                        <td className="border border-gray-600 px-2 py-1 text-xs">{intro.conversationId}</td>
+                        <td className="border border-gray-600 px-2 py-1 text-xs">{intro.summary}</td>
+                        <td className="border border-gray-600 px-2 py-1">
+                          <div className="flex gap-1">
+                            <button
+                              type="button"
+                              onClick={() => handleReviewIntro(intro.id, 'approve')}
+                              disabled={loading}
+                              className="bg-green-600 hover:bg-green-700 disabled:bg-gray-600 px-2 py-1 rounded text-xs"
+                            >
+                              Approve
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleReviewIntro(intro.id, 'defer')}
+                              disabled={loading}
+                              className="bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-600 px-2 py-1 rounded text-xs"
+                            >
+                              Defer
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleReviewIntro(intro.id, 'dismiss')}
+                              disabled={loading}
+                              className="bg-red-600 hover:bg-red-700 disabled:bg-gray-600 px-2 py-1 rounded text-xs"
+                            >
+                              Dismiss
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
 
-                  {conversations.length === 0 && <p className="text-gray-400 text-sm">No conversations yet</p>}
-                </div>
-
-                {/* INTROS SECTION */}
-                <div className="bg-gray-800 border border-gray-700 p-4 rounded mb-6">
-                  <h2 className="text-xl font-bold mb-4">Intro Candidates</h2>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-4">
-                    <input
-                      type="text"
-                      placeholder="Target agent ID for intro"
-                      value={introTargetAgentId}
-                      onChange={e => setIntroTargetAgentId(e.target.value)}
-                      className="bg-gray-700 border border-gray-600 px-3 py-2 rounded text-white text-sm"
-                    />
-                    <button
-                      onClick={handleCreateIntro}
-                      disabled={loading}
-                      className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 px-4 py-2 rounded font-bold text-sm"
-                    >
-                      Create Intro
-                    </button>
-                  </div>
-
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm border border-gray-700">
-                      <thead className="bg-gray-700">
-                        <tr>
-                          <th className="border border-gray-600 px-2 py-1 text-left">Recommended</th>
-                          <th className="border border-gray-600 px-2 py-1 text-left">Reason</th>
-                          <th className="border border-gray-600 px-2 py-1">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {intros.map(intro => (
-                          <tr key={intro.id} className="hover:bg-gray-700">
-                            <td className="border border-gray-600 px-2 py-1">{intro.recommendedAgentName}</td>
-                            <td className="border border-gray-600 px-2 py-1 text-xs">{intro.reason}</td>
-                            <td className="border border-gray-600 px-2 py-1 text-center text-xs">{intro.status}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  {intros.length === 0 && <p className="text-gray-400 mt-4 text-sm">No intro candidates</p>}
-                </div>
-              </>
-            )}
+              {intros.length === 0 && <p className="text-sm text-gray-400">No intro candidates</p>}
+            </section>
           </>
         )}
       </div>
