@@ -40,7 +40,7 @@ test('agentic networking MVP dashboard and town smoke', async ({ page }) => {
   await installNetworkingApiProxy(page);
   await page.goto(appUrl);
 
-  await expect(page.getByRole('heading', { name: 'AI Town' })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('button', { name: 'Dashboard' })).toBeVisible({ timeout: 30_000 });
   await expect(page.locator('canvas').first()).toBeVisible({ timeout: 30_000 });
   await expect.poll(() => getCanvasSnapshotSize(page), { timeout: 30_000 }).toBeGreaterThan(1_000);
 
@@ -77,7 +77,7 @@ test('agentic networking MVP dashboard and town smoke', async ({ page }) => {
   await expect(page.getByText('intro_candidate').first()).toBeVisible();
 
   await page.getByRole('button', { name: 'Back to Town' }).click();
-  await expect(page.getByRole('heading', { name: 'AI Town' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Dashboard' })).toBeVisible();
   await expect(page.locator('canvas').first()).toBeVisible({ timeout: 30_000 });
   await expect.poll(() => getCanvasSnapshotSize(page), { timeout: 30_000 }).toBeGreaterThan(1_000);
 });
