@@ -42,6 +42,8 @@ import type * as http from "../http.js";
 import type * as init from "../init.js";
 import type * as messages from "../messages.js";
 import type * as music from "../music.js";
+import type * as networking_agents from "../networking/agents.js";
+import type * as networking_auth from "../networking/auth.js";
 import type * as testing from "../testing.js";
 import type * as util_FastIntegerCompression from "../util/FastIntegerCompression.js";
 import type * as util_assertNever from "../util/assertNever.js";
@@ -95,6 +97,8 @@ declare const fullApi: ApiFromModules<{
   init: typeof init;
   messages: typeof messages;
   music: typeof music;
+  "networking/agents": typeof networking_agents;
+  "networking/auth": typeof networking_auth;
   testing: typeof testing;
   "util/FastIntegerCompression": typeof util_FastIntegerCompression;
   "util/assertNever": typeof util_assertNever;
