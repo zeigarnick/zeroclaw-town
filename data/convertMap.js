@@ -414,12 +414,14 @@ jsContent += `export const tilesetpxh = ${tilesetpxh};\n\n`;
 jsContent += exportConst('bgtiles', bgTiles);
 jsContent += exportConst('objmap', objectTiles);
 jsContent += exportConst('animatedsprites', animatedSprites);
+jsContent += "/** @type {import('../convex/aiTown/worldMap').VisualLayer[]} */\n";
 jsContent += exportConst('visualLayers', visualLayers);
 if (collisionTiles !== undefined) {
   jsContent += exportConst('collisionTiles', collisionTiles);
 } else {
   jsContent += 'export const collisionTiles = undefined;\n\n';
 }
+jsContent += "/** @type {import('../convex/aiTown/worldMap').AboveCharacterLayer[]} */\n";
 jsContent += exportConst('aboveCharacterLayers', aboveCharacterLayers);
 jsContent += exportConst('spawnPoints', spawnPoints);
 jsContent += exportConst('semanticZones', semanticZones);

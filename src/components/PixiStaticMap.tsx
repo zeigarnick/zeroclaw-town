@@ -2,6 +2,7 @@ import { PixiComponent, applyDefaultProps } from '@pixi/react';
 import * as PIXI from 'pixi.js';
 import { AnimatedSprite, WorldMap } from '../../convex/aiTown/worldMap';
 import * as campfire from '../../data/animations/campfire.json';
+import * as founderCafeSign from '../../data/animations/founder-cafe-sign.json';
 import * as gentlesparkle from '../../data/animations/gentlesparkle.json';
 import * as gentlewaterfall from '../../data/animations/gentlewaterfall.json';
 import * as gentlesplash from '../../data/animations/gentlesplash.json';
@@ -15,6 +16,10 @@ import {
 
 const animations = {
   'campfire.json': { spritesheet: campfire, url: '/ai-town/assets/spritesheets/campfire.png' },
+  'founder-cafe-sign.json': {
+    spritesheet: founderCafeSign,
+    url: '/ai-town/assets/founder-village/founder-cafe-sign.png',
+  },
   'gentlesparkle.json': {
     spritesheet: gentlesparkle,
     url: '/ai-town/assets/spritesheets/gentlesparkle32.png',
