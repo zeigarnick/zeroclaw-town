@@ -4,6 +4,51 @@ import { Infer, ObjectType, v } from 'convex/values';
 const tileLayer = v.array(v.array(v.number()));
 export type TileLayer = Infer<typeof tileLayer>;
 
+const visualLayerRole = v.union(
+  v.literal('background'),
+  v.literal('object'),
+  v.literal('aboveCharacter'),
+);
+export type VisualLayerRole = Infer<typeof visualLayerRole>;
+
+const visualLayer = {
+  name: v.string(),
+  role: visualLayerRole,
+  tiles: tileLayer,
+};
+export type VisualLayer = ObjectType<typeof visualLayer>;
+
+const aboveCharacterLayer = {
+  name: v.string(),
+  role: v.literal('aboveCharacter'),
+  tiles: tileLayer,
+};
+export type AboveCharacterLayer = ObjectType<typeof aboveCharacterLayer>;
+
+const spawnPoint = {
+  name: v.optional(v.string()),
+  kind: v.string(),
+  x: v.number(),
+  y: v.number(),
+  tileX: v.number(),
+  tileY: v.number(),
+};
+export type SpawnPoint = ObjectType<typeof spawnPoint>;
+
+const semanticZone = {
+  name: v.optional(v.string()),
+  kind: v.string(),
+  x: v.number(),
+  y: v.number(),
+  width: v.number(),
+  height: v.number(),
+  tileX: v.number(),
+  tileY: v.number(),
+  tileWidth: v.number(),
+  tileHeight: v.number(),
+};
+export type SemanticZone = ObjectType<typeof semanticZone>;
+
 const animatedSprite = {
   x: v.number(),
   y: v.number(),
@@ -29,6 +74,11 @@ export const serializedWorldMap = {
   bgTiles: v.array(v.array(v.array(v.number()))),
   objectTiles: v.array(tileLayer),
   animatedSprites: v.array(v.object(animatedSprite)),
+  visualLayers: v.optional(v.array(v.object(visualLayer))),
+  collisionTiles: v.optional(tileLayer),
+  aboveCharacterLayers: v.optional(v.array(v.object(aboveCharacterLayer))),
+  spawnPoints: v.optional(v.array(v.object(spawnPoint))),
+  semanticZones: v.optional(v.array(v.object(semanticZone))),
 };
 export type SerializedWorldMap = ObjectType<typeof serializedWorldMap>;
 
@@ -45,6 +95,11 @@ export class WorldMap {
   bgTiles: TileLayer[];
   objectTiles: TileLayer[];
   animatedSprites: AnimatedSprite[];
+  visualLayers?: VisualLayer[];
+  collisionTiles?: TileLayer;
+  aboveCharacterLayers?: AboveCharacterLayer[];
+  spawnPoints?: SpawnPoint[];
+  semanticZones?: SemanticZone[];
 
   constructor(serialized: SerializedWorldMap) {
     this.width = serialized.width;
@@ -56,10 +111,15 @@ export class WorldMap {
     this.bgTiles = serialized.bgTiles;
     this.objectTiles = serialized.objectTiles;
     this.animatedSprites = serialized.animatedSprites;
+    this.visualLayers = serialized.visualLayers;
+    this.collisionTiles = serialized.collisionTiles;
+    this.aboveCharacterLayers = serialized.aboveCharacterLayers;
+    this.spawnPoints = serialized.spawnPoints;
+    this.semanticZones = serialized.semanticZones;
   }
 
   serialize(): SerializedWorldMap {
-    return {
+    const serialized: SerializedWorldMap = {
       width: this.width,
       height: this.height,
       tileSetUrl: this.tileSetUrl,
@@ -70,5 +130,21 @@ export class WorldMap {
       objectTiles: this.objectTiles,
       animatedSprites: this.animatedSprites,
     };
+    if (this.visualLayers !== undefined) {
+      serialized.visualLayers = this.visualLayers;
+    }
+    if (this.collisionTiles !== undefined) {
+      serialized.collisionTiles = this.collisionTiles;
+    }
+    if (this.aboveCharacterLayers !== undefined) {
+      serialized.aboveCharacterLayers = this.aboveCharacterLayers;
+    }
+    if (this.spawnPoints !== undefined) {
+      serialized.spawnPoints = this.spawnPoints;
+    }
+    if (this.semanticZones !== undefined) {
+      serialized.semanticZones = this.semanticZones;
+    }
+    return serialized;
   }
 }
