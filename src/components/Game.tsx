@@ -11,6 +11,7 @@ import { useHistoricalTime } from '../hooks/useHistoricalTime.ts';
 import { DebugTimeManager } from './DebugTimeManager.tsx';
 import { GameId } from '../../convex/aiTown/ids.ts';
 import { useServerGame } from '../hooks/serverGame.ts';
+import type { NetworkingTownProjection } from '../../convex/networking/townProjection.ts';
 
 export const SHOW_DEBUG_UI = !!import.meta.env.VITE_SHOW_DEBUG_UI;
 
@@ -27,6 +28,10 @@ export default function Game() {
   const engineId = worldStatus?.engineId;
 
   const game = useServerGame(worldId);
+  const networkingProjection = useQuery(
+    api.networking.townProjection.get,
+    worldId ? { worldId } : 'skip',
+  ) as NetworkingTownProjection | undefined;
 
   // Send a periodic heartbeat to our world to keep it alive.
   useWorldHeartbeat();
@@ -58,6 +63,7 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
                     width={width}
                     height={height}
                     historicalTime={historicalTime}
+                    networkingProjection={networkingProjection}
                     setSelectedElement={setSelectedElement}
                   />
                 </ConvexProvider>
@@ -75,6 +81,7 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
             engineId={engineId}
             game={game}
             playerId={selectedElement?.id}
+            networkingProjection={networkingProjection}
             setSelectedElement={setSelectedElement}
             scrollViewRef={scrollViewRef}
           />

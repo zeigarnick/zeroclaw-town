@@ -9,12 +9,37 @@ import { useSendInput } from '../hooks/sendInput';
 import { Player } from '../../convex/aiTown/player';
 import { GameId } from '../../convex/aiTown/ids';
 import { ServerGame } from '../hooks/serverGame';
+import type {
+  NetworkingTownAgent,
+  NetworkingTownProjection,
+  NetworkingTownStatus,
+} from '../../convex/networking/townProjection';
+
+const NETWORKING_STATUS_META: Record<NetworkingTownStatus, { label: string; className: string }> = {
+  matched: {
+    label: 'Matched',
+    className: 'bg-brown-500 text-brown-100 border-brown-300',
+  },
+  pending_meeting: {
+    label: 'Pending meeting',
+    className: 'bg-clay-700 text-white border-clay-500',
+  },
+  talking: {
+    label: 'Talking',
+    className: 'bg-brown-700 text-brown-100 border-brown-500',
+  },
+  intro_ready: {
+    label: 'Intro ready',
+    className: 'bg-yellow-300 text-brown-900 border-yellow-100',
+  },
+};
 
 export default function PlayerDetails({
   worldId,
   engineId,
   game,
   playerId,
+  networkingProjection,
   setSelectedElement,
   scrollViewRef,
 }: {
@@ -22,6 +47,7 @@ export default function PlayerDetails({
   engineId: Id<'engines'>;
   game: ServerGame;
   playerId?: GameId<'players'>;
+  networkingProjection?: NetworkingTownProjection;
   setSelectedElement: SelectElement;
   scrollViewRef: React.RefObject<HTMLDivElement>;
 }) {
@@ -47,6 +73,7 @@ export default function PlayerDetails({
   );
 
   const playerDescription = playerId && game.playerDescriptions.get(playerId);
+  const networkingAgent = playerId ? networkingProjection?.agentsByPlayerId[playerId] : undefined;
 
   const startConversation = useSendInput(engineId, 'startConversation');
   const acceptInvite = useSendInput(engineId, 'acceptInvite');
@@ -148,6 +175,7 @@ export default function PlayerDetails({
           </h2>
         </a>
       </div>
+      {networkingAgent && <NetworkingAgentPanel agent={networkingAgent} />}
       {canInvite && (
         <a
           className={
@@ -259,5 +287,90 @@ export default function PlayerDetails({
         </>
       )}
     </>
+  );
+}
+
+function NetworkingAgentPanel({ agent }: { agent: NetworkingTownAgent }) {
+  const activeStatuses = (
+    ['matched', 'pending_meeting', 'talking', 'intro_ready'] as NetworkingTownStatus[]
+  ).filter((status) => agent.counts[status] > 0);
+
+  return (
+    <div className="box mt-6">
+      <div className="bg-brown-700 p-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="font-display text-xl tracking-wider shadow-solid">Networking</h3>
+          {activeStatuses.length > 0 ? (
+            activeStatuses.map((status) => (
+              <span
+                key={status}
+                className={`inline-flex items-center border px-2 py-1 text-xs tabular-nums ${NETWORKING_STATUS_META[status].className}`}
+              >
+                {NETWORKING_STATUS_META[status].label}
+                {agent.counts[status] > 1 ? ` ${agent.counts[status]}` : ''}
+              </span>
+            ))
+          ) : (
+            <span className="inline-flex items-center border border-brown-500 bg-brown-800 px-2 py-1 text-xs text-brown-200">
+              No active status
+            </span>
+          )}
+        </div>
+        <p className="mt-3 text-sm leading-tight text-pretty text-brown-100">
+          {agent.description ?? 'Claimed networking agent.'}
+        </p>
+        {agent.cards.length > 0 && (
+          <div className="mt-4 space-y-2">
+            {agent.cards.map((card) => (
+              <div key={card.id} className="border border-brown-500 bg-brown-800 p-2">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm leading-tight text-pretty">{card.title}</p>
+                  <span className="shrink-0 border border-brown-500 px-2 py-0.5 text-xs text-brown-200">
+                    {card.type}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs leading-tight text-pretty text-brown-200">
+                  {card.summary}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+        <NetworkingRelationshipList label="Matches" relationships={agent.matchedAgents} />
+        <NetworkingRelationshipList
+          label="Pending meetings"
+          relationships={agent.pendingMeetingAgents}
+        />
+        <NetworkingRelationshipList label="Talking with" relationships={agent.talkingAgents} />
+        <NetworkingRelationshipList label="Intro ready" relationships={agent.introReadyAgents} />
+      </div>
+    </div>
+  );
+}
+
+function NetworkingRelationshipList({
+  label,
+  relationships,
+}: {
+  label: string;
+  relationships: NetworkingTownAgent['matchedAgents'];
+}) {
+  if (relationships.length === 0) {
+    return null;
+  }
+  return (
+    <div className="mt-3">
+      <p className="text-xs uppercase text-brown-300">{label}</p>
+      <div className="mt-1 flex flex-wrap gap-2">
+        {relationships.map((relationship) => (
+          <span
+            key={relationship.agentId}
+            className="border border-brown-500 bg-brown-800 px-2 py-1 text-xs text-brown-100"
+          >
+            {relationship.displayName}
+          </span>
+        ))}
+      </div>
+    </div>
   );
 }
