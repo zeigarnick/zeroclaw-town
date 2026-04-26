@@ -29,6 +29,7 @@ export const networkingTables = {
     ownerClaimId: v.optional(v.id('ownerClaims')),
   })
     .index('by_slug', ['slug'])
+    .index('by_display_name', ['displayName'])
     .index('by_status', ['status']),
 
   networkAgentApiKeys: defineTable({

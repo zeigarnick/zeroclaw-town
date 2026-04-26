@@ -1,5 +1,5 @@
 import { v } from 'convex/values';
-import { mutation, query } from '../_generated/server';
+import { MutationCtx, QueryCtx, internalMutation, mutation, query } from '../_generated/server';
 import {
   formatClaimUrl,
   generateApiKey,
@@ -17,99 +17,109 @@ export const registerAgent = mutation({
     slug: v.string(),
     displayName: v.string(),
     description: v.optional(v.string()),
-    claimBaseUrl: v.optional(v.string()),
   },
-  handler: async (ctx, args) => {
-    const slug = normalizeSlug(args.slug);
-    if (!slug) {
-      throw networkingError('invalid_agent_slug', 'Agent slug is required.');
-    }
-
-    const existing = await ctx.db
-      .query('networkAgents')
-      .withIndex('by_slug', (q) => q.eq('slug', slug))
-      .first();
-    if (existing) {
-      throw networkingError('duplicate_agent_slug', 'An agent with this slug already exists.');
-    }
-
-    const now = Date.now();
-    const apiKey = generateApiKey();
-    const claimToken = generateClaimToken();
-    const verificationCode = generateVerificationCode();
-
-    const agentId = await ctx.db.insert('networkAgents', {
-      slug,
-      displayName: args.displayName.trim(),
-      ...(args.description ? { description: args.description.trim() } : {}),
-      status: 'pending_claim',
-      createdAt: now,
-      updatedAt: now,
-    });
-
-    await ctx.db.insert('networkAgentApiKeys', {
-      agentId,
-      keyHash: await hashSecret(apiKey),
-      keyPrefix: getKeyPrefix(apiKey),
-      status: 'active',
-      createdAt: now,
-    });
-
-    const ownerClaimId = await ctx.db.insert('ownerClaims', {
-      agentId,
-      claimTokenHash: await hashSecret(claimToken),
-      verificationCodeHash: await hashSecret(verificationCode),
-      status: 'pending',
-      createdAt: now,
-    });
-
-    await ctx.db.patch(agentId, { ownerClaimId, updatedAt: now });
-
-    return {
-      agentId,
-      agentSlug: slug,
-      apiKey,
-      claimUrl: formatClaimUrl(args.claimBaseUrl ?? DEFAULT_CLAIM_BASE_URL, claimToken),
-      verificationCode,
-      status: 'pending_claim' as const,
-    };
-  },
+  handler: registerAgentHandler,
 });
+
+export async function registerAgentHandler(
+  ctx: MutationCtx,
+  args: {
+    slug: string;
+    displayName: string;
+    description?: string;
+  },
+) {
+  const slug = normalizeSlug(args.slug);
+  if (!slug) {
+    throw networkingError('invalid_agent_slug', 'Agent slug is required.');
+  }
+
+  const existing = await ctx.db
+    .query('networkAgents')
+    .withIndex('by_slug', (q) => q.eq('slug', slug))
+    .first();
+  if (existing) {
+    throw networkingError('duplicate_agent_slug', 'An agent with this slug already exists.');
+  }
+
+  const now = Date.now();
+  const apiKey = generateApiKey();
+  const claimToken = generateClaimToken();
+  const verificationCode = generateVerificationCode();
+
+  const agentId = await ctx.db.insert('networkAgents', {
+    slug,
+    displayName: args.displayName.trim(),
+    ...(args.description ? { description: args.description.trim() } : {}),
+    status: 'pending_claim',
+    createdAt: now,
+    updatedAt: now,
+  });
+
+  await ctx.db.insert('networkAgentApiKeys', {
+    agentId,
+    keyHash: await hashSecret(apiKey),
+    keyPrefix: getKeyPrefix(apiKey),
+    status: 'active',
+    createdAt: now,
+  });
+
+  const ownerClaimId = await ctx.db.insert('ownerClaims', {
+    agentId,
+    claimTokenHash: await hashSecret(claimToken),
+    verificationCodeHash: await hashSecret(verificationCode),
+    status: 'pending',
+    createdAt: now,
+  });
+
+  await ctx.db.patch(agentId, { ownerClaimId, updatedAt: now });
+
+  return {
+    agentId,
+    agentSlug: slug,
+    apiKey,
+    claimUrl: formatClaimUrl(DEFAULT_CLAIM_BASE_URL, claimToken),
+    verificationCode,
+    status: 'pending_claim' as const,
+  };
+}
 
 export const getClaimStatus = query({
   args: {
     claimToken: v.string(),
   },
-  handler: async (ctx, args) => {
-    const claimTokenHash = await hashSecret(args.claimToken);
-    const claim = await ctx.db
-      .query('ownerClaims')
-      .withIndex('by_claim_token_hash', (q) => q.eq('claimTokenHash', claimTokenHash))
-      .first();
-    if (!claim) {
-      throw networkingError('claim_not_found', 'The claim token does not exist.');
-    }
-
-    const agent = await ctx.db.get(claim.agentId);
-    if (!agent) {
-      throw networkingError('agent_not_found', 'The claimed agent does not exist.');
-    }
-
-    return {
-      agentId: claim.agentId,
-      agentSlug: agent.slug,
-      agentDisplayName: agent.displayName,
-      agentStatus: agent.status,
-      claimStatus: claim.status,
-      verifiedAt: claim.verifiedAt,
-      xHandle: claim.xHandle,
-      xProfileUrl: claim.xProfileUrl,
-      verificationMethod: claim.verificationMethod,
-    };
-  },
+  handler: getClaimStatusHandler,
 });
 
-export const claimAgentForTesting = mutation({
+export async function getClaimStatusHandler(ctx: QueryCtx, args: { claimToken: string }) {
+  const claimTokenHash = await hashSecret(args.claimToken);
+  const claim = await ctx.db
+    .query('ownerClaims')
+    .withIndex('by_claim_token_hash', (q) => q.eq('claimTokenHash', claimTokenHash))
+    .first();
+  if (!claim) {
+    throw networkingError('claim_not_found', 'The claim token does not exist.');
+  }
+
+  const agent = await ctx.db.get(claim.agentId);
+  if (!agent) {
+    throw networkingError('agent_not_found', 'The claimed agent does not exist.');
+  }
+
+  return {
+    agentId: claim.agentId,
+    agentSlug: agent.slug,
+    agentDisplayName: agent.displayName,
+    agentStatus: agent.status,
+    claimStatus: claim.status,
+    verifiedAt: claim.verifiedAt,
+    xHandle: claim.xHandle,
+    xProfileUrl: claim.xProfileUrl,
+    verificationMethod: claim.verificationMethod,
+  };
+}
+
+export const claimAgentForTesting = internalMutation({
   args: {
     claimToken: v.string(),
     verificationCode: v.string(),
@@ -117,52 +127,63 @@ export const claimAgentForTesting = mutation({
     xProfileUrl: v.string(),
     verificationMethod: v.optional(v.union(v.literal('tweet'), v.literal('oauth'))),
   },
-  handler: async (ctx, args) => {
-    const claimTokenHash = await hashSecret(args.claimToken);
-    const claim = await ctx.db
-      .query('ownerClaims')
-      .withIndex('by_claim_token_hash', (q) => q.eq('claimTokenHash', claimTokenHash))
-      .first();
-    if (!claim) {
-      throw networkingError('claim_not_found', 'The claim token does not exist.');
-    }
-    if (claim.status !== 'pending') {
-      throw networkingError('invalid_claim_status', 'The claim is no longer pending.');
-    }
-
-    const verificationCodeHash = await hashSecret(args.verificationCode);
-    if (!arrayBuffersEqual(verificationCodeHash, claim.verificationCodeHash)) {
-      throw networkingError('invalid_verification_code', 'The verification code is invalid.');
-    }
-
-    const agent = await ctx.db.get(claim.agentId);
-    if (!agent) {
-      throw networkingError('agent_not_found', 'The claimed agent does not exist.');
-    }
-
-    const now = Date.now();
-    await ctx.db.patch(claim._id, {
-      status: 'verified',
-      xHandle: normalizeXHandle(args.xHandle),
-      xProfileUrl: args.xProfileUrl,
-      verificationMethod: args.verificationMethod ?? 'tweet',
-      verifiedAt: now,
-    });
-    await ctx.db.patch(agent._id, {
-      status: 'active',
-      ownerClaimId: claim._id,
-      claimedAt: now,
-      updatedAt: now,
-    });
-
-    return {
-      agentId: agent._id,
-      agentSlug: agent.slug,
-      status: 'active' as const,
-      ownerClaimId: claim._id,
-    };
-  },
+  handler: claimAgentForTestingHandler,
 });
+
+export async function claimAgentForTestingHandler(
+  ctx: MutationCtx,
+  args: {
+    claimToken: string;
+    verificationCode: string;
+    xHandle: string;
+    xProfileUrl: string;
+    verificationMethod?: 'tweet' | 'oauth';
+  },
+) {
+  const claimTokenHash = await hashSecret(args.claimToken);
+  const claim = await ctx.db
+    .query('ownerClaims')
+    .withIndex('by_claim_token_hash', (q) => q.eq('claimTokenHash', claimTokenHash))
+    .first();
+  if (!claim) {
+    throw networkingError('claim_not_found', 'The claim token does not exist.');
+  }
+  if (claim.status !== 'pending') {
+    throw networkingError('invalid_claim_status', 'The claim is no longer pending.');
+  }
+
+  const verificationCodeHash = await hashSecret(args.verificationCode);
+  if (!arrayBuffersEqual(verificationCodeHash, claim.verificationCodeHash)) {
+    throw networkingError('invalid_verification_code', 'The verification code is invalid.');
+  }
+
+  const agent = await ctx.db.get(claim.agentId);
+  if (!agent) {
+    throw networkingError('agent_not_found', 'The claimed agent does not exist.');
+  }
+
+  const now = Date.now();
+  await ctx.db.patch(claim._id, {
+    status: 'verified',
+    xHandle: normalizeXHandle(args.xHandle),
+    xProfileUrl: args.xProfileUrl,
+    verificationMethod: args.verificationMethod ?? 'tweet',
+    verifiedAt: now,
+  });
+  await ctx.db.patch(agent._id, {
+    status: 'active',
+    ownerClaimId: claim._id,
+    claimedAt: now,
+    updatedAt: now,
+  });
+
+  return {
+    agentId: agent._id,
+    agentSlug: agent.slug,
+    status: 'active' as const,
+    ownerClaimId: claim._id,
+  };
+}
 
 function normalizeSlug(slug: string) {
   return slug
