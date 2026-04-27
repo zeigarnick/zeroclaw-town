@@ -99,7 +99,7 @@ describe('networking agent handlers', () => {
 
     expect(result.agentSlug).toBe('zero-claw');
     expect(result.apiKey).toMatch(/^town_/);
-    expect(result.claimUrl).toMatch(/^https:\/\/zeroclaw-town\.vercel\.app\/claim\/town_claim_/);
+    expect(result.claimUrl).toMatch(/^https:\/\/agora\.vercel\.app\/claim\/town_claim_/);
     expect(result.claimUrl).not.toContain('evil.example');
     expect(result.verificationCode).toMatch(/^town-[A-Z2-9]{6}$/);
 

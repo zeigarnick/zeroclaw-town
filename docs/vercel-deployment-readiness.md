@@ -48,7 +48,7 @@ Frontend build/runtime:
 Convex deployment environment:
 
 - `LLM_PROVIDER=custom`, `LLM_API_URL=https://openrouter.ai/api`, `LLM_API_KEY`, `LLM_MODEL=openai/gpt-4o-mini`, `LLM_EMBEDDING_MODEL=openai/text-embedding-3-small`: required for the current OpenRouter-backed production AI Town chat and embedding path.
-- `NETWORKING_CLAIM_BASE_URL`: production claim link base. Current working value is `https://zeroclaw-town.vercel.app/claim` until `zeroclaw.town` is registered and configured.
+- `NETWORKING_CLAIM_BASE_URL`: production claim link base. Current working value is `https://agora.vercel.app/claim` until `agora.town` is registered and configured.
 - `OPENAI_API_KEY`: alternative provider key if production AI Town initialization or agent memory uses the native OpenAI path instead of custom OpenRouter config.
 - `OPENAI_CHAT_MODEL`, `OPENAI_EMBEDDING_MODEL`: optional OpenAI model overrides for native OpenAI mode.
 - `TOGETHER_API_KEY`, `TOGETHER_CHAT_MODEL`, `TOGETHER_EMBEDDING_MODEL`: optional only if the embedding dimension/provider code is changed to Together.
@@ -63,12 +63,12 @@ Convex HTTP Actions are defined in `convex/http.ts` with `pathPrefix: '/api/v1/'
 
 The deployed frontend can reach these routes in two supported ways:
 
-- Same-origin Vercel route: `https://zeroclaw-town.vercel.app/api/v1/*` rewrites to `https://youthful-sockeye-531.convex.site/api/v1/*`.
+- Same-origin Vercel route: `https://agora.vercel.app/api/v1/*` rewrites to `https://youthful-sockeye-531.convex.site/api/v1/*`.
 - Convex HTTP Actions origin: `src/networking/api.ts` can derive `https://<deployment>.convex.site/api/v1` from `VITE_CONVEX_URL`.
 
 The Convex HTTP handler sends permissive CORS headers, so browser calls from Vercel preview and production origins are allowed.
 
-Important constraint: `https://zeroclaw.town` is not currently usable. Public DNS has no records for the domain, and Vercel reports it as available for purchase. Use `https://zeroclaw-town.vercel.app` until the domain is purchased, attached to the correct Vercel project, and DNS has propagated.
+Important constraint: `https://agora.town` is not currently usable. Public DNS has no records for the domain, and Vercel reports it as available for purchase. Use `https://agora.vercel.app` until the domain is purchased, attached to the correct Vercel project, and DNS has propagated.
 
 ## Preview And Production Differences
 

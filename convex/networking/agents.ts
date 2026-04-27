@@ -12,7 +12,7 @@ import {
   networkingError,
 } from './auth';
 
-const DEFAULT_CLAIM_BASE_URL = 'https://zeroclaw-town.vercel.app/claim';
+const DEFAULT_CLAIM_BASE_URL = 'https://agora.vercel.app/claim';
 const DEFAULT_OWNER_VERIFICATION_METHOD = 'tweet' as const;
 
 export const registerAgent = mutation({
