@@ -6,6 +6,7 @@ import { Id } from '../../convex/_generated/dataModel';
 import { useSendInput } from '../hooks/sendInput';
 import { Player } from '../../convex/aiTown/player';
 import { Conversation } from '../../convex/aiTown/conversation';
+import { usePlayerSessionToken } from '../hooks/playerSession';
 
 export function MessageInput({
   worldId,
@@ -19,13 +20,15 @@ export function MessageInput({
   conversation: Conversation;
 }) {
   const descriptions = useQuery(api.world.gameDescriptions, { worldId });
-  const humanName = descriptions?.playerDescriptions.find((p) => p.playerId === humanPlayer.id)
-    ?.name;
+  const humanName = descriptions?.playerDescriptions.find(
+    (p) => p.playerId === humanPlayer.id,
+  )?.name;
   const inputRef = useRef<HTMLParagraphElement>(null);
   const inflightUuid = useRef<string | undefined>();
   const writeMessage = useMutation(api.messages.writeMessage);
-  const startTyping = useSendInput(engineId, 'startTyping');
+  const startTyping = useSendInput(worldId, engineId, 'startTyping');
   const currentlyTyping = conversation.isTyping;
+  const sessionToken = usePlayerSessionToken();
 
   const onKeyDown = async (e: KeyboardEvent) => {
     e.stopPropagation();
@@ -65,9 +68,13 @@ export function MessageInput({
       messageUuid = currentlyTyping.messageUuid;
     }
     messageUuid = messageUuid || crypto.randomUUID();
+    if (!sessionToken) {
+      return;
+    }
     await writeMessage({
       worldId,
       playerId: humanPlayer.id,
+      sessionToken,
       conversationId: conversation.id,
       text,
       messageUuid,

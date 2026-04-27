@@ -15,6 +15,7 @@ import type {
   NetworkingTownStatus,
 } from '../../convex/networking/townProjection';
 import type { TownConversationThread } from '../../convex/networking/conversations';
+import { usePlayerSessionToken } from '../hooks/playerSession';
 
 const NETWORKING_STATUS_META: Record<NetworkingTownStatus, { label: string; className: string }> = {
   matched: {
@@ -52,7 +53,11 @@ export default function PlayerDetails({
   setSelectedElement: SelectElement;
   scrollViewRef: React.RefObject<HTMLDivElement>;
 }) {
-  const humanTokenIdentifier = useQuery(api.world.userStatus, { worldId });
+  const sessionToken = usePlayerSessionToken();
+  const humanTokenIdentifier = useQuery(api.world.userStatus, {
+    worldId,
+    sessionToken: sessionToken ?? undefined,
+  });
 
   const players = [...game.world.players.values()];
   const humanPlayer = players.find((p) => p.human === humanTokenIdentifier);
@@ -80,10 +85,10 @@ export default function PlayerDetails({
     networkingAgent ? { agentId: networkingAgent.agentId } : 'skip',
   ) as TownConversationThread[] | undefined;
 
-  const startConversation = useSendInput(engineId, 'startConversation');
-  const acceptInvite = useSendInput(engineId, 'acceptInvite');
-  const rejectInvite = useSendInput(engineId, 'rejectInvite');
-  const leaveConversation = useSendInput(engineId, 'leaveConversation');
+  const startConversation = useSendInput(worldId, engineId, 'startConversation');
+  const acceptInvite = useSendInput(worldId, engineId, 'acceptInvite');
+  const rejectInvite = useSendInput(worldId, engineId, 'rejectInvite');
+  const leaveConversation = useSendInput(worldId, engineId, 'leaveConversation');
 
   if (!playerId) {
     return (
@@ -312,9 +317,7 @@ function NetworkingConversationPanel({
     <div className="box mt-6">
       <div className="bg-brown-700 p-3">
         <div className="flex items-center justify-between gap-3">
-          <h3 className="font-display text-xl tracking-wider shadow-solid">
-            Agent conversations
-          </h3>
+          <h3 className="font-display text-xl tracking-wider shadow-solid">Agent conversations</h3>
           <span className="border border-brown-500 bg-brown-800 px-2 py-1 text-xs tabular-nums text-brown-100">
             {conversations ? conversations.length : '...'}
           </span>

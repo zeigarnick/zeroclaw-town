@@ -2,6 +2,7 @@ import { v } from 'convex/values';
 import { mutation, query } from './_generated/server';
 import { insertInput } from './aiTown/insertInput';
 import { conversationId, playerId } from './aiTown/ids';
+import { assertCurrentConversationParticipant, assertPlayerSession } from './world';
 
 export const listMessages = query({
   args: {
@@ -11,7 +12,9 @@ export const listMessages = query({
   handler: async (ctx, args) => {
     const messages = await ctx.db
       .query('messages')
-      .withIndex('conversationId', (q) => q.eq('worldId', args.worldId).eq('conversationId', args.conversationId))
+      .withIndex('conversationId', (q) =>
+        q.eq('worldId', args.worldId).eq('conversationId', args.conversationId),
+      )
       .collect();
     const out = [];
     for (const message of messages) {
@@ -34,9 +37,20 @@ export const writeMessage = mutation({
     conversationId,
     messageUuid: v.string(),
     playerId,
+    sessionToken: v.string(),
     text: v.string(),
   },
   handler: async (ctx, args) => {
+    await assertPlayerSession(ctx, {
+      worldId: args.worldId,
+      playerId: args.playerId,
+      sessionToken: args.sessionToken,
+    });
+    await assertCurrentConversationParticipant(ctx, {
+      worldId: args.worldId,
+      playerId: args.playerId,
+      conversationId: args.conversationId,
+    });
     await ctx.db.insert('messages', {
       conversationId: args.conversationId,
       author: args.playerId,

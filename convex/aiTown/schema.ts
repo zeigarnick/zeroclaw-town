@@ -78,4 +78,15 @@ export const aiTownTables = {
     .index('edge', ['worldId', 'player1', 'player2', 'ended'])
     .index('conversation', ['worldId', 'player1', 'conversationId'])
     .index('playerHistory', ['worldId', 'player1', 'ended']),
+
+  playerSessions: defineTable({
+    worldId: v.id('worlds'),
+    sessionId: v.string(),
+    tokenHash: v.bytes(),
+    createdAt: v.number(),
+    lastUsedAt: v.optional(v.number()),
+    revokedAt: v.optional(v.number()),
+  })
+    .index('by_token_hash', ['tokenHash'])
+    .index('by_world_session', ['worldId', 'sessionId']),
 };

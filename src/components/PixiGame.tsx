@@ -10,6 +10,7 @@ import { Id } from '../../convex/_generated/dataModel';
 import { useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api.js';
 import { useSendInput } from '../hooks/sendInput.ts';
+import { usePlayerSessionToken } from '../hooks/playerSession.ts';
 import { toastOnError } from '../toasts.ts';
 import { DebugPath } from './DebugPath.tsx';
 import { PositionIndicator } from './PositionIndicator.tsx';
@@ -47,12 +48,17 @@ export const PixiGame = (props: {
   const pixiApp = useApp();
   const viewportRef = useRef<Viewport | undefined>();
 
-  const humanTokenIdentifier = useQuery(api.world.userStatus, { worldId: props.worldId }) ?? null;
+  const sessionToken = usePlayerSessionToken();
+  const humanTokenIdentifier =
+    useQuery(api.world.userStatus, {
+      worldId: props.worldId,
+      sessionToken: sessionToken ?? undefined,
+    }) ?? null;
   const humanPlayerId = [...props.game.world.players.values()].find(
     (p) => p.human === humanTokenIdentifier,
   )?.id;
 
-  const moveTo = useSendInput(props.engineId, 'moveTo');
+  const moveTo = useSendInput(props.worldId, props.engineId, 'moveTo');
 
   // Interaction for clicking on the world to navigate.
   const dragStart = useRef<{ screenX: number; screenY: number } | null>(null);

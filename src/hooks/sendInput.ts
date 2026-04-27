@@ -2,6 +2,7 @@ import { ConvexReactClient, useConvex } from 'convex/react';
 import { InputArgs, InputReturnValue, Inputs } from '../../convex/aiTown/inputs';
 import { api } from '../../convex/_generated/api';
 import { Id } from '../../convex/_generated/dataModel';
+import { usePlayerSessionToken } from './playerSession';
 
 export async function waitForInput(convex: ConvexReactClient, inputId: Id<'inputs'>) {
   const watch = convex.watchQuery(api.aiTown.main.inputStatus, { inputId });
@@ -40,12 +41,23 @@ export async function waitForInput(convex: ConvexReactClient, inputId: Id<'input
 }
 
 export function useSendInput<Name extends keyof Inputs>(
+  worldId: Id<'worlds'>,
   engineId: Id<'engines'>,
   name: Name,
 ): (args: InputArgs<Name>) => Promise<InputReturnValue<Name>> {
   const convex = useConvex();
+  const sessionToken = usePlayerSessionToken();
   return async (args) => {
-    const inputId = await convex.mutation(api.world.sendWorldInput, { engineId, name, args });
+    if (!sessionToken) {
+      throw new Error('Join the town before sending player input.');
+    }
+    const inputId = await convex.mutation(api.world.sendWorldInput, {
+      worldId,
+      engineId,
+      sessionToken,
+      name,
+      args,
+    });
     return await waitForInput(convex, inputId);
   };
 }

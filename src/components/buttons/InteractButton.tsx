@@ -9,13 +9,22 @@ import { Id } from '../../../convex/_generated/dataModel';
 import { useCallback } from 'react';
 import { waitForInput } from '../../hooks/sendInput';
 import { useServerGame } from '../../hooks/serverGame';
+import {
+  clearPlayerSessionToken,
+  setPlayerSessionToken,
+  usePlayerSessionToken,
+} from '../../hooks/playerSession';
 
 export default function InteractButton() {
   // const { isAuthenticated } = useConvexAuth();
   const worldStatus = useQuery(api.world.defaultWorldStatus);
   const worldId = worldStatus?.worldId;
   const game = useServerGame(worldId);
-  const humanTokenIdentifier = useQuery(api.world.userStatus, worldId ? { worldId } : 'skip');
+  const sessionToken = usePlayerSessionToken();
+  const humanTokenIdentifier = useQuery(
+    api.world.userStatus,
+    worldId ? { worldId, sessionToken: sessionToken ?? undefined } : 'skip',
+  );
   const userPlayerId =
     game && [...game.world.players.values()].find((p) => p.human === humanTokenIdentifier)?.id;
   const join = useMutation(api.world.joinWorld);
@@ -25,9 +34,14 @@ export default function InteractButton() {
   const convex = useConvex();
   const joinInput = useCallback(
     async (worldId: Id<'worlds'>) => {
-      let inputId;
       try {
-        inputId = await join({ worldId });
+        const joinResult = await join({ worldId });
+        setPlayerSessionToken(joinResult.sessionToken);
+        try {
+          await waitForInput(convex, joinResult.inputId);
+        } catch (e: any) {
+          toast.error(e.message);
+        }
       } catch (e: any) {
         if (e instanceof ConvexError) {
           toast.error(e.data);
@@ -35,13 +49,8 @@ export default function InteractButton() {
         }
         throw e;
       }
-      try {
-        await waitForInput(convex, inputId);
-      } catch (e: any) {
-        toast.error(e.message);
-      }
     },
-    [convex],
+    [convex, join],
   );
 
   const joinOrLeaveGame = () => {
@@ -54,7 +63,12 @@ export default function InteractButton() {
     }
     if (isPlaying) {
       console.log(`Leaving game for player ${userPlayerId}`);
-      void leave({ worldId });
+      if (!sessionToken || !userPlayerId) {
+        return;
+      }
+      void leave({ worldId, playerId: userPlayerId, sessionToken })
+        .then(() => clearPlayerSessionToken())
+        .catch((e: any) => toast.error(e.message));
     } else {
       console.log(`Joining game`);
       void joinInput(worldId);
