@@ -13,8 +13,17 @@ import { apiAdapter } from './networking/api.ts';
 
 type AppView = 'town' | 'dashboard';
 
+function getInitialClaimToken() {
+  const pathMatch = window.location.pathname.match(/^\/claim\/([^/?#]+)/);
+  if (pathMatch) {
+    return decodeURIComponent(pathMatch[1]);
+  }
+  return new URLSearchParams(window.location.search).get('claimToken') ?? '';
+}
+
 export default function Home() {
-  const [currentView, setCurrentView] = useState<AppView>('town');
+  const initialClaimToken = getInitialClaimToken();
+  const [currentView, setCurrentView] = useState<AppView>(initialClaimToken ? 'dashboard' : 'town');
   return (
     <main className="relative overflow-hidden bg-black font-body" style={{ height: '100dvh' }}>
       {/*<div className="p-3 absolute top-0 right-0 z-10 text-2xl">
@@ -54,7 +63,7 @@ export default function Home() {
               Back to Town
             </button>
             <div className="min-h-0 flex-1 overflow-hidden pt-12">
-              <OwnerDashboard apiAdapter={apiAdapter} />
+              <OwnerDashboard apiAdapter={apiAdapter} initialClaimToken={initialClaimToken} />
             </div>
           </div>
         )}

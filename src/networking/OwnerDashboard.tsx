@@ -16,6 +16,7 @@ import {
 
 type OwnerDashboardProps = {
   apiAdapter: IApiAdapter;
+  initialClaimToken?: string;
 };
 
 type DemoCredential = {
@@ -49,14 +50,14 @@ function makeClientMessageId() {
   return `client_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
-export function OwnerDashboard({ apiAdapter }: OwnerDashboardProps) {
+export function OwnerDashboard({ apiAdapter, initialClaimToken = '' }: OwnerDashboardProps) {
   const [registeredAgent, setRegisteredAgent] = useState<Agent | null>(null);
 
   const [agentSlug, setAgentSlug] = useState('');
   const [agentDisplayName, setAgentDisplayName] = useState('');
   const [agentDescription, setAgentDescription] = useState('');
 
-  const [claimToken, setClaimToken] = useState('');
+  const [claimToken, setClaimToken] = useState(initialClaimToken);
   const [verificationCode, setVerificationCode] = useState('');
   const [xHandle, setXHandle] = useState('');
   const [ownerDisplayName, setOwnerDisplayName] = useState('');

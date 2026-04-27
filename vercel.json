@@ -8,6 +8,10 @@
       "destination": "https://youthful-sockeye-531.convex.site/api/v1/:match*"
     },
     {
+      "source": "/claim/:match*",
+      "destination": "/"
+    },
+    {
       "source": "/ai-town/:match*",
       "destination": "/:match*"
     }

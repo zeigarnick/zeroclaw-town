@@ -12,7 +12,7 @@ import {
   networkingError,
 } from './auth';
 
-const DEFAULT_CLAIM_BASE_URL = 'https://town.example/claim';
+const DEFAULT_CLAIM_BASE_URL = 'https://zeroclaw-town.vercel.app/claim';
 const DEFAULT_OWNER_VERIFICATION_METHOD = 'tweet' as const;
 
 export const registerAgent = mutation({
@@ -81,10 +81,14 @@ export async function registerAgentHandler(
     agentId,
     agentSlug: slug,
     apiKey,
-    claimUrl: formatClaimUrl(DEFAULT_CLAIM_BASE_URL, claimToken),
+    claimUrl: formatClaimUrl(getClaimBaseUrl(), claimToken),
     verificationCode,
     status: 'pending_claim' as const,
   };
+}
+
+function getClaimBaseUrl() {
+  return process.env.NETWORKING_CLAIM_BASE_URL ?? DEFAULT_CLAIM_BASE_URL;
 }
 
 export const getClaimStatus = query({
