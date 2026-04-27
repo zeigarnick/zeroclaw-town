@@ -1,5 +1,10 @@
 import { ConvexError } from 'convex/values';
-import { claimAgentForTestingHandler, getClaimStatusHandler, registerAgentHandler } from './agents';
+import {
+  claimAgentForTestingHandler,
+  getClaimStatusHandler,
+  registerAgentForTestingHandler,
+  registerAgentHandler,
+} from './agents';
 import { getKeyPrefix, hashSecret } from './auth';
 
 type TableName = 'networkAgents' | 'networkAgentApiKeys' | 'ownerClaims' | 'worldStatus';
@@ -49,6 +54,10 @@ function createMockCtx() {
             tables[tableName].find((row) =>
               filters.every(({ field, value }) => valuesEqual(row[field], value)),
             ) ?? null,
+          collect: async () =>
+            tables[tableName].filter((row) =>
+              filters.every(({ field, value }) => valuesEqual(row[field], value)),
+            ),
         };
       },
     }),
@@ -84,10 +93,43 @@ function tokenFromClaimUrl(claimUrl: string) {
 }
 
 describe('networking agent handlers', () => {
-  test('registers an active agent with hashed credentials and verified owner claim', async () => {
+  test('public registration creates a pending claim without exposing active credentials', async () => {
     const { ctx, tables } = createMockCtx();
 
-    const result = await registerAgentHandler(
+    const result = await registerAgentHandler(ctx as any, {
+      slug: ' Zero Claw ',
+      displayName: ' ZeroClaw ',
+      description: ' autonomous networking agent ',
+    });
+
+    expect(result).toMatchObject({
+      agentSlug: 'zero-claw',
+      status: 'pending_claim',
+    });
+    expect((result as any).apiKey).toBeUndefined();
+    expect((result as any).verificationCode).toBeUndefined();
+    expect(result.claimUrl).toMatch(/^https:\/\/agora\.vercel\.app\/claim\/town_claim_/);
+
+    expect(tables.networkAgents).toHaveLength(1);
+    expect(tables.networkAgentApiKeys).toHaveLength(0);
+    expect(tables.ownerClaims).toHaveLength(1);
+    expect(tables.networkAgents[0]).toMatchObject({
+      slug: 'zero-claw',
+      displayName: 'ZeroClaw',
+      description: 'autonomous networking agent',
+      status: 'pending_claim',
+      ownerClaimId: tables.ownerClaims[0]._id,
+    });
+    expect(tables.ownerClaims[0]).toMatchObject({
+      agentId: tables.networkAgents[0]._id,
+      status: 'pending',
+    });
+  });
+
+  test('testing registration exposes one-time claim code for controlled flows', async () => {
+    const { ctx, tables } = createMockCtx();
+
+    const result = await registerAgentForTestingHandler(
       ctx as any,
       {
         slug: ' Zero Claw ',
@@ -98,17 +140,15 @@ describe('networking agent handlers', () => {
     );
 
     expect(result.agentSlug).toBe('zero-claw');
-    expect(result.apiKey).toMatch(/^town_/);
     expect(result.claimUrl).toMatch(/^https:\/\/agora\.vercel\.app\/claim\/town_claim_/);
     expect(result.claimUrl).not.toContain('evil.example');
     expect(result.verificationCode).toMatch(/^town-[A-Z2-9]{6}$/);
 
     expect(tables.networkAgents).toHaveLength(1);
-    expect(tables.networkAgentApiKeys).toHaveLength(1);
+    expect(tables.networkAgentApiKeys).toHaveLength(0);
     expect(tables.ownerClaims).toHaveLength(1);
 
     const agent = tables.networkAgents[0];
-    const apiKey = tables.networkAgentApiKeys[0];
     const claim = tables.ownerClaims[0];
     const claimToken = tokenFromClaimUrl(result.claimUrl);
 
@@ -116,34 +156,24 @@ describe('networking agent handlers', () => {
       slug: 'zero-claw',
       displayName: 'ZeroClaw',
       description: 'autonomous networking agent',
-      status: 'active',
+      status: 'pending_claim',
       ownerClaimId: claim._id,
     });
-    expect(apiKey).toMatchObject({
-      agentId: agent._id,
-      keyPrefix: getKeyPrefix(result.apiKey),
-      status: 'active',
-    });
-    expect(buffersEqual(apiKey.keyHash, await hashSecret(result.apiKey))).toBe(true);
-    expect(Buffer.from(apiKey.keyHash).toString('utf8')).not.toContain(result.apiKey);
     expect(buffersEqual(claim.claimTokenHash, await hashSecret(claimToken))).toBe(true);
     expect(
       buffersEqual(claim.verificationCodeHash, await hashSecret(result.verificationCode)),
     ).toBe(true);
     expect(claim).toMatchObject({
       agentId: agent._id,
-      status: 'verified',
-      xHandle: 'zero-claw',
-      xProfileUrl: 'https://x.com/zero-claw',
-      verificationMethod: 'oauth',
+      status: 'pending',
     });
     expect(JSON.stringify(tables)).not.toContain(claimToken);
     expect(JSON.stringify(tables)).not.toContain(result.verificationCode);
   });
 
-  test('reports verified claim status and lets mock claim update owner metadata idempotently', async () => {
+  test('reports pending claim status and activates with a one-time API key', async () => {
     const { ctx, tables } = createMockCtx();
-    const registration = await registerAgentHandler(ctx as any, {
+    const registration = await registerAgentForTestingHandler(ctx as any, {
       slug: 'zeroclaw',
       displayName: 'ZeroClaw',
     });
@@ -152,8 +182,8 @@ describe('networking agent handlers', () => {
     await expect(getClaimStatusHandler(ctx as any, { claimToken })).resolves.toMatchObject({
       agentSlug: 'zeroclaw',
       agentDisplayName: 'ZeroClaw',
-      agentStatus: 'active',
-      claimStatus: 'verified',
+      agentStatus: 'pending_claim',
+      claimStatus: 'pending',
     });
 
     await expect(
@@ -178,8 +208,18 @@ describe('networking agent handlers', () => {
     expect(claimed).toMatchObject({
       agentId: registration.agentId,
       agentSlug: 'zeroclaw',
+      apiKey: expect.stringMatching(/^town_/),
       status: 'active',
     });
+    expect(tables.networkAgentApiKeys).toHaveLength(1);
+    expect(tables.networkAgentApiKeys[0]).toMatchObject({
+      agentId: registration.agentId,
+      keyPrefix: getKeyPrefix(claimed.apiKey),
+      status: 'active',
+    });
+    expect(
+      buffersEqual(tables.networkAgentApiKeys[0].keyHash, await hashSecret(claimed.apiKey)),
+    ).toBe(true);
     expect(tables.networkAgents[0]).toMatchObject({
       status: 'active',
       ownerClaimId: claimed.ownerClaimId,
@@ -190,6 +230,17 @@ describe('networking agent handlers', () => {
       xProfileUrl: 'https://x.com/zeroclaw',
       verificationMethod: 'tweet',
     });
+
+    await expect(
+      claimAgentForTestingHandler(ctx as any, {
+        claimToken,
+        verificationCode: registration.verificationCode,
+        xHandle: '@zeroclaw-again',
+        xProfileUrl: 'https://x.com/zeroclaw-again',
+      }),
+    ).rejects.toMatchObject({
+      data: { code: 'invalid_claim_status' },
+    } satisfies Partial<ConvexError<{ code: string }>>);
 
     await expect(getClaimStatusHandler(ctx as any, { claimToken })).resolves.toMatchObject({
       agentStatus: 'active',

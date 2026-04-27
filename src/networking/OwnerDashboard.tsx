@@ -110,7 +110,9 @@ export function OwnerDashboard({ apiAdapter, initialClaimToken = '' }: OwnerDash
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [intros, setIntros] = useState<IntroCandidate[]>([]);
-  const [messagesByConversation, setMessagesByConversation] = useState<Record<string, Message[]>>({});
+  const [messagesByConversation, setMessagesByConversation] = useState<Record<string, Message[]>>(
+    {},
+  );
 
   const [cardType, setCardType] = useState<'need' | 'offer' | 'exchange'>('need');
   const [cardTitle, setCardTitle] = useState('');
@@ -153,14 +155,19 @@ export function OwnerDashboard({ apiAdapter, initialClaimToken = '' }: OwnerDash
 
   const refreshDashboard = useCallback(
     async (apiKey: string) => {
-      const [cardsResponse, inboxResponse, meetingsResponse, conversationsResponse, introsResponse] =
-        await Promise.all([
-          apiAdapter.getCards(apiKey),
-          apiAdapter.getInbox(apiKey),
-          apiAdapter.getMeetings(apiKey),
-          apiAdapter.getConversations(apiKey),
-          apiAdapter.getIntros(apiKey),
-        ]);
+      const [
+        cardsResponse,
+        inboxResponse,
+        meetingsResponse,
+        conversationsResponse,
+        introsResponse,
+      ] = await Promise.all([
+        apiAdapter.getCards(apiKey),
+        apiAdapter.getInbox(apiKey),
+        apiAdapter.getMeetings(apiKey),
+        apiAdapter.getConversations(apiKey),
+        apiAdapter.getIntros(apiKey),
+      ]);
 
       let firstError = '';
 
@@ -315,19 +322,19 @@ export function OwnerDashboard({ apiAdapter, initialClaimToken = '' }: OwnerDash
 
       const nextAgent: Agent = {
         ...response.data,
-        apiKey: registeredAgent?.apiKey,
+        apiKey: response.data.apiKey,
         claimUrl: registeredAgent?.claimUrl,
-        verificationCode: registeredAgent?.verificationCode,
       };
 
       setRegisteredAgent(nextAgent);
 
-      if (!registeredAgent?.apiKey) {
+      if (!nextAgent.apiKey) {
         showSuccess('Mock claim succeeded. Load an API key to view dashboard data.');
         return;
       }
 
-      await loadApiKey(registeredAgent.apiKey, registeredAgent.agentSlug || 'Registered Agent');
+      setManualApiKey(nextAgent.apiKey);
+      await loadApiKey(nextAgent.apiKey, nextAgent.agentSlug || 'Registered Agent');
     } catch (cause) {
       showError(`Mock claim failed: ${String(cause)}`);
     } finally {
@@ -600,8 +607,12 @@ export function OwnerDashboard({ apiAdapter, initialClaimToken = '' }: OwnerDash
 
   const recommendationEvents = inboxEvents.filter((event) => event.type === 'match_recommendation');
   const pendingMeetings = meetings.filter((meeting) => meeting.status === 'pending');
-  const openConversations = conversations.filter((conversation) => conversation.status !== 'closed');
-  const pendingIntros = intros.filter((intro) => intro.status === 'pending' || intro.status === 'ready');
+  const openConversations = conversations.filter(
+    (conversation) => conversation.status !== 'closed',
+  );
+  const pendingIntros = intros.filter(
+    (intro) => intro.status === 'pending' || intro.status === 'ready',
+  );
 
   return (
     <div className="h-full w-full overflow-y-auto bg-gray-950 text-gray-100">
@@ -906,10 +917,22 @@ function OverviewTab({
   return (
     <div className="space-y-6">
       <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Published cards" value={cards.length} detail="Needs, offers, and exchanges" />
-        <StatCard label="Inbox activity" value={inboxEvents.length} detail="Recent network events" />
+        <StatCard
+          label="Published cards"
+          value={cards.length}
+          detail="Needs, offers, and exchanges"
+        />
+        <StatCard
+          label="Inbox activity"
+          value={inboxEvents.length}
+          detail="Recent network events"
+        />
         <StatCard label="Meetings" value={meetings.length} detail="Requested or accepted" />
-        <StatCard label="Open conversations" value={openConversations.length} detail={`${pendingIntros.length} intro reviews`} />
+        <StatCard
+          label="Open conversations"
+          value={openConversations.length}
+          detail={`${pendingIntros.length} intro reviews`}
+        />
       </section>
 
       <section className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -940,7 +963,10 @@ function OverviewTab({
           ) : (
             <div className="mt-4 space-y-3">
               {nextActions.map((action) => (
-                <article key={action.id} className="rounded-lg border border-gray-800 bg-gray-950 p-4">
+                <article
+                  key={action.id}
+                  className="rounded-lg border border-gray-800 bg-gray-950 p-4"
+                >
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                       <Pill>{action.priority}</Pill>
@@ -1009,14 +1035,19 @@ function CardsTab({
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
       <section className="rounded-lg border border-gray-800 bg-gray-900 p-5 lg:col-span-1">
-        <SectionHeading title="Create card" body="Publish the specific need, offer, or exchange your agent can safely match on." />
+        <SectionHeading
+          title="Create card"
+          body="Publish the specific need, offer, or exchange your agent can safely match on."
+        />
         <div className="mt-4 space-y-3">
           <div className="grid grid-cols-2 gap-2">
             <label className="space-y-1 text-sm text-gray-300">
               <span>Type</span>
               <select
                 value={cardType}
-                onChange={(event) => setCardType(event.target.value as 'need' | 'offer' | 'exchange')}
+                onChange={(event) =>
+                  setCardType(event.target.value as 'need' | 'offer' | 'exchange')
+                }
                 className="w-full rounded-lg border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-gray-100"
               >
                 <option value="need">Need</option>
@@ -1040,12 +1071,45 @@ function CardsTab({
               </select>
             </label>
           </div>
-          <TextInput label="Title" value={cardTitle} setValue={setCardTitle} placeholder="Need warm fintech investor intros" />
-          <TextArea label="Owner-facing summary" value={cardSummary} setValue={setCardSummary} rows={2} placeholder="Short explanation shown in review surfaces" />
-          <TextArea label="Matching details" value={cardDetailsForMatching} setValue={setCardDetailsForMatching} rows={3} placeholder="More detail for matching quality" />
-          <TextArea label="Desired outcome" value={cardDesiredOutcome} setValue={setCardDesiredOutcome} rows={2} placeholder="What should happen if this works?" />
-          <TextInput label="Tags" value={cardTagsCsv} setValue={setCardTagsCsv} placeholder="fundraising, fintech" />
-          <TextInput label="Domains" value={cardDomainsCsv} setValue={setCardDomainsCsv} placeholder="fintech, b2b-saas" />
+          <TextInput
+            label="Title"
+            value={cardTitle}
+            setValue={setCardTitle}
+            placeholder="Need warm fintech investor intros"
+          />
+          <TextArea
+            label="Owner-facing summary"
+            value={cardSummary}
+            setValue={setCardSummary}
+            rows={2}
+            placeholder="Short explanation shown in review surfaces"
+          />
+          <TextArea
+            label="Matching details"
+            value={cardDetailsForMatching}
+            setValue={setCardDetailsForMatching}
+            rows={3}
+            placeholder="More detail for matching quality"
+          />
+          <TextArea
+            label="Desired outcome"
+            value={cardDesiredOutcome}
+            setValue={setCardDesiredOutcome}
+            rows={2}
+            placeholder="What should happen if this works?"
+          />
+          <TextInput
+            label="Tags"
+            value={cardTagsCsv}
+            setValue={setCardTagsCsv}
+            placeholder="fundraising, fintech"
+          />
+          <TextInput
+            label="Domains"
+            value={cardDomainsCsv}
+            setValue={setCardDomainsCsv}
+            placeholder="fintech, b2b-saas"
+          />
           <button
             type="button"
             onClick={handleCreateCard}
@@ -1058,9 +1122,15 @@ function CardsTab({
       </section>
 
       <section className="rounded-lg border border-gray-800 bg-gray-900 p-5 lg:col-span-2">
-        <SectionHeading title="Published cards" body="These are the owner-approved intents available to the matching system." />
+        <SectionHeading
+          title="Published cards"
+          body="These are the owner-approved intents available to the matching system."
+        />
         {cards.length === 0 ? (
-          <EmptyState title="No cards yet" body="Create one active card so your agent has something useful to match against." />
+          <EmptyState
+            title="No cards yet"
+            body="Create one active card so your agent has something useful to match against."
+          />
         ) : (
           <div className="mt-4 grid grid-cols-1 gap-3">
             {cards.map((card) => (
@@ -1069,7 +1139,9 @@ function CardsTab({
                   <div>
                     <div className="flex flex-wrap gap-2">
                       <Pill>{formatEventType(card.type)}</Pill>
-                      <Pill className={statusTone(card.status)}>{formatStatusLabel(card.status)}</Pill>
+                      <Pill className={statusTone(card.status)}>
+                        {formatStatusLabel(card.status)}
+                      </Pill>
                     </div>
                     <h3 className="mt-3 text-base font-semibold text-white">{card.title}</h3>
                     <p className="mt-2 text-sm leading-6 text-gray-300">{card.summary}</p>
@@ -1107,15 +1179,24 @@ function MatchesTab({
   meetings: Meeting[];
   pendingMeetings: Meeting[];
   loading: boolean;
-  handleRequestMeetingForRecommendation: (recommendationId: string, requestMessage?: string) => Promise<void>;
+  handleRequestMeetingForRecommendation: (
+    recommendationId: string,
+    requestMessage?: string,
+  ) => Promise<void>;
   handleRespondToMeeting: (meetingId: string, accept: boolean) => void;
 }) {
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
       <section className="rounded-lg border border-gray-800 bg-gray-900 p-5">
-        <SectionHeading title="Match recommendations" body="Review suggested fits before asking the other side to meet." />
+        <SectionHeading
+          title="Match recommendations"
+          body="Review suggested fits before asking the other side to meet."
+        />
         {recommendationEvents.length === 0 ? (
-          <EmptyState title="No match recommendations" body="New recommendations will appear here when your active cards find compatible offers or needs." />
+          <EmptyState
+            title="No match recommendations"
+            body="New recommendations will appear here when your active cards find compatible offers or needs."
+          />
         ) : (
           <div className="mt-4 space-y-3">
             {recommendationEvents.map((event) => (
@@ -1125,15 +1206,19 @@ function MatchesTab({
                     <Pill>{formatEventType(event.type)}</Pill>
                     <h3 className="mt-3 text-base font-semibold text-white">Potential fit found</h3>
                     <p className="mt-2 text-sm leading-6 text-gray-300">
-                      Your agent received a private recommendation. Request a meeting when this looks
-                      useful enough to start a conversation.
+                      Your agent received a private recommendation. Request a meeting when this
+                      looks useful enough to start a conversation.
                     </p>
-                    <p className="mt-2 text-xs text-gray-500 tabular-nums">{formatDate(event.createdAt)}</p>
+                    <p className="mt-2 text-xs text-gray-500 tabular-nums">
+                      {formatDate(event.createdAt)}
+                    </p>
                   </div>
                   {event.recommendationId && (
                     <button
                       type="button"
-                      onClick={() => handleRequestMeetingForRecommendation(event.recommendationId ?? '')}
+                      onClick={() =>
+                        handleRequestMeetingForRecommendation(event.recommendationId ?? '')
+                      }
                       disabled={loading}
                       className="rounded-lg bg-clay-700 px-3 py-2 text-sm font-medium text-white hover:bg-clay-500 disabled:bg-gray-700"
                     >
@@ -1142,8 +1227,14 @@ function MatchesTab({
                   )}
                 </div>
                 <DeveloperDetails>
-                  <DetailLine label="Recommendation ID" value={event.recommendationId ?? 'Not provided'} />
-                  <DetailLine label="Payload" value={event.payload ? JSON.stringify(event.payload) : 'None'} />
+                  <DetailLine
+                    label="Recommendation ID"
+                    value={event.recommendationId ?? 'Not provided'}
+                  />
+                  <DetailLine
+                    label="Payload"
+                    value={event.payload ? JSON.stringify(event.payload) : 'None'}
+                  />
                 </DeveloperDetails>
               </article>
             ))}
@@ -1152,16 +1243,27 @@ function MatchesTab({
       </section>
 
       <section className="rounded-lg border border-gray-800 bg-gray-900 p-5">
-        <SectionHeading title="Meetings" body={`${pendingMeetings.length} pending decision${pendingMeetings.length === 1 ? '' : 's'}.`} />
+        <SectionHeading
+          title="Meetings"
+          body={`${pendingMeetings.length} pending decision${pendingMeetings.length === 1 ? '' : 's'}.`}
+        />
         {meetings.length === 0 ? (
-          <EmptyState title="No meetings yet" body="Accepted recommendations turn into meeting requests and then conversations." />
+          <EmptyState
+            title="No meetings yet"
+            body="Accepted recommendations turn into meeting requests and then conversations."
+          />
         ) : (
           <div className="mt-4 space-y-3">
             {meetings.map((meeting) => (
-              <article key={meeting.id} className="rounded-lg border border-gray-800 bg-gray-950 p-4">
+              <article
+                key={meeting.id}
+                className="rounded-lg border border-gray-800 bg-gray-950 p-4"
+              >
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
-                    <Pill className={statusTone(meeting.status)}>{formatStatusLabel(meeting.status)}</Pill>
+                    <Pill className={statusTone(meeting.status)}>
+                      {formatStatusLabel(meeting.status)}
+                    </Pill>
                     <h3 className="mt-3 text-base font-semibold text-white">Meeting request</h3>
                     <p className="mt-2 text-sm leading-6 text-gray-300">
                       {meeting.requestMessage || 'No request message was provided.'}
@@ -1205,21 +1307,31 @@ function MatchesTab({
       <section className="rounded-lg border border-gray-800 bg-gray-900 p-5 lg:col-span-2">
         <SectionHeading title="Recent activity" body="Owner-friendly view of the agent inbox." />
         {inboxEvents.length === 0 ? (
-          <EmptyState title="No inbox activity" body="Recommendations, meeting updates, messages, and intro events will collect here." />
+          <EmptyState
+            title="No inbox activity"
+            body="Recommendations, meeting updates, messages, and intro events will collect here."
+          />
         ) : (
           <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
             {inboxEvents.map((event) => (
               <article key={event.id} className="rounded-lg border border-gray-800 bg-gray-950 p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <h3 className="text-sm font-semibold text-white">{formatEventType(event.type)}</h3>
+                    <h3 className="text-sm font-semibold text-white">
+                      {formatEventType(event.type)}
+                    </h3>
                     <p className="mt-1 text-sm text-gray-300">{formatStatusLabel(event.status)}</p>
                   </div>
-                  <p className="text-xs text-gray-500 tabular-nums">{formatDate(event.createdAt)}</p>
+                  <p className="text-xs text-gray-500 tabular-nums">
+                    {formatDate(event.createdAt)}
+                  </p>
                 </div>
                 <DeveloperDetails>
                   <DetailLine label="Inbox event ID" value={event.id} />
-                  <DetailLine label="Payload" value={event.payload ? JSON.stringify(event.payload) : 'None'} />
+                  <DetailLine
+                    label="Payload"
+                    value={event.payload ? JSON.stringify(event.payload) : 'None'}
+                  />
                 </DeveloperDetails>
               </article>
             ))}
@@ -1257,9 +1369,15 @@ function ConversationsTab({
 }) {
   return (
     <section className="rounded-lg border border-gray-800 bg-gray-900 p-5">
-      <SectionHeading title="Conversation review" body="Read the agent transcript and decide whether it should continue, close, or become an intro candidate." />
+      <SectionHeading
+        title="Conversation review"
+        body="Read the agent transcript and decide whether it should continue, close, or become an intro candidate."
+      />
       {conversations.length === 0 ? (
-        <EmptyState title="No conversations yet" body="Accepted meetings create conversations for your agent to qualify the fit." />
+        <EmptyState
+          title="No conversations yet"
+          body="Accepted meetings create conversations for your agent to qualify the fit."
+        />
       ) : (
         <div className="mt-4 grid grid-cols-1 gap-5 lg:grid-cols-3">
           <div className="space-y-3">
@@ -1276,10 +1394,16 @@ function ConversationsTab({
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="text-sm font-semibold text-white">{describeConversation(conversation, index)}</p>
-                    <p className="mt-1 text-xs text-gray-400 tabular-nums">{formatDate(conversation.updatedAt)}</p>
+                    <p className="text-sm font-semibold text-white">
+                      {describeConversation(conversation, index)}
+                    </p>
+                    <p className="mt-1 text-xs text-gray-400 tabular-nums">
+                      {formatDate(conversation.updatedAt)}
+                    </p>
                   </div>
-                  <Pill className={statusTone(conversation.status)}>{formatStatusLabel(conversation.status)}</Pill>
+                  <Pill className={statusTone(conversation.status)}>
+                    {formatStatusLabel(conversation.status)}
+                  </Pill>
                 </div>
               </button>
             ))}
@@ -1287,7 +1411,10 @@ function ConversationsTab({
 
           <div className="lg:col-span-2">
             {!selectedConversation ? (
-              <EmptyState title="Select a conversation" body="Choose a conversation to review transcript details and send a response." />
+              <EmptyState
+                title="Select a conversation"
+                body="Choose a conversation to review transcript details and send a response."
+              />
             ) : (
               <div className="space-y-4">
                 <div className="rounded-lg border border-gray-800 bg-gray-950 p-4">
@@ -1297,7 +1424,8 @@ function ConversationsTab({
                         {describeConversation(selectedConversation, selectedConversationIndex)}
                       </h3>
                       <p className="mt-1 text-sm text-gray-400">
-                        {formatStatusLabel(selectedConversation.status)} since {formatDate(selectedConversation.createdAt)}
+                        {formatStatusLabel(selectedConversation.status)} since{' '}
+                        {formatDate(selectedConversation.createdAt)}
                       </p>
                     </div>
                     <button
@@ -1317,11 +1445,17 @@ function ConversationsTab({
 
                 <div className="h-80 overflow-y-auto rounded-lg border border-gray-800 bg-gray-950 p-4">
                   {selectedConversationMessages.length === 0 ? (
-                    <EmptyState title="No messages" body="Messages will appear here after either agent replies." />
+                    <EmptyState
+                      title="No messages"
+                      body="Messages will appear here after either agent replies."
+                    />
                   ) : (
                     <div className="space-y-3">
                       {selectedConversationMessages.map((message) => (
-                        <article key={message.id} className="rounded-lg border border-gray-800 bg-gray-900 p-3">
+                        <article
+                          key={message.id}
+                          className="rounded-lg border border-gray-800 bg-gray-900 p-3"
+                        >
                           <p className="text-sm leading-6 text-gray-100">{message.body}</p>
                           <p className="mt-2 text-xs text-gray-500 tabular-nums">
                             Sent {formatDate(message.createdAt)}
@@ -1393,7 +1527,10 @@ function IntrosTab({
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
       <section className="rounded-lg border border-gray-800 bg-gray-900 p-5 lg:col-span-1">
-        <SectionHeading title="Create intro candidate" body="Turn a qualified conversation into a human-reviewable next step." />
+        <SectionHeading
+          title="Create intro candidate"
+          body="Turn a qualified conversation into a human-reviewable next step."
+        />
         <div className="mt-4 space-y-3">
           <label className="space-y-1 text-sm text-gray-300">
             <span>Conversation</span>
@@ -1410,8 +1547,20 @@ function IntrosTab({
               ))}
             </select>
           </label>
-          <TextArea label="Summary" value={introSummary} setValue={setIntroSummary} rows={3} placeholder="Why this is qualified" />
-          <TextArea label="Recommended next step" value={introRecommendedNextStep} setValue={setIntroRecommendedNextStep} rows={3} placeholder="What the owner should do next" />
+          <TextArea
+            label="Summary"
+            value={introSummary}
+            setValue={setIntroSummary}
+            rows={3}
+            placeholder="Why this is qualified"
+          />
+          <TextArea
+            label="Recommended next step"
+            value={introRecommendedNextStep}
+            setValue={setIntroRecommendedNextStep}
+            rows={3}
+            placeholder="What the owner should do next"
+          />
           <label className="flex items-center gap-2 rounded-lg border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-gray-300">
             <input
               type="checkbox"
@@ -1432,19 +1581,31 @@ function IntrosTab({
       </section>
 
       <section className="rounded-lg border border-gray-800 bg-gray-900 p-5 lg:col-span-2">
-        <SectionHeading title="Intro candidates" body="These are not automatic human connections. They need owner review." />
+        <SectionHeading
+          title="Intro candidates"
+          body="These are not automatic human connections. They need owner review."
+        />
         {intros.length === 0 ? (
-          <EmptyState title="No intro candidates" body="When a conversation is qualified, create an intro candidate for review here." />
+          <EmptyState
+            title="No intro candidates"
+            body="When a conversation is qualified, create an intro candidate for review here."
+          />
         ) : (
           <div className="mt-4 space-y-3">
             {intros.map((intro) => (
               <article key={intro.id} className="rounded-lg border border-gray-800 bg-gray-950 p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
-                    <Pill className={statusTone(intro.status)}>{formatStatusLabel(intro.status)}</Pill>
+                    <Pill className={statusTone(intro.status)}>
+                      {formatStatusLabel(intro.status)}
+                    </Pill>
                     <h3 className="mt-3 text-base font-semibold text-white">{intro.summary}</h3>
-                    <p className="mt-2 text-sm leading-6 text-gray-300">{intro.recommendedNextStep}</p>
-                    <p className="mt-2 text-xs text-gray-500 tabular-nums">{formatDate(intro.updatedAt)}</p>
+                    <p className="mt-2 text-sm leading-6 text-gray-300">
+                      {intro.recommendedNextStep}
+                    </p>
+                    <p className="mt-2 text-xs text-gray-500 tabular-nums">
+                      {formatDate(intro.updatedAt)}
+                    </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <button
@@ -1577,7 +1738,10 @@ function DeveloperTab({
   return (
     <div className="space-y-6">
       <section className="rounded-lg border border-gray-800 bg-gray-900 p-5">
-        <SectionHeading title="Developer access" body="Raw setup tools and identifiers are kept here so owner workflows stay readable." />
+        <SectionHeading
+          title="Developer access"
+          body="Raw setup tools and identifiers are kept here so owner workflows stay readable."
+        />
         <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
           <div className="rounded-lg border border-gray-800 bg-gray-950 p-4">
             <h3 className="text-sm font-semibold text-white">Load API key</h3>
@@ -1636,11 +1800,29 @@ function DeveloperTab({
 
       <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="rounded-lg border border-gray-800 bg-gray-900 p-5">
-          <SectionHeading title="Register agent" body="Create a pending agent and receive claim credentials." />
+          <SectionHeading
+            title="Register agent"
+            body="Create a pending agent and receive claim credentials."
+          />
           <div className="mt-4 grid grid-cols-1 gap-2">
-            <TextInput label="Slug" value={agentSlug} setValue={setAgentSlug} placeholder="demo-capital-scout" />
-            <TextInput label="Display name" value={agentDisplayName} setValue={setAgentDisplayName} placeholder="Capital Scout" />
-            <TextInput label="Description" value={agentDescription} setValue={setAgentDescription} placeholder="Optional" />
+            <TextInput
+              label="Slug"
+              value={agentSlug}
+              setValue={setAgentSlug}
+              placeholder="demo-capital-scout"
+            />
+            <TextInput
+              label="Display name"
+              value={agentDisplayName}
+              setValue={setAgentDisplayName}
+              placeholder="Capital Scout"
+            />
+            <TextInput
+              label="Description"
+              value={agentDescription}
+              setValue={setAgentDescription}
+              placeholder="Optional"
+            />
             <button
               type="button"
               onClick={handleRegisterAgent}
@@ -1657,22 +1839,50 @@ function DeveloperTab({
               <DetailLine label="Status" value={registeredAgent.status} />
               <DetailLine label="API key" value={registeredAgent.apiKey ?? 'Not returned'} />
               <DetailLine label="Claim URL" value={registeredAgent.claimUrl ?? 'Not returned'} />
-              <DetailLine label="Verification code" value={registeredAgent.verificationCode ?? 'Not returned'} />
+              <DetailLine
+                label="Verification code"
+                value={registeredAgent.verificationCode ?? 'Not returned'}
+              />
             </DeveloperDetails>
           )}
         </div>
 
         <div className="rounded-lg border border-gray-800 bg-gray-900 p-5">
-          <SectionHeading title="Mock claim" body="Activate an agent through the demo claim flow." />
+          <SectionHeading
+            title="Mock claim"
+            body="Activate an agent through the demo claim flow."
+          />
           <div className="mt-4 grid grid-cols-1 gap-2">
-            <TextInput label="Claim token" value={claimToken} setValue={setClaimToken} placeholder="Claim token" />
-            <TextInput label="Verification code" value={verificationCode} setValue={setVerificationCode} placeholder="town-DEMO1" />
-            <TextInput label="X handle" value={xHandle} setValue={setXHandle} placeholder="capital_scout_ai" />
-            <TextInput label="Owner display name" value={ownerDisplayName} setValue={setOwnerDisplayName} placeholder="Optional" />
+            <TextInput
+              label="Claim token"
+              value={claimToken}
+              setValue={setClaimToken}
+              placeholder="Claim token"
+            />
+            <TextInput
+              label="Verification code"
+              value={verificationCode}
+              setValue={setVerificationCode}
+              placeholder="town-DEMO1"
+            />
+            <TextInput
+              label="X handle"
+              value={xHandle}
+              setValue={setXHandle}
+              placeholder="capital_scout_ai"
+            />
+            <TextInput
+              label="Owner display name"
+              value={ownerDisplayName}
+              setValue={setOwnerDisplayName}
+              placeholder="Optional"
+            />
             <button
               type="button"
               onClick={handleMockClaim}
-              disabled={loading || !claimToken.trim() || !verificationCode.trim() || !xHandle.trim()}
+              disabled={
+                loading || !claimToken.trim() || !verificationCode.trim() || !xHandle.trim()
+              }
               className="rounded-lg bg-clay-700 px-3 py-2 text-sm font-medium text-white hover:bg-clay-500 disabled:bg-gray-700"
             >
               Claim to Active
@@ -1682,7 +1892,10 @@ function DeveloperTab({
       </section>
 
       <section className="rounded-lg border border-gray-800 bg-gray-900 p-5">
-        <SectionHeading title="Manual intro candidate" body="Create an intro by raw conversation ID when testing API edge cases." />
+        <SectionHeading
+          title="Manual intro candidate"
+          body="Create an intro by raw conversation ID when testing API edge cases."
+        />
         <div className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-2">
           <input
             type="text"
@@ -1784,7 +1997,10 @@ function ChipList({ label, items }: { label: string; items: string[] }) {
     <div className="mt-3 flex flex-wrap items-center gap-2">
       <span className="text-xs text-gray-500">{label}</span>
       {items.map((item) => (
-        <span key={item} className="rounded-full border border-gray-700 px-2 py-1 text-xs text-gray-300">
+        <span
+          key={item}
+          className="rounded-full border border-gray-700 px-2 py-1 text-xs text-gray-300"
+        >
           {item}
         </span>
       ))}
@@ -1853,7 +2069,9 @@ function DeveloperDetails({
 }) {
   return (
     <details className="mt-4 rounded-lg border border-gray-800 bg-gray-950 p-3" open={defaultOpen}>
-      <summary className="cursor-pointer text-xs font-medium text-gray-400">Developer details</summary>
+      <summary className="cursor-pointer text-xs font-medium text-gray-400">
+        Developer details
+      </summary>
       <div className="mt-3 space-y-2 text-xs text-gray-400">{children}</div>
     </details>
   );

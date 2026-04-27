@@ -1,5 +1,10 @@
 import { ConvexError } from 'convex/values';
-import { claimAgentForTestingHandler, registerAgentHandler } from './agents';
+import {
+  claimAgentForTestingHandler,
+  registerAgentForTestingHandler,
+  registerAgentHandler,
+} from './agents';
+import { getKeyPrefix, hashSecret } from './auth';
 import {
   createCardHandler,
   deleteCardHandler,
@@ -142,14 +147,17 @@ async function registerPendingAgent(ctx: any, slug: string) {
 }
 
 async function registerClaimedAgent(ctx: any, slug: string) {
-  const registration = await registerPendingAgent(ctx, slug);
-  await claimAgentForTestingHandler(ctx, {
+  const registration = await registerAgentForTestingHandler(ctx, {
+    slug,
+    displayName: slug,
+  });
+  const claimed = await claimAgentForTestingHandler(ctx, {
     claimToken: tokenFromClaimUrl(registration.claimUrl),
     verificationCode: registration.verificationCode,
     xHandle: `@${slug}`,
     xProfileUrl: `https://x.com/${slug}`,
   });
-  return registration;
+  return { ...registration, apiKey: claimed.apiKey };
 }
 
 function expectErrorCode(error: unknown, code: string) {
@@ -374,16 +382,24 @@ describe('networking cards handlers', () => {
 
   test('rejects unclaimed activation and updating active cards', async () => {
     const { ctx, tables } = createMockCtx();
-    const pending = await registerPendingAgent(ctx, 'agent-pending');
+    await registerPendingAgent(ctx, 'agent-pending');
     const pendingAgent = tables.networkAgents.find((agent) => agent.slug === 'agent-pending');
     if (!pendingAgent) {
       throw new Error('Expected pending agent row');
     }
     pendingAgent.status = 'pending_claim';
+    const pendingApiKey = 'town_pending_agent_for_tests';
+    await (ctx as any).db.insert('networkAgentApiKeys', {
+      agentId: pendingAgent._id,
+      keyHash: await hashSecret(pendingApiKey),
+      keyPrefix: getKeyPrefix(pendingApiKey),
+      status: 'active',
+      createdAt: Date.now(),
+    });
 
     await expect(
       createCardHandler(ctx as any, {
-        apiKey: pending.apiKey,
+        apiKey: pendingApiKey,
         type: 'need',
         title: 'Need title',
         summary: 'Need summary',

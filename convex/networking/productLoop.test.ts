@@ -1,4 +1,4 @@
-import { claimAgentForTestingHandler, registerAgentHandler } from './agents';
+import { claimAgentForTestingHandler, registerAgentForTestingHandler } from './agents';
 import { createCardHandler } from './cards';
 import { closeConversationHandler, sendMessageHandler } from './conversations';
 import { listInboxHandler } from './inbox';
@@ -152,17 +152,17 @@ function tokenFromClaimUrl(claimUrl: string) {
 }
 
 async function registerClaimedAgent(ctx: any, slug: string) {
-  const registration = await registerAgentHandler(ctx, {
+  const registration = await registerAgentForTestingHandler(ctx, {
     slug,
     displayName: slug,
   });
-  await claimAgentForTestingHandler(ctx, {
+  const claimed = await claimAgentForTestingHandler(ctx, {
     claimToken: tokenFromClaimUrl(registration.claimUrl),
     verificationCode: registration.verificationCode,
     xHandle: `@${slug}`,
     xProfileUrl: `https://x.com/${slug}`,
   });
-  return registration;
+  return { ...registration, apiKey: claimed.apiKey };
 }
 
 async function createActiveCard(
@@ -291,12 +291,14 @@ describe('networking product loop', () => {
     const offerInbox = await listInboxHandler(ctx as any, { apiKey: offerAgent.apiKey });
     expect(
       needInbox.some(
-        (event) => event.type === 'intro_candidate' && event.introCandidateId === introCandidate._id,
+        (event) =>
+          event.type === 'intro_candidate' && event.introCandidateId === introCandidate._id,
       ),
     ).toBe(true);
     expect(
       offerInbox.some(
-        (event) => event.type === 'intro_candidate' && event.introCandidateId === introCandidate._id,
+        (event) =>
+          event.type === 'intro_candidate' && event.introCandidateId === introCandidate._id,
       ),
     ).toBe(true);
   });

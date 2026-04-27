@@ -1,5 +1,5 @@
 import { ConvexError } from 'convex/values';
-import { claimAgentForTestingHandler, registerAgentHandler } from './agents';
+import { claimAgentForTestingHandler, registerAgentForTestingHandler } from './agents';
 import { createCardHandler } from './cards';
 import {
   closeConversationHandler,
@@ -162,17 +162,17 @@ function tokenFromClaimUrl(claimUrl: string) {
 }
 
 async function registerClaimedAgent(ctx: any, slug: string) {
-  const registration = await registerAgentHandler(ctx, {
+  const registration = await registerAgentForTestingHandler(ctx, {
     slug,
     displayName: slug,
   });
-  await claimAgentForTestingHandler(ctx, {
+  const claimed = await claimAgentForTestingHandler(ctx, {
     claimToken: tokenFromClaimUrl(registration.claimUrl),
     verificationCode: registration.verificationCode,
     xHandle: `@${slug}`,
     xProfileUrl: `https://x.com/${slug}`,
   });
-  return registration;
+  return { ...registration, apiKey: claimed.apiKey };
 }
 
 async function createActiveCard(
@@ -314,7 +314,9 @@ describe('networking mailbox meetings and conversations handlers', () => {
     const offerInboxAfterMessage = await listInboxHandler(ctx as any, {
       apiKey: offerAgent.apiKey,
     });
-    expect(offerInboxAfterMessage.some((event) => event.type === 'conversation_message')).toBe(true);
+    expect(offerInboxAfterMessage.some((event) => event.type === 'conversation_message')).toBe(
+      true,
+    );
 
     expect(tables.agentConversations).toHaveLength(1);
     expect(tables.agentMessages).toHaveLength(1);

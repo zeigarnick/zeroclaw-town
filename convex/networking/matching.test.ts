@@ -1,4 +1,4 @@
-import { claimAgentForTestingHandler, registerAgentHandler } from './agents';
+import { claimAgentForTestingHandler, registerAgentForTestingHandler } from './agents';
 import { createCardHandler, updateCardHandler } from './cards';
 import {
   createCardPairKey,
@@ -131,17 +131,17 @@ function tokenFromClaimUrl(claimUrl: string) {
 }
 
 async function registerClaimedAgent(ctx: any, slug: string) {
-  const registration = await registerAgentHandler(ctx, {
+  const registration = await registerAgentForTestingHandler(ctx, {
     slug,
     displayName: slug,
   });
-  await claimAgentForTestingHandler(ctx, {
+  const claimed = await claimAgentForTestingHandler(ctx, {
     claimToken: tokenFromClaimUrl(registration.claimUrl),
     verificationCode: registration.verificationCode,
     xHandle: `@${slug}`,
     xProfileUrl: `https://x.com/${slug}`,
   });
-  return registration;
+  return { ...registration, apiKey: claimed.apiKey };
 }
 
 async function createActiveCard(
@@ -401,7 +401,9 @@ describe('networking matching handlers', () => {
       domains: ['saas'],
       desiredOutcome: 'Book strategy call',
     });
-    expect(tables.recommendations.filter((recommendation) => recommendation.status === 'active')).toHaveLength(1);
+    expect(
+      tables.recommendations.filter((recommendation) => recommendation.status === 'active'),
+    ).toHaveLength(1);
 
     await updateCardHandler(ctx as any, {
       apiKey: needAgent.apiKey,
@@ -410,64 +412,70 @@ describe('networking matching handlers', () => {
       detailsForMatching: 'Need a partner for PLG activation experiments.',
     });
 
-    expect(tables.recommendations.filter((recommendation) => recommendation.status === 'stale')).toHaveLength(1);
-    expect(tables.recommendations.filter((recommendation) => recommendation.status === 'active')).toHaveLength(1);
+    expect(
+      tables.recommendations.filter((recommendation) => recommendation.status === 'stale'),
+    ).toHaveLength(1);
+    expect(
+      tables.recommendations.filter((recommendation) => recommendation.status === 'active'),
+    ).toHaveLength(1);
   });
 
   test.each(['dismissed', 'declined'] as const)(
     'suppresses %s pairings from reappearing as active recommendations',
     async (suppressionStatus) => {
-    const { ctx, tables } = createMockCtx();
-    const needAgent = await registerClaimedAgent(ctx as any, 'suppress-need');
-    const offerAgent = await registerClaimedAgent(ctx as any, 'suppress-offer');
+      const { ctx, tables } = createMockCtx();
+      const needAgent = await registerClaimedAgent(ctx as any, 'suppress-need');
+      const offerAgent = await registerClaimedAgent(ctx as any, 'suppress-offer');
 
-    const needCard = await createActiveCard(ctx as any, {
-      apiKey: needAgent.apiKey,
-      type: 'need',
-      title: 'Need onboarding advisor',
-      summary: 'Need onboarding support',
-      detailsForMatching: 'Need onboarding playbook updates for activation.',
-      tags: ['onboarding'],
-      domains: ['saas'],
-      desiredOutcome: 'Find partner for onboarding',
-    });
-    const offerCard = await createActiveCard(ctx as any, {
-      apiKey: offerAgent.apiKey,
-      type: 'offer',
-      title: 'Offer onboarding advisory',
-      summary: 'Offer onboarding playbook support',
-      detailsForMatching: 'Can improve onboarding copy and flow experiments.',
-      tags: ['onboarding'],
-      domains: ['saas'],
-      desiredOutcome: 'Share activation expertise',
-    });
+      const needCard = await createActiveCard(ctx as any, {
+        apiKey: needAgent.apiKey,
+        type: 'need',
+        title: 'Need onboarding advisor',
+        summary: 'Need onboarding support',
+        detailsForMatching: 'Need onboarding playbook updates for activation.',
+        tags: ['onboarding'],
+        domains: ['saas'],
+        desiredOutcome: 'Find partner for onboarding',
+      });
+      const offerCard = await createActiveCard(ctx as any, {
+        apiKey: offerAgent.apiKey,
+        type: 'offer',
+        title: 'Offer onboarding advisory',
+        summary: 'Offer onboarding playbook support',
+        detailsForMatching: 'Can improve onboarding copy and flow experiments.',
+        tags: ['onboarding'],
+        domains: ['saas'],
+        desiredOutcome: 'Share activation expertise',
+      });
 
-    const pairKey = createCardPairKey(needCard._id as any, offerCard._id as any);
-    const initial = tables.recommendations.find((recommendation) => recommendation.cardPairKey === pairKey);
-    if (!initial) {
-      throw new Error('Expected initial recommendation');
-    }
-    initial.status = suppressionStatus;
+      const pairKey = createCardPairKey(needCard._id as any, offerCard._id as any);
+      const initial = tables.recommendations.find(
+        (recommendation) => recommendation.cardPairKey === pairKey,
+      );
+      if (!initial) {
+        throw new Error('Expected initial recommendation');
+      }
+      initial.status = suppressionStatus;
 
-    await updateCardHandler(ctx as any, {
-      apiKey: needAgent.apiKey,
-      cardId: needCard._id as any,
-      summary: 'Need onboarding growth partner',
-      detailsForMatching: 'Need support with activation and onboarding lifecycle.',
-    });
+      await updateCardHandler(ctx as any, {
+        apiKey: needAgent.apiKey,
+        cardId: needCard._id as any,
+        summary: 'Need onboarding growth partner',
+        detailsForMatching: 'Need support with activation and onboarding lifecycle.',
+      });
 
-    expect(
-      tables.recommendations.filter(
-        (recommendation) =>
-          recommendation.cardPairKey === pairKey && recommendation.status === 'active',
-      ),
-    ).toHaveLength(0);
-    expect(
-      tables.recommendationSuppressions.filter(
-        (suppression) =>
-          suppression.cardPairKey === pairKey && suppression.reason === suppressionStatus,
-      ),
-    ).toHaveLength(1);
+      expect(
+        tables.recommendations.filter(
+          (recommendation) =>
+            recommendation.cardPairKey === pairKey && recommendation.status === 'active',
+        ),
+      ).toHaveLength(0);
+      expect(
+        tables.recommendationSuppressions.filter(
+          (suppression) =>
+            suppression.cardPairKey === pairKey && suppression.reason === suppressionStatus,
+        ),
+      ).toHaveLength(1);
     },
   );
 

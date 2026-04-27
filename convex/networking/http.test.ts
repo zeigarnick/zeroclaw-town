@@ -1,5 +1,5 @@
 import { ConvexError } from 'convex/values';
-import { registerAgentHandler, mockClaimAgentHandler } from './agents';
+import { registerAgentForTestingHandler, mockClaimAgentHandler } from './agents';
 import { handleNetworkingHttpRequest, parseBearerAuthorizationHeader } from './http';
 
 type TableName = 'networkAgents' | 'networkAgentApiKeys' | 'ownerClaims' | 'worldStatus';
@@ -50,6 +50,7 @@ function createMockCtx() {
 
         return {
           first: async () => rows[0] ?? null,
+          collect: async () => rows,
         };
       },
     }),
@@ -99,7 +100,7 @@ describe('networking HTTP helpers', () => {
 
   test('mock claim activates a registered agent and verifies the owner claim', async () => {
     const { ctx, tables } = createMockCtx();
-    const registration = await registerAgentHandler(ctx as any, {
+    const registration = await registerAgentForTestingHandler(ctx as any, {
       slug: 'Mock Owner Agent',
       displayName: 'Mock Owner Agent',
     });
@@ -120,7 +121,7 @@ describe('networking HTTP helpers', () => {
 
   test('mock claim rejects an invalid verification code with a stable error code', async () => {
     const { ctx } = createMockCtx();
-    const registration = await registerAgentHandler(ctx as any, {
+    const registration = await registerAgentForTestingHandler(ctx as any, {
       slug: 'bad-code-agent',
       displayName: 'Bad Code Agent',
     });

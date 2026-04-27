@@ -1,5 +1,5 @@
 import { ConvexError } from 'convex/values';
-import { claimAgentForTestingHandler, registerAgentHandler } from './agents';
+import { claimAgentForTestingHandler, registerAgentForTestingHandler } from './agents';
 import { createCardHandler } from './cards';
 import { closeConversationHandler } from './conversations';
 import { listInboxHandler } from './inbox';
@@ -163,17 +163,17 @@ function expectErrorCode(error: unknown, code: string) {
 }
 
 async function registerClaimedAgent(ctx: any, slug: string) {
-  const registration = await registerAgentHandler(ctx, {
+  const registration = await registerAgentForTestingHandler(ctx, {
     slug,
     displayName: slug,
   });
-  await claimAgentForTestingHandler(ctx, {
+  const claimed = await claimAgentForTestingHandler(ctx, {
     claimToken: tokenFromClaimUrl(registration.claimUrl),
     verificationCode: registration.verificationCode,
     xHandle: `@${slug}`,
     xProfileUrl: `https://x.com/${slug}`,
   });
-  return registration;
+  return { ...registration, apiKey: claimed.apiKey };
 }
 
 async function createActiveCard(
@@ -227,9 +227,12 @@ async function setupAcceptedConversation(ctx: any) {
     desiredOutcome: 'Deliver UX support',
   });
 
-  const rec = (await (ctx as any).db.query('recommendations').withIndex('by_status_created_at', (q: any) =>
-    q.eq('status', 'active'),
-  ).collect())[0];
+  const rec = (
+    await (ctx as any).db
+      .query('recommendations')
+      .withIndex('by_status_created_at', (q: any) => q.eq('status', 'active'))
+      .collect()
+  )[0];
   const meeting = await requestMeetingHandler(ctx, {
     apiKey: needAgent.apiKey,
     recommendationId: rec._id as any,
@@ -259,7 +262,11 @@ describe('networking intro candidates handlers', () => {
         summary: 'Not yet closed.',
         recommendedNextStep: 'Close first or explicitly qualify.',
       }),
-    ).rejects.toThrow(expect.objectContaining({ data: expect.objectContaining({ code: 'conversation_not_qualified' }) }));
+    ).rejects.toThrow(
+      expect.objectContaining({
+        data: expect.objectContaining({ code: 'conversation_not_qualified' }),
+      }),
+    );
 
     const created = await createIntroCandidateHandler(ctx as any, {
       apiKey: needAgent.apiKey,

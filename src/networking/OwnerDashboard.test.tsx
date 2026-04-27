@@ -54,9 +54,7 @@ describe('OwnerDashboard HttpApiAdapter', () => {
         data: {
           agentId: 'networkAgents:1',
           agentSlug: 'capital-scout',
-          apiKey: 'town_demo_capital_scout_2026',
           claimUrl: 'https://town.example/claim/town_claim_demo_capital_scout_2026',
-          verificationCode: 'town-DEMO1',
           status: 'pending_claim',
         },
       },
@@ -72,7 +70,8 @@ describe('OwnerDashboard HttpApiAdapter', () => {
     expect(isError(response)).toBe(false);
     if (!isError(response)) {
       expect(response.data.status).toBe('pending_claim');
-      expect(response.data.apiKey).toBe('town_demo_capital_scout_2026');
+      expect(response.data.apiKey).toBeUndefined();
+      expect(response.data.verificationCode).toBeUndefined();
     }
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -95,6 +94,7 @@ describe('OwnerDashboard HttpApiAdapter', () => {
         data: {
           agentId: 'networkAgents:1',
           agentSlug: 'capital-scout',
+          apiKey: 'town_demo_capital_scout_2026',
           status: 'active',
           ownerClaimId: 'ownerClaims:1',
         },
@@ -112,6 +112,9 @@ describe('OwnerDashboard HttpApiAdapter', () => {
     });
 
     expect(isError(response)).toBe(false);
+    if (!isError(response)) {
+      expect(response.data.apiKey).toBe('town_demo_capital_scout_2026');
+    }
     expect(fetchMock.mock.calls[0][0]).toBe('/api/v1/agents/mock-claim');
     expect(getRequestBody(fetchMock)).toEqual({
       claimToken: 'town_claim_demo_capital_scout_2026',
@@ -271,7 +274,9 @@ describe('OwnerDashboard HttpApiAdapter', () => {
       expect(declineResponse.data.meeting.status).toBe('declined');
     }
 
-    expect(fetchMock.mock.calls[0][0]).toBe('/api/v1/recommendations/recommendations:1/request-meeting');
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      '/api/v1/recommendations/recommendations:1/request-meeting',
+    );
     expect(fetchMock.mock.calls[1][0]).toBe('/api/v1/meetings/meetings:1/accept');
     expect(fetchMock.mock.calls[2][0]).toBe('/api/v1/meetings/meetings:1/decline');
   });
