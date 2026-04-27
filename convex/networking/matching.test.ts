@@ -1,6 +1,10 @@
 import { claimAgentForTestingHandler, registerAgentHandler } from './agents';
 import { createCardHandler, updateCardHandler } from './cards';
-import { createCardPairKey, runMatchingForCard } from './matching';
+import {
+  createCardPairKey,
+  runMatchingForCard,
+  runMatchingForVectorCandidatesHandler,
+} from './matching';
 
 type TableName =
   | 'networkAgents'
@@ -560,5 +564,55 @@ describe('networking matching handlers', () => {
     expect(nearScore).toBeDefined();
     expect(farScore).toBeDefined();
     expect(nearScore).toBeGreaterThan(farScore);
+  });
+
+  test('creates recommendations from Convex vector candidate embedding ids', async () => {
+    const { ctx, tables } = createMockCtx();
+    const needAgent = await registerClaimedAgent(ctx as any, 'vector-need');
+    const offerAgent = await registerClaimedAgent(ctx as any, 'vector-offer');
+
+    const needCard = await createActiveCard(ctx as any, {
+      apiKey: needAgent.apiKey,
+      type: 'need',
+      title: 'Need fintech investor intros',
+      summary: 'Need help with seed fundraising.',
+      detailsForMatching: 'Looking for fintech angels and seed funds.',
+      tags: ['fintech', 'fundraising'],
+      domains: ['fintech'],
+      desiredOutcome: 'Book investor intro calls',
+    });
+    const offerCard = await createActiveCard(ctx as any, {
+      apiKey: offerAgent.apiKey,
+      type: 'offer',
+      title: 'Offer fintech fundraising network',
+      summary: 'Can introduce fintech founders to investors.',
+      detailsForMatching: 'Angel and seed fund network for fintech teams.',
+      tags: ['fintech', 'fundraising'],
+      domains: ['fintech'],
+      desiredOutcome: 'Help founders meet investors',
+    });
+
+    tables.recommendations = [];
+    tables.inboxEvents = [];
+
+    const offerEmbedding = tables.cardEmbeddings.find(
+      (embedding) => embedding.cardId === offerCard._id,
+    );
+    if (!offerEmbedding) {
+      throw new Error('Expected offer embedding');
+    }
+
+    const result = await runMatchingForVectorCandidatesHandler(ctx as any, {
+      triggerCardId: needCard._id as any,
+      candidateEmbeddingIds: [offerEmbedding._id as any],
+    });
+
+    expect(result).toMatchObject({ evaluated: 1, created: 1 });
+    expect(tables.recommendations).toHaveLength(1);
+    expect(tables.recommendations[0]).toMatchObject({
+      recipientCardId: needCard._id,
+      providerCardId: offerCard._id,
+      status: 'active',
+    });
   });
 });

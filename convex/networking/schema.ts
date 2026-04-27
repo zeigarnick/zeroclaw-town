@@ -99,7 +99,12 @@ export const networkingTables = {
   })
     .index('by_card', ['cardId'])
     .index('by_agent_updated_at', ['agentId', 'updatedAt'])
-    .index('by_text_hash', ['textHash']),
+    .index('by_text_hash', ['textHash'])
+    .vectorIndex('embedding', {
+      vectorField: 'embedding',
+      filterFields: ['agentId'],
+      dimensions: 64,
+    }),
 
   recommendations: defineTable({
     recipientAgentId: v.id('networkAgents'),

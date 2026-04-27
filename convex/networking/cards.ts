@@ -1,5 +1,6 @@
 import { v } from 'convex/values';
-import { Id } from '../_generated/dataModel';
+import { makeFunctionReference } from 'convex/server';
+import { Doc, Id } from '../_generated/dataModel';
 import { MutationCtx, QueryCtx, mutation, query } from '../_generated/server';
 import {
   assertAgentStatusIsClaimed,
@@ -19,7 +20,11 @@ import {
   isCardType,
 } from './validators';
 import { getCanonicalCardTextForEmbedding } from './cardText';
-import { markRecommendationsStaleForCard, runMatchingForCard } from './matching';
+import { ensureEmbeddingForCard, markRecommendationsStaleForCard, runMatchingForCard } from './matching';
+
+const runVectorMatchingForCard = makeFunctionReference<'action'>(
+  'networking/matching:runVectorMatchingForCard',
+);
 
 type CreateCardInput = {
   apiKey: string;
@@ -104,7 +109,7 @@ export async function createCardHandler(ctx: MutationCtx, args: CreateCardInput)
     throw networkingError('card_not_found', 'The created card could not be loaded.');
   }
   if (card.status === 'active') {
-    await runMatchingForCard(ctx, card);
+    await enqueueMatchingForCard(ctx, card);
   }
   return card;
 }
@@ -190,7 +195,7 @@ export async function updateCardHandler(ctx: MutationCtx, args: UpdateCardInput)
     );
   }
   if (updated.status === 'active') {
-    await runMatchingForCard(ctx, updated);
+    await enqueueMatchingForCard(ctx, updated);
   }
   return updated;
 }
@@ -365,4 +370,14 @@ function normalizeStringList(values: string[] | undefined) {
 
 function normalizeText(value: string) {
   return value.trim();
+}
+
+async function enqueueMatchingForCard(ctx: MutationCtx, card: Doc<'matchCards'>) {
+  await ensureEmbeddingForCard(ctx, card);
+  if (ctx.scheduler?.runAfter) {
+    await ctx.scheduler.runAfter(0, runVectorMatchingForCard, { cardId: card._id });
+    return;
+  }
+
+  await runMatchingForCard(ctx, card);
 }

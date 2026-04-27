@@ -1,5 +1,13 @@
+import { v } from 'convex/values';
 import { Doc, Id } from '../_generated/dataModel';
-import { MutationCtx } from '../_generated/server';
+import {
+  ActionCtx,
+  MutationCtx,
+  internalAction,
+  internalMutation,
+  internalQuery,
+} from '../_generated/server';
+import { makeFunctionReference } from 'convex/server';
 import { hashSecret } from './auth';
 import { getCanonicalCardTextForEmbedding } from './cardText';
 import { writeRecommendationInboxEvent } from './inbox';
@@ -9,6 +17,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const DETERMINISTIC_EMBEDDING_DIMENSION = 64;
 const DETERMINISTIC_EMBEDDING_MODEL = 'deterministic-v1';
 const DEFAULT_MIN_SCORE = 0.25;
+const VECTOR_MATCH_CANDIDATE_LIMIT = 64;
 const SCORE_WEIGHTS = {
   embeddingSimilarity: 0.45,
   typeCompatibility: 0.2,
@@ -75,6 +84,23 @@ type MatchRunResult = {
   skippedBelowThreshold: number;
 };
 
+function emptyMatchRunResult(): MatchRunResult {
+  return {
+    evaluated: 0,
+    created: 0,
+    updated: 0,
+    skippedSuppressed: 0,
+    skippedBelowThreshold: 0,
+  };
+}
+
+const loadVectorMatchingSeedRef = makeFunctionReference<'query'>(
+  'networking/matching:loadVectorMatchingSeed',
+);
+const runMatchingForVectorCandidatesRef = makeFunctionReference<'mutation'>(
+  'networking/matching:runMatchingForVectorCandidates',
+);
+
 export function createCardPairKey(
   recipientCardId: Id<'matchCards'>,
   providerCardId: Id<'matchCards'>,
@@ -105,8 +131,20 @@ export async function runMatchingForCard(
     .withIndex('by_status_updated_at', (q) => q.eq('status', 'active'))
     .collect();
 
+  return await runMatchingForCardAgainstCandidates(ctx, triggerCard, activeCards, options);
+}
+
+async function runMatchingForCardAgainstCandidates(
+  ctx: MutationCtx,
+  triggerCard: Doc<'matchCards'>,
+  candidateCards: Doc<'matchCards'>[],
+  options: MatchingRunOptions = {},
+): Promise<MatchRunResult> {
+  const now = options.now ?? Date.now();
+  const minScore = options.minScore ?? DEFAULT_MIN_SCORE;
+  const scorer = options.scorer ?? scoreMatch;
   const directionsByPair = new Map<string, MatchDirection>();
-  for (const candidate of activeCards) {
+  for (const candidate of candidateCards) {
     if (candidate._id === triggerCard._id || candidate.agentId === triggerCard.agentId) {
       continue;
     }
@@ -228,6 +266,99 @@ export async function markRecommendationsStaleForCard(
   }
 
   return activeById.size;
+}
+
+export const runVectorMatchingForCard = internalAction({
+  args: {
+    cardId: v.id('matchCards'),
+  },
+  handler: async (ctx, args) => runVectorMatchingForCardHandler(ctx, args),
+});
+
+export async function runVectorMatchingForCardHandler(
+  ctx: Pick<ActionCtx, 'runQuery' | 'runMutation' | 'vectorSearch'>,
+  args: { cardId: Id<'matchCards'> },
+) {
+  const seed = await ctx.runQuery(loadVectorMatchingSeedRef, args);
+  if (!seed) {
+    return emptyMatchRunResult();
+  }
+
+  const candidates = await ctx.vectorSearch('cardEmbeddings', 'embedding', {
+    vector: seed.embedding,
+    limit: VECTOR_MATCH_CANDIDATE_LIMIT,
+  });
+
+  return await ctx.runMutation(runMatchingForVectorCandidatesRef, {
+    triggerCardId: args.cardId,
+    candidateEmbeddingIds: candidates.map((candidate) => candidate._id),
+  });
+}
+
+export const loadVectorMatchingSeed = internalQuery({
+  args: {
+    cardId: v.id('matchCards'),
+  },
+  handler: async (ctx, args) => {
+    const card = await ctx.db.get(args.cardId);
+    if (!card || card.status !== 'active') {
+      return null;
+    }
+
+    const embedding = await ctx.db
+      .query('cardEmbeddings')
+      .withIndex('by_card', (q) => q.eq('cardId', card._id))
+      .first();
+    if (!embedding) {
+      return null;
+    }
+
+    return {
+      embedding: embedding.embedding,
+    };
+  },
+});
+
+export const runMatchingForVectorCandidates = internalMutation({
+  args: {
+    triggerCardId: v.id('matchCards'),
+    candidateEmbeddingIds: v.array(v.id('cardEmbeddings')),
+  },
+  handler: async (ctx, args) => runMatchingForVectorCandidatesHandler(ctx, args),
+});
+
+export async function runMatchingForVectorCandidatesHandler(
+  ctx: MutationCtx,
+  args: {
+    triggerCardId: Id<'matchCards'>;
+    candidateEmbeddingIds: Id<'cardEmbeddings'>[];
+  },
+) {
+  const triggerCard = await ctx.db.get(args.triggerCardId);
+  if (!triggerCard || triggerCard.status !== 'active') {
+    return emptyMatchRunResult();
+  }
+
+  await ensureEmbeddingForCard(ctx, triggerCard);
+  const candidateCards = [];
+  for (const embeddingId of args.candidateEmbeddingIds) {
+    const embedding = await ctx.db.get(embeddingId);
+    if (!embedding || embedding.cardId === triggerCard._id) {
+      continue;
+    }
+
+    const card = await ctx.db.get(embedding.cardId);
+    if (card?.status === 'active') {
+      candidateCards.push(card);
+    }
+  }
+
+  return await runMatchingForCardAgainstCandidates(ctx, triggerCard, candidateCards);
+}
+
+export async function ensureEmbeddingForCard(ctx: MutationCtx, card: Doc<'matchCards'>) {
+  const embeddings = await resolveEmbeddings(ctx, [card], { now: Date.now() });
+  return embeddings.get(card._id);
 }
 
 export function scoreMatch(input: MatchScoringInput): MatchScore {
