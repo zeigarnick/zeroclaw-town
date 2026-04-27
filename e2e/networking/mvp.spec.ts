@@ -45,36 +45,50 @@ test('agentic networking MVP dashboard and town smoke', async ({ page }) => {
   await expect.poll(() => getCanvasSnapshotSize(page), { timeout: 30_000 }).toBeGreaterThan(1_000);
 
   await page.getByRole('button', { name: 'Dashboard' }).click();
-  await expect(page.getByRole('heading', { name: 'Owner Dashboard' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true');
 
   await page.getByRole('button', { name: 'Capital Scout' }).click();
-  await expect(page.getByText(`Active: Capital Scout | ${DEMO_KEYS.capitalScout}`)).toBeVisible({
+  await expect(page.getByTestId('active-owner-label')).toHaveText('Capital Scout', {
     timeout: 30_000,
   });
-  await expect(page.getByRole('heading', { name: 'Cards' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'What needs attention' })).toBeVisible();
+
+  await page.getByRole('tab', { name: 'Cards' }).click();
+  await expect(page.getByRole('heading', { name: 'Published cards' })).toBeVisible();
   await expect(page.getByText('Need warm fintech investor intros')).toBeVisible();
-  await expect(page.getByRole('heading', { name: /Inbox Events/ })).toBeVisible();
-  await expect(page.getByText('match_recommendation').first()).toBeVisible();
+
+  await page.getByRole('tab', { name: 'Matches' }).click();
+  await expect(page.getByRole('heading', { name: 'Match recommendations' })).toBeVisible();
+  await expect(page.getByText('Match Recommendation').first()).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Meetings' })).toBeVisible();
-  await expect(page.getByText('accepted').first()).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Conversations' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Intro Candidates' })).toBeVisible();
+  await expect(page.getByText('Accepted').first()).toBeVisible();
+
+  await page.getByRole('tab', { name: 'Intros' }).click();
+  await expect(page.getByRole('heading', { name: 'Intro candidates' })).toBeVisible();
   await expect(
     page.getByText('Both agents agreed there is a timely fit for fintech investor introductions and pitch review.'),
   ).toBeVisible();
 
+  await page.getByRole('tab', { name: 'Conversations' }).click();
   await selectFirstConversation(page);
   await expect(
     page.getByText('The founder is raising in early May and wants feedback on the fintech wedge before investor calls.'),
   ).toBeVisible();
 
   await page.getByRole('button', { name: 'Growth Operator' }).click();
-  await expect(page.getByText(`Active: Growth Operator | ${DEMO_KEYS.growthOperator}`)).toBeVisible({
+  await expect(page.getByTestId('active-owner-label')).toHaveText('Growth Operator', {
     timeout: 30_000,
   });
+
+  await page.getByRole('tab', { name: 'Cards' }).click();
   await expect(page.getByText('Offer fintech GTM and investor network').first()).toBeVisible();
-  await expect(page.getByText('meeting_request').first()).toBeVisible();
-  await expect(page.getByText('intro_candidate').first()).toBeVisible();
+
+  await page.getByRole('tab', { name: 'Matches' }).click();
+  await expect(page.getByText('Meeting Request').first()).toBeVisible();
+
+  await page.getByRole('tab', { name: 'Intros' }).click();
+  await expect(page.getByText('Intro Candidate').first()).toBeVisible();
 
   await page.getByRole('button', { name: 'Back to Town' }).click();
   await expect(page.getByRole('button', { name: 'Dashboard' })).toBeVisible();
@@ -83,15 +97,9 @@ test('agentic networking MVP dashboard and town smoke', async ({ page }) => {
 });
 
 async function selectFirstConversation(page: Page) {
-  const conversationSelect = page.locator('select').filter({
-    has: page.locator('option', { hasText: 'Select conversation' }),
-  });
-  await expect(conversationSelect).toBeVisible();
-  const values = await conversationSelect.locator('option').evaluateAll((options) =>
-    options.map((option) => (option as HTMLOptionElement).value).filter(Boolean),
-  );
-  expect(values.length).toBeGreaterThan(0);
-  await conversationSelect.selectOption(values[0]);
+  const conversationButton = page.getByRole('button', { name: /Conversation 1/ }).first();
+  await expect(conversationButton).toBeVisible();
+  await conversationButton.click();
 }
 
 async function getCanvasSnapshotSize(page: Page) {

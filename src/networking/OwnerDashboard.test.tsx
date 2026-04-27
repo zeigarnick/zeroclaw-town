@@ -1,5 +1,12 @@
 import { HttpApiAdapter, isError } from './api';
 import { jest } from '@jest/globals';
+import {
+  OWNER_DASHBOARD_TABS,
+  buildOwnerNextActions,
+  formatEventType,
+  formatStatusLabel,
+  getDefaultOwnerDashboardTab,
+} from './ownerDashboardPresentation';
 
 type MockResponseSpec = {
   status?: number;
@@ -496,5 +503,103 @@ describe('OwnerDashboard HttpApiAdapter', () => {
     if (isError(cardsResponse)) {
       expect(cardsResponse.error.code).toBe('invalid_api_key');
     }
+  });
+});
+
+describe('OwnerDashboard presentation helpers', () => {
+  test('defaults to the Overview tab and exposes the expected tab order', () => {
+    expect(getDefaultOwnerDashboardTab()).toBe('overview');
+    expect(OWNER_DASHBOARD_TABS.map((tab) => tab.label)).toEqual([
+      'Overview',
+      'Cards',
+      'Matches',
+      'Conversations',
+      'Intros',
+      'Developer',
+    ]);
+  });
+
+  test('formats raw networking labels into owner-facing labels', () => {
+    expect(formatEventType('match_recommendation')).toBe('Match Recommendation');
+    expect(formatEventType('intro_candidate')).toBe('Intro Candidate');
+    expect(formatStatusLabel('pending_claim')).toBe('Pending Claim');
+    expect(formatStatusLabel('')).toBe('Unknown');
+  });
+
+  test('derives prioritized owner next actions from dashboard state', () => {
+    const actions = buildOwnerNextActions({
+      cards: [
+        {
+          id: 'matchCards:1',
+          agentId: 'networkAgents:1',
+          type: 'need',
+          title: 'Need warm intros',
+          summary: 'Looking for investor intros.',
+          detailsForMatching: 'Seed fintech team.',
+          desiredOutcome: 'Book investor calls.',
+          tags: ['fundraising'],
+          domains: ['fintech'],
+          status: 'active',
+          createdAt: 1710000000000,
+          updatedAt: 1710000000000,
+        },
+      ],
+      inboxEvents: [
+        {
+          id: 'inboxEvents:1',
+          type: 'match_recommendation',
+          status: 'unread',
+          recommendationId: 'recommendations:1',
+          createdAt: 1710000000000,
+          updatedAt: 1710000000000,
+        },
+      ],
+      meetings: [
+        {
+          id: 'meetings:1',
+          recommendationId: 'recommendations:1',
+          requesterAgentId: 'networkAgents:1',
+          responderAgentId: 'networkAgents:2',
+          requesterCardId: 'matchCards:1',
+          responderCardId: 'matchCards:2',
+          status: 'pending',
+          createdAt: 1710000000000,
+          updatedAt: 1710000000000,
+        },
+      ],
+      conversations: [
+        {
+          id: 'agentConversations:1',
+          meetingId: 'meetings:1',
+          participantOneAgentId: 'networkAgents:1',
+          participantTwoAgentId: 'networkAgents:2',
+          status: 'open',
+          createdAt: 1710000000000,
+          updatedAt: 1710000000000,
+        },
+      ],
+      intros: [
+        {
+          id: 'introCandidates:1',
+          meetingId: 'meetings:1',
+          conversationId: 'agentConversations:1',
+          requesterAgentId: 'networkAgents:1',
+          responderAgentId: 'networkAgents:2',
+          summary: 'Good fit.',
+          recommendedNextStep: 'Schedule a call.',
+          status: 'pending',
+          createdByAgentId: 'networkAgents:1',
+          createdAt: 1710000000000,
+          updatedAt: 1710000000000,
+        },
+      ],
+    });
+
+    expect(actions.map((action) => action.id)).toEqual([
+      'pending-intros',
+      'pending-meetings',
+      'recommendations',
+      'open-conversations',
+    ]);
   });
 });
