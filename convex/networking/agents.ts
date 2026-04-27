@@ -24,6 +24,28 @@ export const registerAgent = mutation({
   handler: registerAgentHandler,
 });
 
+export const autoClaimAgentBySlug = internalMutation({
+  args: {
+    slug: v.string(),
+    xHandle: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const slug = normalizeSlug(args.slug);
+    const agent = await ctx.db
+      .query('networkAgents')
+      .withIndex('by_slug', (q) => q.eq('slug', slug))
+      .first();
+    if (!agent) {
+      throw networkingError('agent_not_found', 'The agent does not exist.');
+    }
+    return await activateAgent(ctx, agent, Date.now(), {
+      xHandle: args.xHandle ?? agent.slug,
+      xProfileUrl: defaultProfileUrlForHandle(args.xHandle ?? agent.slug),
+      verificationMethod: 'oauth',
+    });
+  },
+});
+
 export async function registerAgentHandler(
   ctx: MutationCtx,
   args: {
@@ -54,9 +76,10 @@ export async function registerAgentHandler(
     slug,
     displayName: args.displayName.trim(),
     ...(args.description ? { description: args.description.trim() } : {}),
-    status: 'pending_claim',
+    status: 'active',
     createdAt: now,
     updatedAt: now,
+    claimedAt: now,
   });
 
   await ctx.db.insert('networkAgentApiKeys', {
@@ -71,11 +94,19 @@ export async function registerAgentHandler(
     agentId,
     claimTokenHash: await hashSecret(claimToken),
     verificationCodeHash: await hashSecret(verificationCode),
-    status: 'pending',
+    status: 'verified',
+    xHandle: slug,
+    xProfileUrl: defaultProfileUrlForHandle(slug),
+    verificationMethod: 'oauth',
     createdAt: now,
+    verifiedAt: now,
   });
 
   await ctx.db.patch(agentId, { ownerClaimId, updatedAt: now });
+  const agent = await ctx.db.get(agentId);
+  if (agent) {
+    await ensureNetworkingTownAvatar(ctx, agent, now);
+  }
 
   return {
     agentId,
@@ -83,7 +114,7 @@ export async function registerAgentHandler(
     apiKey,
     claimUrl: formatClaimUrl(getClaimBaseUrl(), claimToken),
     verificationCode,
-    status: 'pending_claim' as const,
+    status: 'active' as const,
   };
 }
 
@@ -208,13 +239,12 @@ async function claimAgentHandler(
   if (!claim) {
     throw networkingError('claim_not_found', 'The claim token does not exist.');
   }
-  if (claim.status !== 'pending') {
-    throw networkingError('invalid_claim_status', 'The claim is no longer pending.');
-  }
-
   const verificationCodeHash = await hashSecret(args.verificationCode);
   if (!arrayBuffersEqual(verificationCodeHash, claim.verificationCodeHash)) {
     throw networkingError('invalid_verification_code', 'The verification code is invalid.');
+  }
+  if (claim.status !== 'pending' && claim.status !== 'verified') {
+    throw networkingError('invalid_claim_status', 'The claim cannot be activated.');
   }
 
   const agent = await ctx.db.get(claim.agentId);
@@ -222,17 +252,49 @@ async function claimAgentHandler(
     throw networkingError('agent_not_found', 'The claimed agent does not exist.');
   }
 
-  const now = Date.now();
-  await ctx.db.patch(claim._id, {
-    status: 'verified',
+  return await activateAgent(ctx, agent, Date.now(), {
     xHandle: normalizeXHandle(args.xHandle),
     xProfileUrl: args.xProfileUrl,
     verificationMethod: args.verificationMethod ?? DEFAULT_OWNER_VERIFICATION_METHOD,
-    verifiedAt: now,
   });
+}
+
+async function activateAgent(
+  ctx: MutationCtx,
+  agent: Doc<'networkAgents'>,
+  now: number,
+  owner: {
+    xHandle: string;
+    xProfileUrl: string;
+    verificationMethod: 'tweet' | 'oauth';
+  },
+) {
+  let ownerClaimId = agent.ownerClaimId;
+  if (ownerClaimId) {
+    await ctx.db.patch(ownerClaimId, {
+      status: 'verified',
+      xHandle: owner.xHandle,
+      xProfileUrl: owner.xProfileUrl,
+      verificationMethod: owner.verificationMethod,
+      verifiedAt: now,
+    });
+  } else {
+    ownerClaimId = await ctx.db.insert('ownerClaims', {
+      agentId: agent._id,
+      claimTokenHash: await hashSecret(generateClaimToken()),
+      verificationCodeHash: await hashSecret(generateVerificationCode()),
+      status: 'verified',
+      xHandle: owner.xHandle,
+      xProfileUrl: owner.xProfileUrl,
+      verificationMethod: owner.verificationMethod,
+      createdAt: now,
+      verifiedAt: now,
+    });
+  }
+
   await ctx.db.patch(agent._id, {
     status: 'active',
-    ownerClaimId: claim._id,
+    ownerClaimId,
     claimedAt: now,
     updatedAt: now,
   });
@@ -242,7 +304,7 @@ async function claimAgentHandler(
     agentId: agent._id,
     agentSlug: agent.slug,
     status: 'active' as const,
-    ownerClaimId: claim._id,
+    ownerClaimId,
   };
 }
 

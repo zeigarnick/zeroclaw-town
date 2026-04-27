@@ -375,6 +375,11 @@ describe('networking cards handlers', () => {
   test('rejects unclaimed activation and updating active cards', async () => {
     const { ctx, tables } = createMockCtx();
     const pending = await registerPendingAgent(ctx, 'agent-pending');
+    const pendingAgent = tables.networkAgents.find((agent) => agent.slug === 'agent-pending');
+    if (!pendingAgent) {
+      throw new Error('Expected pending agent row');
+    }
+    pendingAgent.status = 'pending_claim';
 
     await expect(
       createCardHandler(ctx as any, {
