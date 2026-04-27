@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import volumeImg from '../../../assets/volume.svg';
 import { sound } from '@pixi/sound';
 import Button from './Button';
@@ -8,21 +8,29 @@ import { api } from '../../../convex/_generated/api';
 export default function MusicButton() {
   const musicUrl = useQuery(api.music.getBackgroundMusic);
   const [isPlaying, setPlaying] = useState(false);
+  const loadedMusicUrlRef = useRef<string | null>(null);
 
-  useEffect(() => {
-    if (musicUrl) {
-      sound.add('background', musicUrl).loop = true;
+  const flipSwitch = useCallback(async () => {
+    if (!musicUrl) {
+      return;
     }
-  }, [musicUrl]);
+    if (loadedMusicUrlRef.current !== musicUrl) {
+      if (loadedMusicUrlRef.current) {
+        sound.remove('background');
+      }
+      sound.add('background', musicUrl).loop = true;
+      loadedMusicUrlRef.current = musicUrl;
+    }
 
-  const flipSwitch = async () => {
     if (isPlaying) {
       sound.stop('background');
-    } else {
-      await sound.play('background');
+      setPlaying(false);
+      return;
     }
-    setPlaying(!isPlaying);
-  };
+
+    await sound.play('background');
+    setPlaying(true);
+  }, [isPlaying, musicUrl]);
 
   const handleKeyPress = useCallback(
     (event: { key: string }) => {
@@ -37,6 +45,14 @@ export default function MusicButton() {
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [handleKeyPress]);
+
+  useEffect(() => {
+    return () => {
+      if (loadedMusicUrlRef.current) {
+        sound.remove('background');
+      }
+    };
+  }, []);
 
   return (
     <>

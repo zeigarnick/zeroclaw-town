@@ -80,7 +80,6 @@ const init = mutation({
     numAgents: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    detectMismatchedLLMProvider();
     const { worldStatus, engine } = await getOrCreateDefaultWorld(ctx);
     if (worldStatus.status !== 'running') {
       console.warn(
@@ -95,6 +94,9 @@ const init = mutation({
     );
     if (shouldCreate) {
       const toCreate = args.numAgents !== undefined ? args.numAgents : Descriptions.length;
+      if (toCreate > 0) {
+        detectMismatchedLLMProvider();
+      }
       for (let i = 0; i < toCreate; i++) {
         await insertInput(ctx, worldStatus.worldId, 'createAgent', {
           descriptionIndex: i % Descriptions.length,
