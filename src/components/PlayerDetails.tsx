@@ -14,6 +14,7 @@ import type {
   NetworkingTownProjection,
   NetworkingTownStatus,
 } from '../../convex/networking/townProjection';
+import type { TownConversationThread } from '../../convex/networking/conversations';
 
 const NETWORKING_STATUS_META: Record<NetworkingTownStatus, { label: string; className: string }> = {
   matched: {
@@ -74,6 +75,10 @@ export default function PlayerDetails({
 
   const playerDescription = playerId && game.playerDescriptions.get(playerId);
   const networkingAgent = playerId ? networkingProjection?.agentsByPlayerId[playerId] : undefined;
+  const networkingConversations = useQuery(
+    api.networking.conversations.listTownConversations,
+    networkingAgent ? { agentId: networkingAgent.agentId } : 'skip',
+  ) as TownConversationThread[] | undefined;
 
   const startConversation = useSendInput(engineId, 'startConversation');
   const acceptInvite = useSendInput(engineId, 'acceptInvite');
@@ -176,6 +181,12 @@ export default function PlayerDetails({
         </a>
       </div>
       {networkingAgent && <NetworkingAgentPanel agent={networkingAgent} />}
+      {networkingAgent && (
+        <NetworkingConversationPanel
+          agent={networkingAgent}
+          conversations={networkingConversations}
+        />
+      )}
       {canInvite && (
         <a
           className={
@@ -287,6 +298,112 @@ export default function PlayerDetails({
         </>
       )}
     </>
+  );
+}
+
+function NetworkingConversationPanel({
+  agent,
+  conversations,
+}: {
+  agent: NetworkingTownAgent;
+  conversations?: TownConversationThread[];
+}) {
+  return (
+    <div className="box mt-6">
+      <div className="bg-brown-700 p-3">
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="font-display text-xl tracking-wider shadow-solid">
+            Agent conversations
+          </h3>
+          <span className="border border-brown-500 bg-brown-800 px-2 py-1 text-xs tabular-nums text-brown-100">
+            {conversations ? conversations.length : '...'}
+          </span>
+        </div>
+        {!conversations && (
+          <p className="mt-3 text-sm leading-tight text-pretty text-brown-200">
+            Loading conversations...
+          </p>
+        )}
+        {conversations?.length === 0 && (
+          <p className="mt-3 text-sm leading-tight text-pretty text-brown-200">
+            No networking conversations yet.
+          </p>
+        )}
+        {conversations && conversations.length > 0 && (
+          <div className="mt-4 space-y-4">
+            {conversations.map((conversation) => (
+              <NetworkingConversationThreadView
+                key={conversation.conversationId}
+                agent={agent}
+                conversation={conversation}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function NetworkingConversationThreadView({
+  agent,
+  conversation,
+}: {
+  agent: NetworkingTownAgent;
+  conversation: TownConversationThread;
+}) {
+  const isOpen = conversation.status === 'open';
+  return (
+    <section className="border border-brown-500 bg-brown-800 p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="text-sm leading-tight text-pretty">
+            {agent.displayName} with {conversation.otherAgent.displayName}
+          </p>
+          <p className="mt-1 text-xs text-brown-300">
+            Updated {new Date(conversation.updatedAt).toLocaleString()}
+          </p>
+        </div>
+        <span
+          className={`border px-2 py-1 text-xs tabular-nums ${
+            isOpen
+              ? 'border-yellow-100 bg-yellow-300 text-brown-900'
+              : 'border-brown-500 bg-brown-700 text-brown-100'
+          }`}
+        >
+          {isOpen ? 'Live' : 'Closed'}
+        </span>
+      </div>
+      {conversation.messages.length === 0 ? (
+        <p className="mt-3 text-sm leading-tight text-pretty text-brown-200">
+          The agents have not exchanged messages yet.
+        </p>
+      ) : (
+        <div className="mt-3 space-y-3">
+          {conversation.messages.map((message) => {
+            const isSelectedAgent = message.authorAgentId === agent.agentId;
+            return (
+              <div
+                key={message.messageId}
+                className={`border p-2 ${
+                  isSelectedAgent
+                    ? 'border-yellow-200 bg-yellow-100 text-brown-900'
+                    : 'border-brown-500 bg-brown-700 text-brown-100'
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2 text-xs">
+                  <span>{message.authorDisplayName}</span>
+                  <time dateTime={new Date(message.createdAt).toISOString()}>
+                    {new Date(message.createdAt).toLocaleTimeString()}
+                  </time>
+                </div>
+                <p className="mt-2 text-sm leading-tight text-pretty">{message.body}</p>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
   );
 }
 

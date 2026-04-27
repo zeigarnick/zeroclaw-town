@@ -92,6 +92,110 @@ export async function listMessagesHandler(
     .collect();
 }
 
+export type TownConversationThread = Awaited<ReturnType<typeof listTownConversationsHandler>>[number];
+
+export const listTownConversations = query({
+  args: {
+    agentId: v.id('networkAgents'),
+  },
+  handler: (ctx, args) => listTownConversationsHandler(ctx, args),
+});
+
+export async function listTownConversationsHandler(
+  ctx: QueryCtx,
+  args: { agentId: Id<'networkAgents'> },
+) {
+  const agent = await ctx.db.get(args.agentId);
+  if (!agent || agent.status !== 'active') {
+    return [];
+  }
+
+  const byId = new Map<Id<'agentConversations'>, Doc<'agentConversations'>>();
+  for (const status of conversationStatuses) {
+    const participantOneRows = await ctx.db
+      .query('agentConversations')
+      .withIndex('by_participant_one_status_updated_at', (q) =>
+        q.eq('participantOneAgentId', agent._id).eq('status', status),
+      )
+      .collect();
+    const participantTwoRows = await ctx.db
+      .query('agentConversations')
+      .withIndex('by_participant_two_status_updated_at', (q) =>
+        q.eq('participantTwoAgentId', agent._id).eq('status', status),
+      )
+      .collect();
+    for (const row of [...participantOneRows, ...participantTwoRows]) {
+      byId.set(row._id, row);
+    }
+  }
+
+  const threads = [];
+  for (const conversation of Array.from(byId.values()).sort(
+    (left, right) => right.updatedAt - left.updatedAt,
+  )) {
+    const participantOne = await ctx.db.get(conversation.participantOneAgentId);
+    const participantTwo = await ctx.db.get(conversation.participantTwoAgentId);
+    if (!participantOne || !participantTwo) {
+      continue;
+    }
+    const messages = await ctx.db
+      .query('agentMessages')
+      .withIndex('by_conversation_created_at', (q) => q.eq('conversationId', conversation._id))
+      .collect();
+    const otherAgent =
+      participantOne._id === agent._id
+        ? participantTwo
+        : participantTwo._id === agent._id
+          ? participantOne
+          : null;
+    if (!otherAgent) {
+      continue;
+    }
+
+    threads.push({
+      conversationId: conversation._id,
+      meetingId: conversation.meetingId,
+      status: conversation.status,
+      createdAt: conversation.createdAt,
+      updatedAt: conversation.updatedAt,
+      closedAt: conversation.closedAt,
+      closedByAgentId: conversation.closedByAgentId,
+      selectedAgent: {
+        agentId: agent._id,
+        displayName: agent.displayName,
+      },
+      otherAgent: {
+        agentId: otherAgent._id,
+        displayName: otherAgent.displayName,
+      },
+      participants: [
+        {
+          agentId: participantOne._id,
+          displayName: participantOne.displayName,
+        },
+        {
+          agentId: participantTwo._id,
+          displayName: participantTwo.displayName,
+        },
+      ],
+      messages: messages.map((message) => ({
+        messageId: message._id,
+        authorAgentId: message.authorAgentId,
+        authorDisplayName:
+          message.authorAgentId === participantOne._id
+            ? participantOne.displayName
+            : participantTwo.displayName,
+        recipientAgentId: message.recipientAgentId,
+        clientMessageId: message.clientMessageId,
+        body: message.body,
+        createdAt: message.createdAt,
+      })),
+    });
+  }
+
+  return threads;
+}
+
 export const sendMessage = mutation({
   args: {
     apiKey: v.string(),

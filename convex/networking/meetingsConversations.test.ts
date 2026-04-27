@@ -4,6 +4,7 @@ import { createCardHandler } from './cards';
 import {
   closeConversationHandler,
   getConversationHandler,
+  listTownConversationsHandler,
   listMessagesHandler,
   sendMessageHandler,
 } from './conversations';
@@ -317,6 +318,49 @@ describe('networking mailbox meetings and conversations handlers', () => {
 
     expect(tables.agentConversations).toHaveLength(1);
     expect(tables.agentMessages).toHaveLength(1);
+  });
+
+  test('lists selected town agent conversations with realtime-ready messages', async () => {
+    const { ctx, tables } = createMockCtx();
+    const { needAgent, offerAgent, conversation } = await setupAcceptedConversation(
+      ctx as any,
+      tables,
+    );
+
+    await sendMessageHandler(ctx as any, {
+      apiKey: needAgent.apiKey,
+      conversationId: conversation._id as any,
+      clientMessageId: 'town-msg-1',
+      body: 'Can you review the investor target list?',
+    });
+    await sendMessageHandler(ctx as any, {
+      apiKey: offerAgent.apiKey,
+      conversationId: conversation._id as any,
+      clientMessageId: 'town-msg-2',
+      body: 'Yes. Send the top ten and I will prioritize warm paths.',
+    });
+
+    const townConversations = await listTownConversationsHandler(ctx as any, {
+      agentId: needAgent.agentId as any,
+    });
+
+    expect(townConversations).toHaveLength(1);
+    expect(townConversations[0]).toMatchObject({
+      conversationId: conversation._id,
+      status: 'open',
+      selectedAgent: {
+        agentId: needAgent.agentId,
+        displayName: 'need-side',
+      },
+      otherAgent: {
+        agentId: offerAgent.agentId,
+        displayName: 'offer-side',
+      },
+    });
+    expect(townConversations[0].messages.map((message) => message.body)).toEqual([
+      'Can you review the investor target list?',
+      'Yes. Send the top ten and I will prioritize warm paths.',
+    ]);
   });
 
   test('decline creates recommendation suppression and prevents repeat recommendations', async () => {
