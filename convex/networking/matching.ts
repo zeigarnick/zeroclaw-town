@@ -12,9 +12,9 @@ import { hashSecret } from './auth';
 import { getCanonicalCardTextForEmbedding } from './cardText';
 import { writeRecommendationInboxEvent } from './inbox';
 import { MATCH_CARD_STALE_AFTER_DAYS } from './validators';
+import { EMBEDDING_DIMENSION, fetchEmbedding, getLLMConfig } from '../util/llm';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-const DETERMINISTIC_EMBEDDING_DIMENSION = 64;
 const DETERMINISTIC_EMBEDDING_MODEL = 'deterministic-v1';
 const DEFAULT_MIN_SCORE = 0.25;
 const VECTOR_MATCH_CANDIDATE_LIMIT = 64;
@@ -99,6 +99,9 @@ const loadVectorMatchingSeedRef = makeFunctionReference<'query'>(
 );
 const runMatchingForVectorCandidatesRef = makeFunctionReference<'mutation'>(
   'networking/matching:runMatchingForVectorCandidates',
+);
+const writeCardEmbeddingRef = makeFunctionReference<'mutation'>(
+  'networking/matching:writeCardEmbedding',
 );
 
 export function createCardPairKey(
@@ -284,8 +287,23 @@ export async function runVectorMatchingForCardHandler(
     return emptyMatchRunResult();
   }
 
+  let embedding = seed.embedding;
+  if (!embedding) {
+    const generated = await fetchSemanticEmbeddingWithFallback(seed.canonicalText);
+    const writeResult = await ctx.runMutation(writeCardEmbeddingRef, {
+      cardId: args.cardId,
+      textHash: seed.textHash,
+      embedding: generated.embedding,
+      model: generated.model,
+    });
+    if (!writeResult.written) {
+      return emptyMatchRunResult();
+    }
+    embedding = generated.embedding;
+  }
+
   const candidates = await ctx.vectorSearch('cardEmbeddings', 'embedding', {
-    vector: seed.embedding,
+    vector: embedding,
     limit: VECTOR_MATCH_CANDIDATE_LIMIT,
   });
 
@@ -304,20 +322,86 @@ export const loadVectorMatchingSeed = internalQuery({
     if (!card || card.status !== 'active') {
       return null;
     }
+    const canonicalText = getCanonicalCardTextForEmbedding(card);
+    const textHash = await hashSecret(canonicalText);
 
     const embedding = await ctx.db
       .query('cardEmbeddings')
       .withIndex('by_card', (q) => q.eq('cardId', card._id))
       .first();
-    if (!embedding) {
-      return null;
-    }
+    const hasReusableEmbedding =
+      embedding &&
+      buffersEqual(embedding.textHash, textHash) &&
+      embedding.embedding.length === EMBEDDING_DIMENSION &&
+      embedding.model !== DETERMINISTIC_EMBEDDING_MODEL;
 
     return {
-      embedding: embedding.embedding,
+      canonicalText,
+      textHash,
+      embedding: hasReusableEmbedding ? embedding.embedding : null,
     };
   },
 });
+
+export const writeCardEmbedding = internalMutation({
+  args: {
+    cardId: v.id('matchCards'),
+    textHash: v.bytes(),
+    embedding: v.array(v.float64()),
+    model: v.string(),
+  },
+  handler: async (ctx, args) => writeCardEmbeddingHandler(ctx, args),
+});
+
+export async function writeCardEmbeddingHandler(
+  ctx: MutationCtx,
+  args: {
+    cardId: Id<'matchCards'>;
+    textHash: ArrayBuffer;
+    embedding: number[];
+    model: string;
+  },
+) {
+  const card = await ctx.db.get(args.cardId);
+  if (!card || card.status !== 'active') {
+    return { written: false as const };
+  }
+  const currentTextHash = await hashSecret(getCanonicalCardTextForEmbedding(card));
+  if (!buffersEqual(currentTextHash, args.textHash)) {
+    return { written: false as const };
+  }
+  if (args.embedding.length !== EMBEDDING_DIMENSION) {
+    throw new Error(
+      `Expected networking card embedding dimension ${EMBEDDING_DIMENSION}, got ${args.embedding.length}`,
+    );
+  }
+
+  const now = Date.now();
+  const existing = await ctx.db
+    .query('cardEmbeddings')
+    .withIndex('by_card', (q) => q.eq('cardId', card._id))
+    .first();
+  if (existing) {
+    await ctx.db.patch(existing._id, {
+      agentId: card.agentId,
+      textHash: args.textHash,
+      embedding: args.embedding,
+      model: args.model,
+      updatedAt: now,
+    });
+    return { written: true as const, embeddingId: existing._id };
+  }
+
+  const embeddingId = await ctx.db.insert('cardEmbeddings', {
+    cardId: card._id,
+    agentId: card.agentId,
+    textHash: args.textHash,
+    embedding: args.embedding,
+    model: args.model,
+    updatedAt: now,
+  });
+  return { written: true as const, embeddingId };
+}
 
 export const runMatchingForVectorCandidates = internalMutation({
   args: {
@@ -614,7 +698,29 @@ function buffersEqual(left: ArrayBuffer, right: ArrayBuffer) {
   return true;
 }
 
-function deterministicEmbedding(text: string, dimension = DETERMINISTIC_EMBEDDING_DIMENSION) {
+async function fetchSemanticEmbeddingWithFallback(text: string) {
+  try {
+    const { embedding } = await fetchEmbedding(text);
+    if (embedding.length !== EMBEDDING_DIMENSION) {
+      throw new Error(`Expected ${EMBEDDING_DIMENSION} dimensions, got ${embedding.length}`);
+    }
+    return {
+      embedding,
+      model: getLLMConfig().embeddingModel,
+    };
+  } catch (error) {
+    console.warn(
+      'Falling back to deterministic networking embedding:',
+      error instanceof Error ? error.message : String(error),
+    );
+    return {
+      embedding: deterministicEmbedding(text),
+      model: DETERMINISTIC_EMBEDDING_MODEL,
+    };
+  }
+}
+
+function deterministicEmbedding(text: string, dimension = EMBEDDING_DIMENSION) {
   const tokens = tokenize(text);
   const vector = new Array<number>(dimension).fill(0);
   for (const token of tokens) {

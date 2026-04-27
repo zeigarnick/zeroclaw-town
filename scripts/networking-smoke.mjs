@@ -120,13 +120,12 @@ try {
   });
 
   const recommendationId = await step('find recommendation in inbox', async () => {
-    const inbox = await api('GET', '/inbox', { apiKey: needAgent.apiKey });
-    const recommendation = inbox.find(
-      (event) => event.type === 'match_recommendation' && typeof event.recommendationId === 'string',
-    );
-    if (!recommendation) {
-      throw new Error(`No match_recommendation inbox event found. Inbox snippet: ${snippet(inbox)}`);
-    }
+    const recommendation = await poll(async () => {
+      const inbox = await api('GET', '/inbox', { apiKey: needAgent.apiKey });
+      return inbox.find(
+        (event) => event.type === 'match_recommendation' && typeof event.recommendationId === 'string',
+      );
+    }, 'match_recommendation inbox event');
     return recommendation.recommendationId;
   });
 
@@ -140,13 +139,13 @@ try {
   );
 
   await step('verify responder inbox', async () => {
-    const inbox = await api('GET', '/inbox', { apiKey: offerAgent.apiKey });
-    assertArrayHas(
-      inbox,
-      (event) => event.type === 'meeting_request' && event.meetingId === meeting._id,
-      'meeting request event',
-    );
-    return { events: inbox.length };
+    const event = await poll(async () => {
+      const inbox = await api('GET', '/inbox', { apiKey: offerAgent.apiKey });
+      return inbox.find(
+        (row) => row.type === 'meeting_request' && row.meetingId === meeting._id,
+      );
+    }, 'meeting request event');
+    return { event: event._id };
   });
 
   const acceptResult = await step('accept meeting', async () =>
@@ -160,17 +159,17 @@ try {
   }
 
   await step('list meetings and conversations', async () => {
-    const [needMeetings, offerConversations] = await Promise.all([
-      api('GET', '/meetings', { apiKey: needAgent.apiKey }),
-      api('GET', '/conversations', { apiKey: offerAgent.apiKey }),
+    const [needMeeting, offerConversation] = await Promise.all([
+      poll(async () => {
+        const meetings = await api('GET', '/meetings', { apiKey: needAgent.apiKey });
+        return meetings.find((row) => row._id === meeting._id && row.status === 'accepted');
+      }, 'accepted meeting'),
+      poll(async () => {
+        const conversations = await api('GET', '/conversations', { apiKey: offerAgent.apiKey });
+        return conversations.find((row) => row._id === conversationId && row.status === 'open');
+      }, 'open conversation'),
     ]);
-    assertArrayHas(needMeetings, (row) => row._id === meeting._id && row.status === 'accepted', 'accepted meeting');
-    assertArrayHas(
-      offerConversations,
-      (row) => row._id === conversationId && row.status === 'open',
-      'open conversation',
-    );
-    return { meetings: needMeetings.length, conversations: offerConversations.length };
+    return { meeting: needMeeting._id, conversation: offerConversation._id };
   });
 
   const messageBody = `Smoke message ${runId}`;
@@ -185,11 +184,13 @@ try {
   );
 
   await step('list messages', async () => {
-    const messages = await api('GET', `/conversations/${conversationId}/messages`, {
-      apiKey: offerAgent.apiKey,
-    });
-    assertArrayHas(messages, (message) => message.body === messageBody, 'smoke message');
-    return { messages: messages.length };
+    const message = await poll(async () => {
+      const messages = await api('GET', `/conversations/${conversationId}/messages`, {
+        apiKey: offerAgent.apiKey,
+      });
+      return messages.find((row) => row.body === messageBody);
+    }, 'smoke message');
+    return { message: message._id };
   });
 
   await step('close conversation', async () =>
@@ -216,9 +217,11 @@ try {
   );
 
   await step('list intros', async () => {
-    const intros = await api('GET', '/intros', { apiKey: needAgent.apiKey });
-    assertArrayHas(intros, (row) => row._id === intro._id && row.status === 'approved', 'approved intro');
-    return { intros: intros.length };
+    const approvedIntro = await poll(async () => {
+      const intros = await api('GET', '/intros', { apiKey: needAgent.apiKey });
+      return intros.find((row) => row._id === intro._id && row.status === 'approved');
+    }, 'approved intro');
+    return { intro: approvedIntro._id };
   });
 
   console.log('');
@@ -310,6 +313,24 @@ async function step(name, fn) {
     console.log('failed');
     throw new Error(`[${name}] ${error instanceof Error ? error.message : String(error)}`);
   }
+}
+
+async function poll(fn, label, { timeoutMs = 30_000, intervalMs = 1_000 } = {}) {
+  const startedAt = Date.now();
+  let lastError;
+  while (Date.now() - startedAt < timeoutMs) {
+    try {
+      const result = await fn();
+      if (result) {
+        return result;
+      }
+    } catch (error) {
+      lastError = error;
+    }
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+  const suffix = lastError instanceof Error ? ` Last error: ${lastError.message}` : '';
+  throw new Error(`Timed out waiting for ${label}.${suffix}`);
 }
 
 function runCommand(command, commandArgs) {

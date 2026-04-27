@@ -1,5 +1,6 @@
 import { defineTable } from 'convex/server';
 import { v } from 'convex/values';
+import { EMBEDDING_DIMENSION } from '../util/llm';
 import {
   cardStatusValidator,
   cardTypeValidator,
@@ -103,7 +104,7 @@ export const networkingTables = {
     .vectorIndex('embedding', {
       vectorField: 'embedding',
       filterFields: ['agentId'],
-      dimensions: 64,
+      dimensions: EMBEDDING_DIMENSION,
     }),
 
   recommendations: defineTable({
