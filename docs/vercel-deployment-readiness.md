@@ -42,15 +42,16 @@ Vercel build environment:
 Frontend build/runtime:
 
 - `VITE_CONVEX_URL`: preferred by `src/components/ConvexClientProvider.tsx`. Full-stack builds receive it from `convex deploy --cmd`; fallback frontend-only builds and production bundles without an explicit value use `https://youthful-sockeye-531.convex.cloud`.
-- `VITE_NETWORKING_API_BASE_URL`: optional override for dashboard HTTP calls. Leave unset for normal Vercel builds so the app derives the Convex HTTP Actions host from `VITE_CONVEX_URL`.
+- `VITE_NETWORKING_API_BASE_URL`: optional override for dashboard HTTP calls. Leave unset for normal Vercel builds so the app can use same-origin `/api/v1` through the Vercel rewrite.
 - `VITE_SHOW_DEBUG_UI`: optional debug flag.
 
 Convex deployment environment:
 
-- `OPENAI_API_KEY`: required if production AI Town initialization or agent memory uses the current OpenAI embedding configuration.
-- `OPENAI_CHAT_MODEL`, `OPENAI_EMBEDDING_MODEL`: optional OpenAI model overrides.
+- `LLM_PROVIDER=custom`, `LLM_API_URL=https://openrouter.ai/api`, `LLM_API_KEY`, `LLM_MODEL=openai/gpt-4o-mini`, `LLM_EMBEDDING_MODEL=openai/text-embedding-3-small`: required for the current OpenRouter-backed production AI Town chat and embedding path.
+- `NETWORKING_CLAIM_BASE_URL`: production claim link base. Current working value is `https://zeroclaw-town.vercel.app/claim` until `zeroclaw.town` is registered and configured.
+- `OPENAI_API_KEY`: alternative provider key if production AI Town initialization or agent memory uses the native OpenAI path instead of custom OpenRouter config.
+- `OPENAI_CHAT_MODEL`, `OPENAI_EMBEDDING_MODEL`: optional OpenAI model overrides for native OpenAI mode.
 - `TOGETHER_API_KEY`, `TOGETHER_CHAT_MODEL`, `TOGETHER_EMBEDDING_MODEL`: optional only if the embedding dimension/provider code is changed to Together.
-- `LLM_API_URL`, `LLM_API_KEY`, `LLM_MODEL`, `LLM_EMBEDDING_MODEL`: optional custom hosted LLM configuration.
 - `REPLICATE_API_TOKEN`: required only for background music generation.
 - `CONVEX_SITE_URL`: required for Replicate webhooks if music generation is enabled.
 - `AI_TOWN_MAP_SLICE`: optional; set to `founderCafe` only when the Founder Cafe slice has completed runtime visual QA.
@@ -60,14 +61,14 @@ Convex deployment environment:
 
 Convex HTTP Actions are defined in `convex/http.ts` with `pathPrefix: '/api/v1/'` for GET, POST, and OPTIONS.
 
-The deployed frontend can reach these routes when `VITE_CONVEX_URL` is available because `src/networking/api.ts` derives the HTTP Actions origin by converting:
+The deployed frontend can reach these routes in two supported ways:
 
-- `https://<deployment>.convex.cloud` to `https://<deployment>.convex.site`
-- then appending `/api/v1`
+- Same-origin Vercel route: `https://zeroclaw-town.vercel.app/api/v1/*` rewrites to `https://youthful-sockeye-531.convex.site/api/v1/*`.
+- Convex HTTP Actions origin: `src/networking/api.ts` can derive `https://<deployment>.convex.site/api/v1` from `VITE_CONVEX_URL`.
 
 The Convex HTTP handler sends permissive CORS headers, so browser calls from Vercel preview and production origins are allowed.
 
-Important constraint: Vercel itself does not host `/api/v1/*` for this repo. External clients and the dashboard's default adapter should call the Convex `.convex.site/api/v1/*` origin. A same-origin `/api/v1/*` URL only works if a future Vercel rewrite/proxy is added.
+Important constraint: `https://zeroclaw.town` is not currently usable. Public DNS has no records for the domain, and Vercel reports it as available for purchase. Use `https://zeroclaw-town.vercel.app` until the domain is purchased, attached to the correct Vercel project, and DNS has propagated.
 
 ## Preview And Production Differences
 
