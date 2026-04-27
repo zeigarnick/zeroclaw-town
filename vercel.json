@@ -1,6 +1,6 @@
 {
   "framework": "vite",
-  "buildCommand": "if [ -n \"$CONVEX_DEPLOY_KEY\" ]; then npm run build:vercel; else echo \"CONVEX_DEPLOY_KEY is not set; running frontend-only Vite build against the configured Convex production URL. This deploy does not push Convex functions.\"; VITE_CONVEX_URL=\"${VITE_CONVEX_URL:-https://youthful-sockeye-531.convex.cloud}\" npm run build; fi",
+  "buildCommand": "node scripts/vercel-build.mjs",
   "outputDirectory": "dist",
   "rewrites": [
     {

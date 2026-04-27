@@ -10,16 +10,16 @@ The app is a Vite React static frontend with Convex backend functions and Convex
 Repository config now encodes that contract:
 
 - Vercel framework preset: `vite`
-- Vercel build command: use `npm run build:vercel` when `CONVEX_DEPLOY_KEY` exists; otherwise run a frontend-only Vite build with `VITE_CONVEX_URL` set to the configured Convex production URL.
+- Vercel build command: `node scripts/vercel-build.mjs`
 - Vercel output directory: `dist`
-- Vercel build script: `convex deploy --cmd 'npm run build' --cmd-url-env-var-name VITE_CONVEX_URL`
+- Vercel build script: `scripts/vercel-build.mjs` runs `npm run build:vercel` when `CONVEX_DEPLOY_KEY` exists, otherwise it runs `npm run build` with `VITE_CONVEX_URL=https://youthful-sockeye-531.convex.cloud`.
 - Static asset base: Vite uses `base: '/ai-town'`, with a Vercel rewrite from `/ai-town/:match*` to `/:match*`
 
 This prepares the project for Vercel compatibility without treating a frontend-only deploy as launch-ready.
 
 ## Convex Deployment Strategy
 
-Use one Vercel project pointing at this app root. The Vercel build command is intentionally conditional: it runs the Convex deploy wrapper when `CONVEX_DEPLOY_KEY` is set, and otherwise runs a frontend-only Vite build against `https://youthful-sockeye-531.convex.cloud` so pre-launch preview builds do not fail solely because Convex deploy keys have not been installed yet.
+Use one Vercel project pointing at this app root. The Vercel build script is intentionally conditional: it runs the Convex deploy wrapper when `CONVEX_DEPLOY_KEY` is set, and otherwise runs a frontend-only Vite build against `https://youthful-sockeye-531.convex.cloud` so pre-launch preview builds do not fail solely because Convex deploy keys have not been installed yet.
 
 Set `CONVEX_DEPLOY_KEY` in Vercel with environment scoping:
 
@@ -41,7 +41,7 @@ Vercel build environment:
 
 Frontend build/runtime:
 
-- `VITE_CONVEX_URL`: required by `src/components/ConvexClientProvider.tsx`. Full-stack builds receive it from `convex deploy --cmd`; fallback frontend-only builds use `https://youthful-sockeye-531.convex.cloud` unless Vercel provides an override.
+- `VITE_CONVEX_URL`: preferred by `src/components/ConvexClientProvider.tsx`. Full-stack builds receive it from `convex deploy --cmd`; fallback frontend-only builds and production bundles without an explicit value use `https://youthful-sockeye-531.convex.cloud`.
 - `VITE_NETWORKING_API_BASE_URL`: optional override for dashboard HTTP calls. Leave unset for normal Vercel builds so the app derives the Convex HTTP Actions host from `VITE_CONVEX_URL`.
 - `VITE_SHOW_DEBUG_UI`: optional debug flag.
 
