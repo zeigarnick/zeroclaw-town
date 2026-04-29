@@ -167,6 +167,66 @@ describe('networking HTTP helpers', () => {
     });
   });
 
+  test('routes event registration through the event API envelope', async () => {
+    const calls: Array<{ kind: string; args: any }> = [];
+    const response = await handleNetworkingHttpRequest(
+      {
+        runMutation: async (_funcRef, args) => {
+          calls.push({ kind: 'mutation', args });
+          return {
+            eventId: args.eventId,
+            displayName: 'Cedar Scout 123',
+            approvalStatus: 'pending_owner_review',
+          };
+        },
+        runQuery: async () => {
+          throw new Error('unexpected query');
+        },
+      },
+      new Request('https://town.example/api/v1/events/demo-event/register', {
+        method: 'POST',
+        body: JSON.stringify({
+          agentIdentifier: 'attendee-agent',
+          avatarConfig: {
+            hair: 'curly',
+            skinTone: 'tone-3',
+            clothing: 'jacket',
+          },
+          publicCard: {
+            role: 'Founder',
+            offers: ['GTM help'],
+          },
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await readJson(response)).toEqual({
+      success: true,
+      data: {
+        eventId: 'demo-event',
+        displayName: 'Cedar Scout 123',
+        approvalStatus: 'pending_owner_review',
+      },
+    });
+    expect(calls[0]).toMatchObject({
+      kind: 'mutation',
+      args: {
+        eventId: 'demo-event',
+        agentIdentifier: 'attendee-agent',
+        avatarConfig: {
+          hair: 'curly',
+          skinTone: 'tone-3',
+          clothing: 'jacket',
+        },
+        publicCard: {
+          role: 'Founder',
+          offers: ['GTM help'],
+        },
+      },
+    });
+  });
+
   test('wraps representative route errors in stable JSON envelopes', async () => {
     const response = await handleNetworkingHttpRequest(
       {

@@ -41,6 +41,24 @@ const functions = {
     mockClaimAgent: makeFunctionReference<'mutation'>('networking/agents:mockClaimAgent'),
     getClaimStatus: makeFunctionReference<'query'>('networking/agents:getClaimStatus'),
   },
+  eventAgents: {
+    registerEventAgent: makeFunctionReference<'mutation'>(
+      'networking/eventAgents:registerEventAgent',
+    ),
+    getOwnerReview: makeFunctionReference<'query'>('networking/eventAgents:getOwnerReview'),
+    approveOwnerReview: makeFunctionReference<'mutation'>(
+      'networking/eventAgents:approveOwnerReview',
+    ),
+    rejectOwnerReview: makeFunctionReference<'mutation'>(
+      'networking/eventAgents:rejectOwnerReview',
+    ),
+    requestOwnerReviewChanges: makeFunctionReference<'mutation'>(
+      'networking/eventAgents:requestOwnerReviewChanges',
+    ),
+    listApprovedPublicCards: makeFunctionReference<'query'>(
+      'networking/eventAgents:listApprovedPublicCards',
+    ),
+  },
   cards: {
     createCard: makeFunctionReference<'mutation'>('networking/cards:createCard'),
     listCards: makeFunctionReference<'query'>('networking/cards:listCards'),
@@ -89,6 +107,71 @@ export async function handleNetworkingHttpRequest(
   try {
     const url = new URL(request.url);
     const route = parseApiRoute(url.pathname);
+
+    if (request.method === 'POST' && route[0] === 'events' && route[2] === 'register') {
+      const body = await parseJsonObject(request);
+      const data = await ctx.runMutation(functions.eventAgents.registerEventAgent, {
+        eventId: requirePathId(route[1], 'eventId'),
+        agentIdentifier: optionalString(body.agentIdentifier, 'agentIdentifier'),
+        publicCard: requireValue(body.publicCard, 'publicCard'),
+        avatarConfig: body.avatarConfig,
+      });
+      return jsonSuccess(data);
+    }
+
+    if (
+      request.method === 'GET' &&
+      route[0] === 'events' &&
+      route[2] === 'owner-sessions' &&
+      route.length === 4
+    ) {
+      const data = await ctx.runQuery(functions.eventAgents.getOwnerReview, {
+        reviewToken: requirePathId(route[3], 'reviewToken'),
+      });
+      return jsonSuccess(data);
+    }
+
+    if (
+      request.method === 'POST' &&
+      route[0] === 'events' &&
+      route[2] === 'owner-sessions' &&
+      route.length === 5
+    ) {
+      const body = await parseJsonObject(request);
+      const reviewToken = requirePathId(route[3], 'reviewToken');
+      if (route[4] === 'approve') {
+        const data = await ctx.runMutation(functions.eventAgents.approveOwnerReview, {
+          reviewToken,
+        });
+        return jsonSuccess(data);
+      }
+      if (route[4] === 'reject') {
+        const data = await ctx.runMutation(functions.eventAgents.rejectOwnerReview, {
+          reviewToken,
+          reviewNote: optionalString(body.reviewNote, 'reviewNote'),
+        });
+        return jsonSuccess(data);
+      }
+      if (route[4] === 'request-changes') {
+        const data = await ctx.runMutation(functions.eventAgents.requestOwnerReviewChanges, {
+          reviewToken,
+          reviewNote: optionalString(body.reviewNote, 'reviewNote'),
+        });
+        return jsonSuccess(data);
+      }
+    }
+
+    if (
+      request.method === 'GET' &&
+      route[0] === 'events' &&
+      route[2] === 'approved-cards' &&
+      route.length === 3
+    ) {
+      const data = await ctx.runQuery(functions.eventAgents.listApprovedPublicCards, {
+        eventId: requirePathId(route[1], 'eventId'),
+      });
+      return jsonSuccess(data);
+    }
 
     if (request.method === 'POST' && route[0] === 'agents' && route[1] === 'register') {
       const body = await parseJsonObject(request);
@@ -449,6 +532,13 @@ function requireString(value: unknown, fieldName: string) {
   return value;
 }
 
+function requireValue(value: unknown, fieldName: string) {
+  if (value === undefined) {
+    throw new RouteError('invalid_request', `${fieldName} is required.`, 400);
+  }
+  return value;
+}
+
 function optionalString(value: unknown, fieldName: string) {
   if (value === undefined) {
     return undefined;
@@ -555,6 +645,7 @@ function statusForNetworkingError(code: NetworkingErrorCode) {
 
   if (
     code === 'duplicate_agent_slug' ||
+    code === 'duplicate_event_agent' ||
     code === 'meeting_already_exists' ||
     code === 'duplicate_client_message_id'
   ) {
