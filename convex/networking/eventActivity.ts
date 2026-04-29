@@ -3,7 +3,7 @@ import { Doc } from '../_generated/dataModel';
 import { MutationCtx, QueryCtx, query } from '../_generated/server';
 import { networkingError } from './auth';
 import { normalizeEventId } from './eventAgents';
-import { getStoredPublicEventMarkerSlug } from './eventMarkerIdentity';
+import { ensurePublicEventMarkerSlug } from './eventMarkerIdentity';
 import { EventActivityType } from './validators';
 
 const DEFAULT_EVENT_ACTIVITY_LIMIT = 12;
@@ -58,14 +58,18 @@ export async function createMatchActivityForApprovedIntent(
       'Approved connection intent participants could not be loaded.',
     );
   }
+  const [requesterMarkerSlug, targetMarkerSlug] = await Promise.all([
+    ensurePublicEventMarkerSlug(ctx, requester, now),
+    ensurePublicEventMarkerSlug(ctx, target, now),
+  ]);
 
   const activityId = await ctx.db.insert('eventActivityEvents', {
     eventId: intent.eventId,
     type: 'match_created',
     requesterDisplayName: requester.displayName,
     targetDisplayName: target.displayName,
-    requesterMarkerSlug: getStoredPublicEventMarkerSlug(requester),
-    targetMarkerSlug: getStoredPublicEventMarkerSlug(target),
+    requesterMarkerSlug,
+    targetMarkerSlug,
     sourceIntentId: intent._id,
     payload: {
       matchKind: 'recipient_approved',

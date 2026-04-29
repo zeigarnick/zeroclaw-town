@@ -118,12 +118,17 @@ async function insertAgentWithCard(
   ctx: ReturnType<typeof createMockCtx>['ctx'],
   label: string,
   cardOverrides: Partial<Row['publicCard']> = {},
+  options: { omitPublicMarkerSlug?: boolean } = {},
 ) {
   const now = 1710000000000;
   const agentId = await ctx.db.insert('eventAgents', {
     eventId: 'demo-event',
     agentIdentifier: label,
-    publicMarkerSlug: `public-marker-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+    ...(options.omitPublicMarkerSlug
+      ? {}
+      : {
+          publicMarkerSlug: `public-marker-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+        }),
     displayName: label,
     avatarConfig: {
       hair: 'curly',
@@ -253,6 +258,40 @@ describe('event activity', () => {
     expect(serialized).not.toContain('event-agent-');
     expect(serialized).not.toContain('sourceIntentId');
     expect(serialized).not.toContain('GTM help');
+  });
+
+  test('repairs missing public marker slugs before creating match activity', async () => {
+    const { ctx, tables } = createMockCtx();
+    const requester = await insertAgentWithCard(ctx, 'Legacy Scout', {}, { omitPublicMarkerSlug: true });
+    const target = await insertAgentWithCard(ctx, 'Legacy Builder', {}, { omitPublicMarkerSlug: true });
+    const intent = await createEventConnectionIntentHandler(ctx as any, {
+      eventId: 'demo-event',
+      requesterAgentId: requester.agentId as any,
+      targetAgentId: target.agentId as any,
+      requesterOwnerSessionToken: requester.ownerSessionToken,
+    });
+
+    await decideEventConnectionIntentHandler(ctx as any, {
+      eventId: 'demo-event',
+      intentId: intent.id as any,
+      ownerSessionToken: target.ownerSessionToken,
+      decision: 'approve',
+    });
+
+    const requesterRow = tables.eventAgents.find((row) => row._id === requester.agentId);
+    const targetRow = tables.eventAgents.find((row) => row._id === target.agentId);
+    expect(requesterRow?.publicMarkerSlug).toMatch(/^event-marker-[a-z0-9_-]+$/);
+    expect(targetRow?.publicMarkerSlug).toMatch(/^event-marker-[a-z0-9_-]+$/);
+    expect(tables.eventActivityEvents[0]).toMatchObject({
+      requesterMarkerSlug: requesterRow?.publicMarkerSlug,
+      targetMarkerSlug: targetRow?.publicMarkerSlug,
+    });
+    const serialized = JSON.stringify(
+      await listRecentEventActivityHandler(ctx as any, { eventId: 'demo-event' }),
+    );
+    expect(serialized).not.toContain('eventAgents:');
+    expect(serialized).not.toContain('eventConnectionIntents');
+    expect(serialized).not.toContain('event_owner_');
   });
 
   test('does not create activity for declined or auto-rejected intents', async () => {

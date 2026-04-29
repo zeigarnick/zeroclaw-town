@@ -263,7 +263,6 @@ describe('networking town projection', () => {
       expect.objectContaining({
         source: 'event',
         eventId: 'demo-event',
-        agentId: 'eventAgents:1',
         slug: 'stored-public-cedar',
         displayName: 'Cedar Scout 123',
         avatarConfig: {
@@ -282,6 +281,7 @@ describe('networking town projection', () => {
     expect(JSON.stringify(projection)).not.toContain('example');
     expect(JSON.stringify(projection)).not.toContain('Private Pending');
     expect(JSON.stringify(projection.agents)).not.toContain('event-agent-');
+    expect(JSON.stringify(projection.agents)).not.toContain('eventAgents:');
     expect(projection.statusCounts).toEqual({
       matched: 0,
       pending_meeting: 0,
@@ -316,6 +316,41 @@ describe('networking town projection', () => {
     expect(JSON.stringify(projection.eventActivity)).not.toContain('sourceIntentId');
     expect(JSON.stringify(projection.eventActivity)).not.toContain('eventConnectionIntents');
     expect(JSON.stringify(projection.eventActivity)).not.toContain('eventAgents:');
+  });
+
+  test('keeps existing approved event agents without stored marker slugs visible', async () => {
+    const ctx = createMockCtx({
+      eventAgents: [
+        eventAgent(
+          'eventAgents:legacy',
+          'demo-event',
+          'legacy-private-id',
+          'Legacy Scout 321',
+          'approved',
+          10,
+        ),
+      ],
+      eventNetworkingCards: [
+        eventCard('eventNetworkingCards:legacy', 'demo-event', 'eventAgents:legacy', 'approved', 20),
+      ],
+    });
+
+    const projection = await getTownProjectionHandler(ctx as any, {
+      worldId: 'worlds:1' as any,
+      eventId: 'demo-event',
+    });
+
+    expect(projection.agents).toHaveLength(1);
+    expect(projection.agents[0]).toMatchObject({
+      source: 'event',
+      eventId: 'demo-event',
+      slug: expect.stringMatching(/^legacy-event-marker-[a-z0-9]+$/),
+      displayName: 'Legacy Scout 321',
+    });
+    const serialized = JSON.stringify(projection.agents);
+    expect(serialized).not.toContain('eventAgents:legacy');
+    expect(serialized).not.toContain('legacy-private-id');
+    expect(serialized).not.toContain('agentId');
   });
 });
 
@@ -456,13 +491,13 @@ function eventAgent(
   displayName: string,
   approvalStatus: string,
   updatedAt: number,
-  publicMarkerSlug: string,
+  publicMarkerSlug?: string,
 ) {
   return {
     _id,
     eventId,
     agentIdentifier,
-    publicMarkerSlug,
+    ...(publicMarkerSlug === undefined ? {} : { publicMarkerSlug }),
     displayName,
     avatarConfig: {
       hair: 'curly',

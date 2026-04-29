@@ -3,6 +3,7 @@ import {
   decideOwnerReviewHandler,
   getOwnerReviewHandler,
   listApprovedPublicCardsHandler,
+  repairEventPublicMarkerSlugsHandler,
   registerEventAgentHandler,
 } from './eventAgents';
 import { resetEventRateLimitTestState } from './eventRateLimits';
@@ -332,5 +333,29 @@ describe('event agent handlers', () => {
     ).rejects.toMatchObject({
       data: { code: 'invalid_event_owner_session_status' },
     } satisfies Partial<ConvexError<{ code: string }>>);
+  });
+
+  test('repairs existing event agents missing public marker slugs', async () => {
+    const { ctx, tables } = createMockCtx();
+    await ctx.db.insert('eventAgents', {
+      eventId: 'demo-event',
+      agentIdentifier: 'legacy-approved',
+      displayName: 'Legacy Scout 123',
+      avatarConfig: avatarConfig(),
+      approvalStatus: 'approved',
+      createdAt: 1710000000000,
+      updatedAt: 1710000000000,
+    });
+
+    await expect(
+      repairEventPublicMarkerSlugsHandler(ctx as any, { eventId: 'demo-event' }),
+    ).resolves.toEqual({
+      eventId: 'demo-event',
+      repairedCount: 1,
+    });
+
+    expect(tables.eventAgents[0].publicMarkerSlug).toMatch(/^event-marker-[a-z0-9_-]+$/);
+    expect(tables.eventAgents[0].publicMarkerSlug).not.toContain('eventAgents:');
+    expect(tables.eventAgents[0].publicMarkerSlug).not.toContain('legacy-approved');
   });
 });

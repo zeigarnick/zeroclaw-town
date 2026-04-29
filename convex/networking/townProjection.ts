@@ -8,6 +8,7 @@ import {
   listRecentEventActivityHandler,
 } from './eventActivity';
 import type { EventAvatarConfig, EventPublicCard } from './eventCards';
+import { getPublicEventMarkerSlugForView } from './eventMarkerIdentity';
 
 export type NetworkingTownStatus = 'matched' | 'pending_meeting' | 'talking' | 'intro_ready';
 
@@ -26,7 +27,7 @@ export type NetworkingTownRelationship = {
 
 export type NetworkingTownAgent = {
   source: 'legacy' | 'event';
-  agentId: Id<'networkAgents'> | Id<'eventAgents'>;
+  agentId?: Id<'networkAgents'>;
   eventId?: string;
   slug: string;
   displayName: string;
@@ -354,14 +355,10 @@ async function collectApprovedEventAgents(
     if (!approvedCard) {
       continue;
     }
-    if (!agent.publicMarkerSlug) {
-      continue;
-    }
     projectedAgents.push({
       source: 'event',
       eventId: agent.eventId,
-      agentId: agent._id,
-      slug: agent.publicMarkerSlug,
+      slug: getPublicEventMarkerSlugForView(agent),
       displayName: agent.displayName,
       description: approvedCard.publicCard.category ?? approvedCard.publicCard.role,
       avatarConfig: agent.avatarConfig,

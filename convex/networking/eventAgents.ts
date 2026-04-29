@@ -14,6 +14,7 @@ import {
 import { createEventWorld, ensureEventSpaceWorld } from './eventWorlds';
 import { writeEventOrganizerAuditEvent } from './eventOrganizerControls';
 import { enforceEventRateLimit } from './eventRateLimits';
+import { createPublicEventMarkerSlug, ensurePublicEventMarkerSlug } from './eventMarkerIdentity';
 import {
   EventAgentStatus,
   EventCardStatus,
@@ -112,7 +113,7 @@ export async function registerEventAgentHandler(
   const eventAgentId = await ctx.db.insert('eventAgents', {
     eventId,
     agentIdentifier,
-    publicMarkerSlug: generatePublicMarkerSlug(),
+    publicMarkerSlug: createPublicEventMarkerSlug(),
     displayName,
     avatarConfig,
     approvalStatus: 'pending_owner_review',
@@ -237,6 +238,10 @@ export async function decideOwnerReviewHandler(
   const agentStatus = decision as EventAgentStatus;
   const sessionStatus =
     decision === 'changes_requested' ? 'changes_requested' : decision;
+  const publicMarkerSlug =
+    decision === 'approved' && !agent.publicMarkerSlug
+      ? createPublicEventMarkerSlug()
+      : agent.publicMarkerSlug;
 
   await ctx.db.patch(card._id, {
     status: decision,
@@ -247,6 +252,7 @@ export async function decideOwnerReviewHandler(
   await ctx.db.patch(agent._id, {
     approvalStatus: agentStatus,
     activeCardId: card._id,
+    ...(publicMarkerSlug === undefined ? {} : { publicMarkerSlug }),
     updatedAt: now,
     [timestampField]: now,
   });
@@ -290,6 +296,33 @@ export async function listApprovedPublicCardsHandler(
     views.push(toEventPublicCardView(agent, card));
   }
   return views.sort((left, right) => left.displayName.localeCompare(right.displayName));
+}
+
+export const repairEventPublicMarkerSlugs = mutation({
+  args: {
+    eventId: v.string(),
+  },
+  handler: (ctx, args) => repairEventPublicMarkerSlugsHandler(ctx, args),
+});
+
+export async function repairEventPublicMarkerSlugsHandler(
+  ctx: MutationCtx,
+  args: { eventId: string },
+) {
+  const eventId = normalizeEventId(args.eventId);
+  const agents = await ctx.db
+    .query('eventAgents')
+    .withIndex('by_event_updated_at', (q) => q.eq('eventId', eventId))
+    .collect();
+  const now = Date.now();
+  let repairedCount = 0;
+  for (const agent of agents) {
+    if (!agent.publicMarkerSlug) {
+      await ensurePublicEventMarkerSlug(ctx, agent, now);
+      repairedCount += 1;
+    }
+  }
+  return { eventId, repairedCount };
 }
 
 export async function authenticateApprovedEventOwnerSession(
@@ -476,10 +509,6 @@ function generateRandomDisplayName() {
 
 function generateEventOwnerSessionToken() {
   return `event_owner_${randomBase64Url(24)}`;
-}
-
-function generatePublicMarkerSlug() {
-  return `event-marker-${generateShortToken()}`;
 }
 
 function generateShortToken() {
