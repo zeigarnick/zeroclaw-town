@@ -103,7 +103,7 @@ describe('networking agent handlers', () => {
     });
 
     expect(result).toMatchObject({
-      agentSlug: 'zero-claw',
+      agentSlug: 'opennetwork',
       status: 'pending_claim',
     });
     expect((result as any).apiKey).toBeUndefined();
@@ -114,7 +114,7 @@ describe('networking agent handlers', () => {
     expect(tables.networkAgentApiKeys).toHaveLength(0);
     expect(tables.ownerClaims).toHaveLength(1);
     expect(tables.networkAgents[0]).toMatchObject({
-      slug: 'zero-claw',
+      slug: 'opennetwork',
       displayName: 'opennetwork',
       description: 'autonomous networking agent',
       status: 'pending_claim',
@@ -139,7 +139,7 @@ describe('networking agent handlers', () => {
       } as any,
     );
 
-    expect(result.agentSlug).toBe('zero-claw');
+    expect(result.agentSlug).toBe('opennetwork');
     expect(result.claimUrl).toMatch(/^https:\/\/agora\.vercel\.app\/claim\/town_claim_/);
     expect(result.claimUrl).not.toContain('evil.example');
     expect(result.verificationCode).toMatch(/^town-[A-Z2-9]{6}$/);
@@ -153,7 +153,7 @@ describe('networking agent handlers', () => {
     const claimToken = tokenFromClaimUrl(result.claimUrl);
 
     expect(agent).toMatchObject({
-      slug: 'zero-claw',
+      slug: 'opennetwork',
       displayName: 'opennetwork',
       description: 'autonomous networking agent',
       status: 'pending_claim',
