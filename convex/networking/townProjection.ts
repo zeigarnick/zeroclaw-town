@@ -8,6 +8,7 @@ import {
   listRecentEventActivityHandler,
 } from './eventActivity';
 import type { EventAvatarConfig, EventPublicCard } from './eventCards';
+import { publicEventMarkerSlug } from './eventMarkerIdentity';
 
 export type NetworkingTownStatus = 'matched' | 'pending_meeting' | 'talking' | 'intro_ready';
 
@@ -375,10 +376,6 @@ async function collectApprovedEventAgents(
   return projectedAgents;
 }
 
-function publicEventMarkerSlug(eventAgentId: Id<'eventAgents'>) {
-  return `event-agent-${hashString(eventAgentId).toString(36)}`;
-}
-
 async function collectOpenConversations(
   ctx: QueryCtx,
   agentIds: Id<'networkAgents'>[],
@@ -447,13 +444,6 @@ function normalizeAgentLookupKey(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
-function hashString(value: string) {
-  let hash = 0;
-  for (const char of value) {
-    hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
-  }
-  return hash;
-}
 
 function addRelationship(
   accumulators: Map<Id<'networkAgents'>, AgentAccumulator>,

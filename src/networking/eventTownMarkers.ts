@@ -3,6 +3,7 @@ import type { EventAvatarConfig, EventPublicCard } from '../../convex/networking
 
 export type EventTownMarker = {
   key: string;
+  markerSlug: string;
   displayName: string;
   avatarConfig: EventAvatarConfig;
   avatarSummary: string;
@@ -52,6 +53,7 @@ export function buildEventTownMarkers({
     const avatarConfig = agent.avatarConfig!;
     return {
       key: `${agent.eventId ?? 'event'}:${agent.slug}`,
+      markerSlug: agent.slug,
       displayName: agent.displayName,
       avatarConfig,
       avatarSummary: describeAvatar(avatarConfig),

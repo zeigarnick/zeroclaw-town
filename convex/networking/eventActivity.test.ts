@@ -4,6 +4,7 @@ import {
   upsertEventPrivateContactHandler,
 } from './eventContactReveal';
 import { getEventMatchActivityCount, listRecentEventActivityHandler } from './eventActivity';
+import { publicEventMarkerSlug } from './eventMarkerIdentity';
 import { upsertEventRecipientRulesHandler } from './eventRecipientRules';
 import { hashSecret } from './auth';
 
@@ -218,6 +219,8 @@ describe('event activity', () => {
       type: 'match_created',
       requesterDisplayName: 'Cedar Scout',
       targetDisplayName: 'Orbit Builder',
+      requesterMarkerSlug: publicEventMarkerSlug(requester.agentId as any),
+      targetMarkerSlug: publicEventMarkerSlug(target.agentId as any),
       sourceIntentId: intent.id,
       payload: {
         matchKind: 'recipient_approved',
@@ -232,6 +235,8 @@ describe('event activity', () => {
         type: 'match_created',
         requesterDisplayName: 'Cedar Scout',
         targetDisplayName: 'Orbit Builder',
+        requesterMarkerSlug: publicEventMarkerSlug(requester.agentId as any),
+        targetMarkerSlug: publicEventMarkerSlug(target.agentId as any),
         payload: {
           matchKind: 'recipient_approved',
         },
@@ -244,6 +249,7 @@ describe('event activity', () => {
     expect(serialized).not.toContain('target@example.com');
     expect(serialized).not.toContain('Private Co');
     expect(serialized).not.toContain('event_owner_');
+    expect(serialized).not.toContain('eventAgents:');
     expect(serialized).not.toContain('sourceIntentId');
     expect(serialized).not.toContain('GTM help');
   });

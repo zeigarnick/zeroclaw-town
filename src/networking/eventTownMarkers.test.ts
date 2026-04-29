@@ -48,6 +48,7 @@ describe('event town markers', () => {
 
     expect(marker).toMatchObject({
       key: 'demo-event:attendee-a',
+      markerSlug: 'attendee-a',
       displayName: 'Cedar Scout 123',
       avatarSummary: 'Hair: curly | Skin tone: tone-3 | Clothing: jacket | Accessory: glasses',
       publicCard: {

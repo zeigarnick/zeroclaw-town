@@ -3,6 +3,7 @@ import { Doc } from '../_generated/dataModel';
 import { MutationCtx, QueryCtx, query } from '../_generated/server';
 import { networkingError } from './auth';
 import { normalizeEventId } from './eventAgents';
+import { publicEventMarkerSlug } from './eventMarkerIdentity';
 import { EventActivityType } from './validators';
 
 const DEFAULT_EVENT_ACTIVITY_LIMIT = 12;
@@ -16,6 +17,8 @@ export type EventActivityView = {
   type: EventActivityType;
   requesterDisplayName: string;
   targetDisplayName: string;
+  requesterMarkerSlug?: string;
+  targetMarkerSlug?: string;
   payload: EventActivityPayload;
   createdAt: number;
   updatedAt: number;
@@ -61,6 +64,8 @@ export async function createMatchActivityForApprovedIntent(
     type: 'match_created',
     requesterDisplayName: requester.displayName,
     targetDisplayName: target.displayName,
+    requesterMarkerSlug: publicEventMarkerSlug(requester._id),
+    targetMarkerSlug: publicEventMarkerSlug(target._id),
     sourceIntentId: intent._id,
     payload: {
       matchKind: 'recipient_approved',
@@ -107,6 +112,8 @@ function toEventActivityView(activity: Doc<'eventActivityEvents'>): EventActivit
     type: activity.type,
     requesterDisplayName: activity.requesterDisplayName,
     targetDisplayName: activity.targetDisplayName,
+    requesterMarkerSlug: activity.requesterMarkerSlug,
+    targetMarkerSlug: activity.targetMarkerSlug,
     payload: activity.payload,
     createdAt: activity.createdAt,
     updatedAt: activity.updatedAt,

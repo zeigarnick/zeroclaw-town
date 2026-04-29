@@ -22,14 +22,15 @@ function activityFixture(): NonNullable<NetworkingTownProjection['eventActivity'
 }
 
 describe('EventMatchAlerts', () => {
-  test('renders pseudonymous match alert copy and aggregate count', () => {
+  test('renders compact aggregate count without old alert-card copy', () => {
     const markup = renderToStaticMarkup(<EventMatchAlerts activity={activityFixture()} />);
 
     expect(markup).toContain('Matches');
     expect(markup).toContain('7');
-    expect(markup).toContain('Cedar Scout');
-    expect(markup).toContain('matched with');
-    expect(markup).toContain('Orbit Builder');
+    expect(markup).not.toContain('Cedar Scout');
+    expect(markup).not.toContain('matched with');
+    expect(markup).not.toContain('Orbit Builder');
+    expect(markup).not.toContain('aria-live');
   });
 
   test('omits private contact and source identifiers from unexpected activity data', () => {

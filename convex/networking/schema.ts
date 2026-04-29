@@ -379,6 +379,8 @@ export const networkingTables = {
     type: eventActivityTypeValidator,
     requesterDisplayName: v.string(),
     targetDisplayName: v.string(),
+    requesterMarkerSlug: v.optional(v.string()),
+    targetMarkerSlug: v.optional(v.string()),
     sourceIntentId: v.id('eventConnectionIntents'),
     payload: v.object({
       matchKind: v.literal('recipient_approved'),

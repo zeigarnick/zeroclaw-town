@@ -1,4 +1,5 @@
 import { getTownProjectionHandler } from './townProjection';
+import { publicEventMarkerSlug } from './eventMarkerIdentity';
 
 type TableName =
   | 'networkAgents'
@@ -286,6 +287,8 @@ describe('networking town projection', () => {
           type: 'match_created',
           requesterDisplayName: 'Cedar Scout 123',
           targetDisplayName: 'Harbor Builder 789',
+          requesterMarkerSlug: publicEventMarkerSlug('eventAgents:1' as any),
+          targetMarkerSlug: 'event-agent-harbor',
           payload: {
             matchKind: 'recipient_approved',
           },
@@ -294,6 +297,8 @@ describe('networking town projection', () => {
           type: 'match_created',
           requesterDisplayName: 'Cedar Scout 123',
           targetDisplayName: 'Orbit Builder 456',
+          requesterMarkerSlug: publicEventMarkerSlug('eventAgents:1' as any),
+          targetMarkerSlug: 'event-agent-orbit',
           payload: {
             matchKind: 'recipient_approved',
           },
@@ -302,6 +307,7 @@ describe('networking town projection', () => {
     });
     expect(JSON.stringify(projection.eventActivity)).not.toContain('sourceIntentId');
     expect(JSON.stringify(projection.eventActivity)).not.toContain('eventConnectionIntents');
+    expect(JSON.stringify(projection.eventActivity)).not.toContain('eventAgents:');
   });
 });
 
@@ -498,6 +504,9 @@ function eventActivityEvent(
     type: 'match_created',
     requesterDisplayName,
     targetDisplayName,
+    requesterMarkerSlug: publicEventMarkerSlug('eventAgents:1' as any),
+    targetMarkerSlug:
+      targetDisplayName === 'Harbor Builder 789' ? 'event-agent-harbor' : 'event-agent-orbit',
     sourceIntentId,
     payload: {
       matchKind: 'recipient_approved',

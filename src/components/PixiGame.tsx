@@ -30,6 +30,11 @@ import { Player as ServerPlayer } from '../../convex/aiTown/player.ts';
 import { buildEventTownMarkers } from '../networking/eventTownMarkers.ts';
 import type { EventTownMarker } from '../networking/eventTownMarkers.ts';
 import {
+  buildEventMatchChoreography,
+  hasActiveEventMatchChoreography,
+} from '../networking/eventMatchChoreography.ts';
+import type { EventMatchBubble } from '../networking/eventMatchChoreography.ts';
+import {
   beginMapNavigationPointer,
   MapNavigationPointerStart,
   shouldCompleteMapNavigationPointer,
@@ -128,6 +133,35 @@ export const PixiGame = (props: {
       }),
     [props.networkingProjection?.agents, width, height, tileDim],
   );
+  const [matchChoreographyNow, setMatchChoreographyNow] = useState(() => Date.now());
+  const eventActivity = props.networkingProjection?.eventActivity;
+  useEffect(() => {
+    let frameId: number | undefined;
+    const tick = () => {
+      const nowMs = Date.now();
+      setMatchChoreographyNow(nowMs);
+      if (hasActiveEventMatchChoreography({ activity: eventActivity, nowMs })) {
+        frameId = window.requestAnimationFrame(tick);
+      }
+    };
+
+    tick();
+    return () => {
+      if (frameId !== undefined) {
+        window.cancelAnimationFrame(frameId);
+      }
+    };
+  }, [eventActivity]);
+  const matchChoreography = useMemo(
+    () =>
+      buildEventMatchChoreography({
+        markers: eventTownMarkers,
+        activity: eventActivity,
+        nowMs: matchChoreographyNow,
+        tileDim,
+      }),
+    [eventActivity, eventTownMarkers, matchChoreographyNow, tileDim],
+  );
 
   // Zoom on the user’s avatar when it is created
   useEffect(() => {
@@ -178,13 +212,14 @@ export const PixiGame = (props: {
       {hasAboveCharacterFixedSprites(props.game.worldMap) && (
         <PixiFixedSprites map={props.game.worldMap} renderLayer="aboveCharacters" />
       )}
-      {eventTownMarkers.map((marker) => (
+      {matchChoreography.markers.map((marker) => (
         <EventAgentMarker
           key={marker.key}
           marker={marker}
           onSelect={props.onSelectEventTownMarker}
         />
       ))}
+      {matchChoreography.bubble && <EventMatchBubbleMarker bubble={matchChoreography.bubble} />}
       {players.map((p) => {
         const networkingAgent = props.networkingProjection?.agentsByPlayerId[p.id];
         return networkingAgent?.primaryStatus ? (
@@ -259,6 +294,41 @@ function NetworkingBadge({
             fill: meta.text,
             fontFamily: 'VCR OSD Mono, monospace',
             fontSize: 9,
+          })
+        }
+      />
+    </Container>
+  );
+}
+
+function EventMatchBubbleMarker({ bubble }: { bubble: EventMatchBubble }) {
+  const draw = useCallback(
+    (g: PIXI.Graphics) => {
+      g.clear();
+      g.beginFill(0x181425, 0.88 * bubble.alpha);
+      g.drawRoundedRect(-32, -13, 64, 26, 6);
+      g.endFill();
+      g.beginFill(0xfec742, bubble.alpha);
+      g.drawRoundedRect(-29, -10, 58, 20, 5);
+      g.endFill();
+    },
+    [bubble.alpha],
+  );
+
+  return (
+    <Container x={bubble.x} y={bubble.y} alpha={bubble.alpha}>
+      <Graphics draw={draw} />
+      <Text
+        x={0}
+        y={0}
+        text={bubble.text}
+        anchor={{ x: 0.5, y: 0.5 }}
+        style={
+          new PIXI.TextStyle({
+            align: 'center',
+            fill: 0x181425,
+            fontFamily: 'VCR OSD Mono, monospace',
+            fontSize: 10,
           })
         }
       />

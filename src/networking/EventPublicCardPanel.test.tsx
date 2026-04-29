@@ -5,6 +5,7 @@ import type { EventTownMarker } from './eventTownMarkers';
 function markerFixture(): EventTownMarker {
   return {
     key: 'demo-event:public-marker-42',
+    markerSlug: 'public-marker-42',
     displayName: 'Cedar Scout 123',
     avatarConfig: {
       hair: 'curly',
