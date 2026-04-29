@@ -3,7 +3,11 @@ import {
   decideEventConnectionIntentHandler,
   upsertEventPrivateContactHandler,
 } from './eventContactReveal';
-import { getEventMatchActivityCount, listRecentEventActivityHandler } from './eventActivity';
+import {
+  getEventMatchActivityCount,
+  listRecentEventActivityHandler,
+  repairEventActivityMarkerSlugsHandler,
+} from './eventActivity';
 import { upsertEventRecipientRulesHandler } from './eventRecipientRules';
 import { hashSecret } from './auth';
 
@@ -292,6 +296,83 @@ describe('event activity', () => {
     expect(serialized).not.toContain('eventAgents:');
     expect(serialized).not.toContain('eventConnectionIntents');
     expect(serialized).not.toContain('event_owner_');
+  });
+
+  test('omits legacy hash-derived marker slugs from activity views until repaired', async () => {
+    const { ctx } = createMockCtx();
+    await ctx.db.insert('eventActivityEvents', {
+      eventId: 'demo-event',
+      type: 'match_created',
+      requesterDisplayName: 'Cedar Scout',
+      targetDisplayName: 'Orbit Builder',
+      requesterMarkerSlug: 'event-agent-abc123',
+      targetMarkerSlug: 'event-agent-def456',
+      sourceIntentId: 'eventConnectionIntents:missing',
+      payload: {
+        matchKind: 'recipient_approved',
+      },
+      createdAt: 1710000000000,
+      updatedAt: 1710000000000,
+    });
+
+    const activity = await listRecentEventActivityHandler(ctx as any, {
+      eventId: 'demo-event',
+    });
+
+    expect(activity).toEqual([
+      expect.not.objectContaining({
+        requesterMarkerSlug: expect.any(String),
+        targetMarkerSlug: expect.any(String),
+      }),
+    ]);
+    expect(JSON.stringify(activity)).not.toContain('event-agent-');
+    expect(JSON.stringify(activity)).not.toContain('eventConnectionIntents');
+  });
+
+  test('repairs legacy hash-derived activity marker slugs from source intent participants', async () => {
+    const { ctx, tables } = createMockCtx();
+    const requester = await insertAgentWithCard(ctx, 'Cedar Scout');
+    const target = await insertAgentWithCard(ctx, 'Orbit Builder');
+    const intent = await createEventConnectionIntentHandler(ctx as any, {
+      eventId: 'demo-event',
+      requesterAgentId: requester.agentId as any,
+      targetAgentId: target.agentId as any,
+      requesterOwnerSessionToken: requester.ownerSessionToken,
+    });
+    await ctx.db.insert('eventActivityEvents', {
+      eventId: 'demo-event',
+      type: 'match_created',
+      requesterDisplayName: 'Cedar Scout',
+      targetDisplayName: 'Orbit Builder',
+      requesterMarkerSlug: 'event-agent-abc123',
+      targetMarkerSlug: 'event-agent-def456',
+      sourceIntentId: intent.id,
+      payload: {
+        matchKind: 'recipient_approved',
+      },
+      createdAt: 1710000000000,
+      updatedAt: 1710000000000,
+    });
+
+    await expect(
+      repairEventActivityMarkerSlugsHandler(ctx as any, { eventId: 'demo-event' }),
+    ).resolves.toEqual({
+      eventId: 'demo-event',
+      repairedCount: 1,
+      skippedCount: 0,
+    });
+
+    expect(tables.eventActivityEvents[0]).toMatchObject({
+      requesterMarkerSlug: 'public-marker-cedar-scout',
+      targetMarkerSlug: 'public-marker-orbit-builder',
+    });
+    const serialized = JSON.stringify(
+      await listRecentEventActivityHandler(ctx as any, { eventId: 'demo-event' }),
+    );
+    expect(serialized).toContain('public-marker-cedar-scout');
+    expect(serialized).toContain('public-marker-orbit-builder');
+    expect(serialized).not.toContain('event-agent-');
+    expect(serialized).not.toContain('eventConnectionIntents');
   });
 
   test('does not create activity for declined or auto-rejected intents', async () => {

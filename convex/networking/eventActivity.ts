@@ -1,6 +1,6 @@
 import { v } from 'convex/values';
 import { Doc } from '../_generated/dataModel';
-import { MutationCtx, QueryCtx, query } from '../_generated/server';
+import { MutationCtx, QueryCtx, mutation, query } from '../_generated/server';
 import { networkingError } from './auth';
 import { normalizeEventId } from './eventAgents';
 import { ensurePublicEventMarkerSlug } from './eventMarkerIdentity';
@@ -30,6 +30,14 @@ export const listRecentEventActivity = query({
     limit: v.optional(v.number()),
   },
   handler: (ctx, args) => listRecentEventActivityHandler(ctx, args),
+});
+
+export const repairEventActivityMarkerSlugs = mutation({
+  args: {
+    eventId: v.string(),
+    limit: v.optional(v.number()),
+  },
+  handler: (ctx, args) => repairEventActivityMarkerSlugsHandler(ctx, args),
 });
 
 export async function createMatchActivityForApprovedIntent(
@@ -111,17 +119,83 @@ export async function getEventMatchActivityCount(ctx: QueryCtx, eventId: string)
   return aggregate?.matchCount ?? 0;
 }
 
+export async function repairEventActivityMarkerSlugsHandler(
+  ctx: MutationCtx,
+  args: { eventId: string; limit?: number },
+) {
+  const eventId = normalizeEventId(args.eventId);
+  const limit = normalizeLimit(args.limit);
+  const events = await ctx.db
+    .query('eventActivityEvents')
+    .withIndex('by_event_type_created_at', (q) =>
+      q.eq('eventId', eventId).eq('type', 'match_created'),
+    )
+    .order('desc')
+    .take(limit);
+  const now = Date.now();
+  let repairedCount = 0;
+  let skippedCount = 0;
+
+  for (const activity of events) {
+    if (
+      isPublicEventMarkerSlug(activity.requesterMarkerSlug) &&
+      isPublicEventMarkerSlug(activity.targetMarkerSlug)
+    ) {
+      continue;
+    }
+
+    const intent = await ctx.db.get(activity.sourceIntentId);
+    if (!intent || intent.eventId !== eventId) {
+      skippedCount += 1;
+      continue;
+    }
+    const [requester, target] = await Promise.all([
+      ctx.db.get(intent.requesterAgentId),
+      ctx.db.get(intent.targetAgentId),
+    ]);
+    if (
+      !requester ||
+      !target ||
+      requester.eventId !== eventId ||
+      target.eventId !== eventId
+    ) {
+      skippedCount += 1;
+      continue;
+    }
+    const [requesterMarkerSlug, targetMarkerSlug] = await Promise.all([
+      ensurePublicEventMarkerSlug(ctx, requester, now),
+      ensurePublicEventMarkerSlug(ctx, target, now),
+    ]);
+    await ctx.db.patch(activity._id, {
+      requesterMarkerSlug,
+      targetMarkerSlug,
+      updatedAt: now,
+    });
+    repairedCount += 1;
+  }
+
+  return { eventId, repairedCount, skippedCount };
+}
+
 function toEventActivityView(activity: Doc<'eventActivityEvents'>): EventActivityView {
   return {
     type: activity.type,
     requesterDisplayName: activity.requesterDisplayName,
     targetDisplayName: activity.targetDisplayName,
-    requesterMarkerSlug: activity.requesterMarkerSlug,
-    targetMarkerSlug: activity.targetMarkerSlug,
+    requesterMarkerSlug: sanitizePublicEventMarkerSlug(activity.requesterMarkerSlug),
+    targetMarkerSlug: sanitizePublicEventMarkerSlug(activity.targetMarkerSlug),
     payload: activity.payload,
     createdAt: activity.createdAt,
     updatedAt: activity.updatedAt,
   };
+}
+
+function sanitizePublicEventMarkerSlug(markerSlug: string | undefined) {
+  return isPublicEventMarkerSlug(markerSlug) ? markerSlug : undefined;
+}
+
+function isPublicEventMarkerSlug(markerSlug: string | undefined) {
+  return markerSlug !== undefined && !markerSlug.startsWith('event-agent-');
 }
 
 function normalizeLimit(limit: number | undefined) {

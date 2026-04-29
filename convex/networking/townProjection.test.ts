@@ -235,8 +235,8 @@ describe('networking town projection', () => {
           'demo-event',
           'Cedar Scout 123',
           'Harbor Builder 789',
-          'stored-public-cedar',
-          'stored-public-harbor',
+          'event-agent-legacy-requester',
+          'event-agent-legacy-target',
           'eventConnectionIntents:2',
           31,
         ),
@@ -295,8 +295,6 @@ describe('networking town projection', () => {
           type: 'match_created',
           requesterDisplayName: 'Cedar Scout 123',
           targetDisplayName: 'Harbor Builder 789',
-          requesterMarkerSlug: 'stored-public-cedar',
-          targetMarkerSlug: 'stored-public-harbor',
           payload: {
             matchKind: 'recipient_approved',
           },
@@ -316,6 +314,13 @@ describe('networking town projection', () => {
     expect(JSON.stringify(projection.eventActivity)).not.toContain('sourceIntentId');
     expect(JSON.stringify(projection.eventActivity)).not.toContain('eventConnectionIntents');
     expect(JSON.stringify(projection.eventActivity)).not.toContain('eventAgents:');
+    expect(JSON.stringify(projection.eventActivity)).not.toContain('event-agent-legacy');
+    expect(projection.eventActivity?.recent[0]).toEqual(
+      expect.not.objectContaining({
+        requesterMarkerSlug: expect.any(String),
+        targetMarkerSlug: expect.any(String),
+      }),
+    );
   });
 
   test('keeps existing approved event agents without stored marker slugs visible', async () => {
