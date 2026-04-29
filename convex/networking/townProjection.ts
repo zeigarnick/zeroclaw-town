@@ -328,7 +328,7 @@ async function collectApprovedEventAgents(
       source: 'event',
       eventId: agent.eventId,
       agentId: agent._id,
-      slug: agent.agentIdentifier,
+      slug: publicEventMarkerSlug(agent._id),
       displayName: agent.displayName,
       description: approvedCard.publicCard.category ?? approvedCard.publicCard.role,
       avatarConfig: agent.avatarConfig,
@@ -343,6 +343,10 @@ async function collectApprovedEventAgents(
     });
   }
   return projectedAgents;
+}
+
+function publicEventMarkerSlug(eventAgentId: Id<'eventAgents'>) {
+  return `event-agent-${hashString(eventAgentId).toString(36)}`;
 }
 
 async function collectOpenConversations(
@@ -411,6 +415,14 @@ function resolveTownPlayerId(
 
 function normalizeAgentLookupKey(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function hashString(value: string) {
+  let hash = 0;
+  for (const char of value) {
+    hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+  }
+  return hash;
 }
 
 function addRelationship(

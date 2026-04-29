@@ -164,7 +164,14 @@ describe('networking town projection', () => {
       agentConversations: [],
       introCandidates: [],
       eventAgents: [
-        eventAgent('eventAgents:1', 'demo-event', 'attendee-a', 'Cedar Scout 123', 'approved', 10),
+        eventAgent(
+          'eventAgents:1',
+          'demo-event',
+          'founder-example-com',
+          'Cedar Scout 123',
+          'approved',
+          10,
+        ),
         eventAgent(
           'eventAgents:2',
           'demo-event',
@@ -196,7 +203,7 @@ describe('networking town projection', () => {
         source: 'event',
         eventId: 'demo-event',
         agentId: 'eventAgents:1',
-        slug: 'attendee-a',
+        slug: expect.stringMatching(/^event-agent-[a-z0-9]+$/),
         displayName: 'Cedar Scout 123',
         avatarConfig: {
           hair: 'curly',
@@ -209,6 +216,9 @@ describe('networking town projection', () => {
         }),
       }),
     ]);
+    expect(JSON.stringify(projection)).not.toContain('founder-example-com');
+    expect(JSON.stringify(projection)).not.toContain('founder');
+    expect(JSON.stringify(projection)).not.toContain('example');
     expect(JSON.stringify(projection)).not.toContain('Private Pending');
   });
 });
