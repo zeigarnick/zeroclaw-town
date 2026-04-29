@@ -178,7 +178,7 @@ export async function handleNetworkingHttpRequest(
       const data = await ctx.runMutation(functions.eventAgents.registerEventAgent, {
         eventId: requirePathId(route[1], 'eventId'),
         agentIdentifier: optionalString(body.agentIdentifier, 'agentIdentifier'),
-        requesterKey: publicRequesterKey(request),
+        requesterKey: publicRequesterKey(),
         publicCard: requireValue(body.publicCard, 'publicCard'),
         avatarConfig: body.avatarConfig,
       });
@@ -259,7 +259,7 @@ export async function handleNetworkingHttpRequest(
     ) {
       const data = await ctx.runMutation(functions.eventDirectory.searchEventDirectory, {
         eventId: requirePathId(route[1], 'eventId'),
-        requesterKey: publicRequesterKey(request),
+        requesterKey: publicRequesterKey(),
         filters: {
           q: optionalQueryParam(url.searchParams, 'q'),
           role: optionalQueryParam(url.searchParams, 'role'),
@@ -1021,31 +1021,8 @@ function optionalBoolean(value: unknown, fieldName: string) {
   return value;
 }
 
-function publicRequesterKey(request: Request) {
-  return trustedPlatformRequesterKey(request.headers) ?? 'unknown-public-requester';
-}
-
-function firstForwardedIp(headerValue: string | null) {
-  return headerValue?.split(',')[0]?.trim() || undefined;
-}
-
-function trustedPlatformRequesterKey(headers: Headers) {
-  const cloudflareIp = headers.get('cf-connecting-ip')?.trim();
-  if (cloudflareIp && headers.get('cf-ray')) {
-    return `cf-ip:${cloudflareIp}`.slice(0, 180);
-  }
-
-  const flyIp = headers.get('fly-client-ip')?.trim();
-  if (flyIp && headers.get('fly-request-id')) {
-    return `fly-ip:${flyIp}`.slice(0, 180);
-  }
-
-  const vercelIp = firstForwardedIp(headers.get('x-vercel-forwarded-for'));
-  if (vercelIp && headers.get('x-vercel-id')) {
-    return `vercel-ip:${vercelIp}`.slice(0, 180);
-  }
-
-  return undefined;
+function publicRequesterKey() {
+  return 'unknown-public-requester';
 }
 
 function optionalStringArray(value: unknown, fieldName: string) {

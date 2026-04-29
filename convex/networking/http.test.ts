@@ -332,36 +332,51 @@ describe('networking HTTP helpers', () => {
     ]);
   });
 
-  test('uses trusted platform requester identity when a platform marker is present', async () => {
+  test('ignores spoofed platform-looking headers for public rate buckets', async () => {
     const calls: Array<{ kind: string; args: any }> = [];
-    const response = await handleNetworkingHttpRequest(
-      {
-        runMutation: async (_funcRef, args) => {
-          calls.push({ kind: 'mutation', args });
-          return [];
-        },
-        runQuery: async () => {
-          throw new Error('unexpected query');
-        },
+    const ctx = {
+      runMutation: async (_funcRef: unknown, args: any) => {
+        calls.push({ kind: 'mutation', args });
+        return [];
       },
+      runQuery: async () => {
+        throw new Error('unexpected query');
+      },
+    };
+
+    await handleNetworkingHttpRequest(
+      ctx,
       new Request('https://town.example/api/v1/events/demo-event/directory?q=climate', {
         method: 'GET',
         headers: {
           'cf-connecting-ip': '203.0.113.20',
           'cf-ray': 'demo-edge-ray',
-          'user-agent': 'ignored-agent',
+          'fly-client-ip': '203.0.113.21',
+          'fly-request-id': 'demo-fly-request',
+          'x-vercel-forwarded-for': '203.0.113.22',
+          'x-vercel-id': 'demo-vercel-id',
+        },
+      }),
+    );
+    await handleNetworkingHttpRequest(
+      ctx,
+      new Request('https://town.example/api/v1/events/demo-event/directory?q=energy', {
+        method: 'GET',
+        headers: {
+          'cf-connecting-ip': '198.51.100.20',
+          'cf-ray': 'different-edge-ray',
+          'fly-client-ip': '198.51.100.21',
+          'fly-request-id': 'different-fly-request',
+          'x-vercel-forwarded-for': '198.51.100.22',
+          'x-vercel-id': 'different-vercel-id',
         },
       }),
     );
 
-    expect(response.status).toBe(200);
-    expect(calls[0]).toMatchObject({
-      kind: 'mutation',
-      args: {
-        eventId: 'demo-event',
-        requesterKey: 'cf-ip:203.0.113.20',
-      },
-    });
+    expect(calls.map((call) => call.args.requesterKey)).toEqual([
+      'unknown-public-requester',
+      'unknown-public-requester',
+    ]);
   });
 
   test('routes public event space reads for rotated skill URLs', async () => {
