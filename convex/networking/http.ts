@@ -233,12 +233,14 @@ export async function handleNetworkingHttpRequest(
     ) {
       const body = await parseJsonObject(request);
       requireExactBodyKeys(body, ['requesterAgentId', 'targetAgentId']);
+      const ownerSessionToken = requireEventOwnerToken(request.headers.get('Authorization'));
       const data = await ctx.runMutation(
         functions.eventConnectionIntents.createEventConnectionIntent,
         {
           eventId: requirePathId(route[1], 'eventId'),
           requesterAgentId: requireString(body.requesterAgentId, 'requesterAgentId'),
           targetAgentId: requireString(body.targetAgentId, 'targetAgentId'),
+          requesterOwnerSessionToken: ownerSessionToken,
         },
       );
       return jsonSuccess(data);
@@ -254,6 +256,7 @@ export async function handleNetworkingHttpRequest(
       const data = await ctx.runQuery(functions.eventConnectionIntents.listEventInboundIntents, {
         eventId: requirePathId(route[1], 'eventId'),
         targetAgentId: requirePathId(route[3], 'targetAgentId'),
+        ownerSessionToken: requireEventOwnerToken(request.headers.get('Authorization')),
       });
       return jsonSuccess(data);
     }
@@ -271,6 +274,7 @@ export async function handleNetworkingHttpRequest(
       const data = await ctx.runMutation(functions.eventRecipientRules.upsertEventRecipientRules, {
         eventId: requirePathId(route[1], 'eventId'),
         eventAgentId: requirePathId(route[3], 'eventAgentId'),
+        ownerSessionToken: requireEventOwnerToken(request.headers.get('Authorization')),
         rules,
       });
       return jsonSuccess(data);
@@ -288,6 +292,7 @@ export async function handleNetworkingHttpRequest(
       const data = await ctx.runMutation(functions.eventContactReveal.upsertEventPrivateContact, {
         eventId: requirePathId(route[1], 'eventId'),
         eventAgentId: requirePathId(route[3], 'eventAgentId'),
+        ownerSessionToken: requireEventOwnerToken(request.headers.get('Authorization')),
         contact: parsePrivateContact(body.contact),
       });
       return jsonSuccess(data);
@@ -301,11 +306,11 @@ export async function handleNetworkingHttpRequest(
       route.length === 5
     ) {
       const body = await parseJsonObject(request);
-      requireExactBodyKeys(body, ['recipientAgentId', 'decision']);
+      requireExactBodyKeys(body, ['decision']);
       const data = await ctx.runMutation(functions.eventContactReveal.decideEventConnectionIntent, {
         eventId: requirePathId(route[1], 'eventId'),
         intentId: requirePathId(route[3], 'intentId'),
-        recipientAgentId: requireString(body.recipientAgentId, 'recipientAgentId'),
+        ownerSessionToken: requireEventOwnerToken(request.headers.get('Authorization')),
         decision: requireDecision(body.decision),
       });
       return jsonSuccess(data);
@@ -320,7 +325,7 @@ export async function handleNetworkingHttpRequest(
       const data = await ctx.runQuery(functions.eventContactReveal.getEventContactReveal, {
         eventId: requirePathId(route[1], 'eventId'),
         intentId: requirePathId(route[3], 'intentId'),
-        viewerAgentId: requireQueryParam(url.searchParams, 'viewerAgentId'),
+        ownerSessionToken: requireEventOwnerToken(request.headers.get('Authorization')),
       });
       return jsonSuccess(data);
     }
@@ -586,6 +591,27 @@ export function parseBearerAuthorizationHeader(authorizationHeader: string | nul
 
 function requireBearerApiKey(authorizationHeader: string | null) {
   return parseBearerAuthorizationHeader(authorizationHeader);
+}
+
+function requireEventOwnerToken(authorizationHeader: string | null) {
+  if (!authorizationHeader) {
+    throw new RouteError(
+      'invalid_event_owner_token',
+      'Authorization header is required. Expected Bearer event_owner_*.',
+      401,
+    );
+  }
+
+  const [scheme, token, extra] = authorizationHeader.trim().split(/\s+/);
+  if (scheme !== 'Bearer' || !token || extra || !token.startsWith('event_owner_')) {
+    throw new RouteError(
+      'invalid_event_owner_token',
+      'Authorization header must be in the form: Bearer event_owner_*.',
+      401,
+    );
+  }
+
+  return token;
 }
 
 function parseApiRoute(pathname: string) {
@@ -861,6 +887,10 @@ function jsonHeaders() {
 
 function statusForNetworkingError(code: NetworkingErrorCode) {
   if (code === 'invalid_api_key' || code === 'api_key_revoked') {
+    return 401;
+  }
+
+  if (code === 'invalid_event_owner_token') {
     return 401;
   }
 

@@ -3,7 +3,7 @@ import { Doc, Id } from '../_generated/dataModel';
 import { MutationCtx, QueryCtx, mutation, query } from '../_generated/server';
 import { networkingError } from './auth';
 import { toEventConnectionIntentView } from './eventConnectionIntents';
-import { normalizeEventId } from './eventAgents';
+import { authenticateApprovedEventOwnerSession, normalizeEventId } from './eventAgents';
 import { MAX_EVENT_PUBLIC_TEXT_LENGTH } from './validators';
 
 export type EventPrivateContact = {
@@ -31,26 +31,28 @@ export type EventContactRevealView = {
 type UpsertEventPrivateContactArgs = {
   eventId: string;
   eventAgentId: Id<'eventAgents'>;
+  ownerSessionToken: string;
   contact: EventPrivateContact;
 };
 
 type DecideEventConnectionIntentArgs = {
   eventId: string;
   intentId: Id<'eventConnectionIntents'>;
-  recipientAgentId: Id<'eventAgents'>;
+  ownerSessionToken: string;
   decision: 'approve' | 'decline';
 };
 
 type GetEventContactRevealArgs = {
   eventId: string;
   intentId: Id<'eventConnectionIntents'>;
-  viewerAgentId: Id<'eventAgents'>;
+  ownerSessionToken: string;
 };
 
 export const upsertEventPrivateContact = mutation({
   args: {
     eventId: v.string(),
     eventAgentId: v.id('eventAgents'),
+    ownerSessionToken: v.string(),
     contact: v.object({
       realName: v.optional(v.string()),
       company: v.optional(v.string()),
@@ -68,7 +70,7 @@ export const decideEventConnectionIntent = mutation({
   args: {
     eventId: v.string(),
     intentId: v.id('eventConnectionIntents'),
-    recipientAgentId: v.id('eventAgents'),
+    ownerSessionToken: v.string(),
     decision: v.union(v.literal('approve'), v.literal('decline')),
   },
   handler: (ctx, args) => decideEventConnectionIntentHandler(ctx, args),
@@ -78,7 +80,7 @@ export const getEventContactReveal = query({
   args: {
     eventId: v.string(),
     intentId: v.id('eventConnectionIntents'),
-    viewerAgentId: v.id('eventAgents'),
+    ownerSessionToken: v.string(),
   },
   handler: (ctx, args) => getEventContactRevealHandler(ctx, args),
 });
@@ -101,6 +103,11 @@ export async function upsertEventPrivateContactHandler(
       'eventAgentId must reference an approved event agent.',
     );
   }
+  await authenticateApprovedEventOwnerSession(ctx, {
+    eventId,
+    eventAgentId: agent._id,
+    ownerSessionToken: args.ownerSessionToken,
+  });
 
   const contact = normalizePrivateContact(args.contact);
   const now = Date.now();
@@ -142,7 +149,11 @@ export async function decideEventConnectionIntentHandler(
   args: DecideEventConnectionIntentArgs,
 ) {
   const eventId = normalizeEventId(args.eventId);
-  const intent = await getActionableIntent(ctx, eventId, args.intentId, args.recipientAgentId);
+  const recipientAuth = await authenticateApprovedEventOwnerSession(ctx, {
+    eventId,
+    ownerSessionToken: args.ownerSessionToken,
+  });
+  const intent = await getActionableIntent(ctx, eventId, args.intentId, recipientAuth.agent._id);
   const now = Date.now();
 
   if (args.decision === 'decline') {
@@ -188,6 +199,10 @@ export async function getEventContactRevealHandler(
   args: GetEventContactRevealArgs,
 ): Promise<EventContactRevealView> {
   const eventId = normalizeEventId(args.eventId);
+  const viewerAuth = await authenticateApprovedEventOwnerSession(ctx, {
+    eventId,
+    ownerSessionToken: args.ownerSessionToken,
+  });
   const reveal = await ctx.db
     .query('eventContactReveals')
     .withIndex('by_intent', (q) => q.eq('intentId', args.intentId))
@@ -198,7 +213,10 @@ export async function getEventContactRevealHandler(
       'The contact reveal could not be loaded.',
     );
   }
-  if (args.viewerAgentId !== reveal.requesterAgentId && args.viewerAgentId !== reveal.targetAgentId) {
+  if (
+    viewerAuth.agent._id !== reveal.requesterAgentId &&
+    viewerAuth.agent._id !== reveal.targetAgentId
+  ) {
     throw networkingError(
       'event_connection_intent_access_denied',
       'Only participants can view this contact reveal.',

@@ -4,12 +4,14 @@ import {
   listEventInboundIntentsHandler,
 } from './eventConnectionIntents';
 import { upsertEventRecipientRulesHandler } from './eventRecipientRules';
+import { hashSecret } from './auth';
 
 type TableName =
   | 'eventAgents'
   | 'eventNetworkingCards'
   | 'eventConnectionIntents'
-  | 'eventRecipientRules';
+  | 'eventRecipientRules'
+  | 'eventOwnerSessions';
 type Row = Record<string, any> & { _id: string };
 
 function createMockCtx() {
@@ -18,12 +20,14 @@ function createMockCtx() {
     eventNetworkingCards: [],
     eventConnectionIntents: [],
     eventRecipientRules: [],
+    eventOwnerSessions: [],
   };
   const counters: Record<TableName, number> = {
     eventAgents: 0,
     eventNetworkingCards: 0,
     eventConnectionIntents: 0,
     eventRecipientRules: 0,
+    eventOwnerSessions: 0,
   };
 
   const db = {
@@ -52,7 +56,7 @@ function createMockCtx() {
         };
         buildQuery(q);
         const rows = tables[tableName].filter((row) =>
-          filters.every(({ field, value }) => row[field] === value),
+          filters.every(({ field, value }) => valuesEqual(row[field], value)),
         );
         return {
           first: async () => rows[0] ?? null,
@@ -63,6 +67,22 @@ function createMockCtx() {
   };
 
   return { ctx: { db }, tables };
+}
+
+function valuesEqual(left: any, right: any) {
+  if (left instanceof ArrayBuffer && right instanceof ArrayBuffer) {
+    return buffersEqual(left, right);
+  }
+  return left === right;
+}
+
+function buffersEqual(left: ArrayBuffer, right: ArrayBuffer) {
+  if (left.byteLength !== right.byteLength) {
+    return false;
+  }
+  const leftBytes = new Uint8Array(left);
+  const rightBytes = new Uint8Array(right);
+  return leftBytes.every((byte, index) => byte === rightBytes[index]);
 }
 
 function findById(tables: Record<TableName, Row[]>, id: string) {
@@ -109,7 +129,19 @@ async function insertAgentWithCard(
     approvedAt: now,
   });
   await ctx.db.patch(agentId, { activeCardId: cardId });
-  return { agentId, cardId };
+  const ownerSessionToken = `event_owner_${overrides.agentIdentifier ?? now}`;
+  const ownerSessionId = await ctx.db.insert('eventOwnerSessions', {
+    eventId,
+    eventAgentId: agentId,
+    cardId,
+    sessionTokenHash: await hashSecret(ownerSessionToken),
+    status: overrides.ownerSessionStatus ?? 'approved',
+    createdAt: now,
+    updatedAt: now,
+    decidedAt: now,
+  });
+  await ctx.db.patch(agentId, { ownerSessionId });
+  return { agentId, cardId, ownerSessionToken };
 }
 
 describe('event connection intents', () => {
@@ -122,6 +154,7 @@ describe('event connection intents', () => {
       eventId: ' Demo Event ',
       requesterAgentId: requester.agentId as any,
       targetAgentId: target.agentId as any,
+      requesterOwnerSessionToken: requester.ownerSessionToken,
     });
 
     expect(intent).toMatchObject({
@@ -163,6 +196,7 @@ describe('event connection intents', () => {
         eventId: 'demo-event',
         requesterAgentId: requester.agentId as any,
         targetAgentId: otherEventTarget.agentId as any,
+        requesterOwnerSessionToken: requester.ownerSessionToken,
       }),
     ).rejects.toMatchObject({
       data: { code: 'event_agent_not_found' },
@@ -173,6 +207,7 @@ describe('event connection intents', () => {
         eventId: 'demo-event',
         requesterAgentId: requester.agentId as any,
         targetAgentId: pendingTarget.agentId as any,
+        requesterOwnerSessionToken: requester.ownerSessionToken,
       }),
     ).rejects.toMatchObject({
       data: { code: 'event_agent_not_approved' },
@@ -189,6 +224,7 @@ describe('event connection intents', () => {
         eventId: 'demo-event',
         requesterAgentId: requester.agentId as any,
         targetAgentId: requester.agentId as any,
+        requesterOwnerSessionToken: requester.ownerSessionToken,
       }),
     ).rejects.toMatchObject({
       data: { code: 'invalid_event_connection_intent' },
@@ -198,6 +234,7 @@ describe('event connection intents', () => {
       eventId: 'demo-event',
       requesterAgentId: requester.agentId as any,
       targetAgentId: target.agentId as any,
+      requesterOwnerSessionToken: requester.ownerSessionToken,
     });
 
     await expect(
@@ -205,6 +242,7 @@ describe('event connection intents', () => {
         eventId: 'demo-event',
         requesterAgentId: requester.agentId as any,
         targetAgentId: target.agentId as any,
+        requesterOwnerSessionToken: requester.ownerSessionToken,
       }),
     ).rejects.toMatchObject({
       data: { code: 'duplicate_event_connection_intent' },
@@ -220,6 +258,7 @@ describe('event connection intents', () => {
     await upsertEventRecipientRulesHandler(ctx as any, {
       eventId: 'demo-event',
       eventAgentId: target.agentId as any,
+      ownerSessionToken: target.ownerSessionToken,
       rules: {
         blockedAgentIds: [blockedRequester.agentId as any],
         requiredKeywords: ['climate'],
@@ -230,11 +269,13 @@ describe('event connection intents', () => {
       eventId: 'demo-event',
       requesterAgentId: requester.agentId as any,
       targetAgentId: target.agentId as any,
+      requesterOwnerSessionToken: requester.ownerSessionToken,
     });
     const rejected = await createEventConnectionIntentHandler(ctx as any, {
       eventId: 'demo-event',
       requesterAgentId: blockedRequester.agentId as any,
       targetAgentId: target.agentId as any,
+      requesterOwnerSessionToken: blockedRequester.ownerSessionToken,
     });
 
     expect(allowed.status).toBe('pending_recipient_review');
@@ -245,6 +286,7 @@ describe('event connection intents', () => {
     const inbound = await listEventInboundIntentsHandler(ctx as any, {
       eventId: 'demo-event',
       targetAgentId: target.agentId as any,
+      ownerSessionToken: target.ownerSessionToken,
     });
 
     expect(inbound).toHaveLength(1);
@@ -252,5 +294,32 @@ describe('event connection intents', () => {
     expect(inbound[0].requester.displayName).toContain('Cedar Scout');
     expect(JSON.stringify(inbound)).not.toContain('agentIdentifier');
     expect(JSON.stringify(inbound)).not.toContain('contact');
+
+    await expect(
+      listEventInboundIntentsHandler(ctx as any, {
+        eventId: 'demo-event',
+        targetAgentId: target.agentId as any,
+        ownerSessionToken: requester.ownerSessionToken,
+      }),
+    ).rejects.toMatchObject({
+      data: { code: 'invalid_event_owner_token' },
+    } satisfies Partial<ConvexError<{ code: string }>>);
+  });
+
+  test('rejects forged requester owner tokens for intent creation', async () => {
+    const { ctx } = createMockCtx();
+    const requester = await insertAgentWithCard(ctx, { agentIdentifier: 'requester' });
+    const target = await insertAgentWithCard(ctx, { agentIdentifier: 'target' });
+
+    await expect(
+      createEventConnectionIntentHandler(ctx as any, {
+        eventId: 'demo-event',
+        requesterAgentId: requester.agentId as any,
+        targetAgentId: target.agentId as any,
+        requesterOwnerSessionToken: target.ownerSessionToken,
+      }),
+    ).rejects.toMatchObject({
+      data: { code: 'invalid_event_owner_token' },
+    } satisfies Partial<ConvexError<{ code: string }>>);
   });
 });

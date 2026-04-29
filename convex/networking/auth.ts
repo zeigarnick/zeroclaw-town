@@ -23,6 +23,7 @@ export type NetworkingErrorCode =
   | 'event_connection_intent_not_actionable'
   | 'event_connection_intent_not_found'
   | 'event_contact_reveal_not_found'
+  | 'invalid_event_owner_token'
   | 'event_owner_session_not_found'
   | 'event_registration_paused'
   | 'invalid_event_connection_intent'

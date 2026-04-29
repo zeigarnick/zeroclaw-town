@@ -43,6 +43,12 @@ type EventOwnerReview = {
   updatedAt: number;
 };
 
+export type EventOwnerSessionAuth = {
+  session: Doc<'eventOwnerSessions'>;
+  agent: Doc<'eventAgents'>;
+  card: Doc<'eventNetworkingCards'>;
+};
+
 export const registerEventAgent = mutation({
   args: {
     eventId: v.string(),
@@ -248,6 +254,43 @@ export async function listApprovedPublicCardsHandler(
     views.push(toEventPublicCardView(agent, card));
   }
   return views.sort((left, right) => left.displayName.localeCompare(right.displayName));
+}
+
+export async function authenticateApprovedEventOwnerSession(
+  ctx: QueryCtx | MutationCtx,
+  args: {
+    eventId: string;
+    ownerSessionToken: string;
+    eventAgentId?: Id<'eventAgents'>;
+  },
+): Promise<EventOwnerSessionAuth> {
+  const eventId = normalizeEventId(args.eventId);
+  if (!args.ownerSessionToken.startsWith('event_owner_')) {
+    throw networkingError('invalid_event_owner_token', 'A valid event owner token is required.');
+  }
+
+  const { session, agent, card } = await getOwnerReviewRows(ctx, args.ownerSessionToken);
+  if (session.eventId !== eventId || agent.eventId !== eventId || card.eventId !== eventId) {
+    throw networkingError('invalid_event_owner_token', 'The event owner token is not valid for this event.');
+  }
+  if (args.eventAgentId !== undefined && agent._id !== args.eventAgentId) {
+    throw networkingError(
+      'invalid_event_owner_token',
+      'The event owner token is not valid for this event agent.',
+    );
+  }
+  if (
+    session.status !== 'approved' ||
+    agent.approvalStatus !== 'approved' ||
+    card.status !== 'approved'
+  ) {
+    throw networkingError(
+      'invalid_event_owner_session_status',
+      'The event owner token must belong to an approved event agent.',
+    );
+  }
+
+  return { session, agent, card };
 }
 
 async function getOrCreateEventSpace(ctx: MutationCtx, eventId: string, now: number) {

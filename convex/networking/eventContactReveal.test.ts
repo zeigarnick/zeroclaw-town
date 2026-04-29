@@ -5,6 +5,7 @@ import {
   getEventContactRevealHandler,
   upsertEventPrivateContactHandler,
 } from './eventContactReveal';
+import { hashSecret } from './auth';
 
 type TableName =
   | 'eventAgents'
@@ -12,7 +13,8 @@ type TableName =
   | 'eventConnectionIntents'
   | 'eventRecipientRules'
   | 'eventPrivateContacts'
-  | 'eventContactReveals';
+  | 'eventContactReveals'
+  | 'eventOwnerSessions';
 type Row = Record<string, any> & { _id: string };
 
 function createMockCtx() {
@@ -23,6 +25,7 @@ function createMockCtx() {
     eventRecipientRules: [],
     eventPrivateContacts: [],
     eventContactReveals: [],
+    eventOwnerSessions: [],
   };
   const counters: Record<TableName, number> = {
     eventAgents: 0,
@@ -31,6 +34,7 @@ function createMockCtx() {
     eventRecipientRules: 0,
     eventPrivateContacts: 0,
     eventContactReveals: 0,
+    eventOwnerSessions: 0,
   };
 
   const db = {
@@ -59,7 +63,7 @@ function createMockCtx() {
         };
         buildQuery(q);
         const rows = tables[tableName].filter((row) =>
-          filters.every(({ field, value }) => row[field] === value),
+          filters.every(({ field, value }) => valuesEqual(row[field], value)),
         );
         return {
           first: async () => rows[0] ?? null,
@@ -70,6 +74,22 @@ function createMockCtx() {
   };
 
   return { ctx: { db }, tables };
+}
+
+function valuesEqual(left: any, right: any) {
+  if (left instanceof ArrayBuffer && right instanceof ArrayBuffer) {
+    return buffersEqual(left, right);
+  }
+  return left === right;
+}
+
+function buffersEqual(left: ArrayBuffer, right: ArrayBuffer) {
+  if (left.byteLength !== right.byteLength) {
+    return false;
+  }
+  const leftBytes = new Uint8Array(left);
+  const rightBytes = new Uint8Array(right);
+  return leftBytes.every((byte, index) => byte === rightBytes[index]);
 }
 
 function findById(tables: Record<TableName, Row[]>, id: string) {
@@ -115,7 +135,19 @@ async function insertAgentWithCard(
     approvedAt: now,
   });
   await ctx.db.patch(agentId, { activeCardId: cardId });
-  return { agentId, cardId };
+  const ownerSessionToken = `event_owner_${label}`;
+  const ownerSessionId = await ctx.db.insert('eventOwnerSessions', {
+    eventId: 'demo-event',
+    eventAgentId: agentId,
+    cardId,
+    sessionTokenHash: await hashSecret(ownerSessionToken),
+    status: 'approved',
+    createdAt: now,
+    updatedAt: now,
+    decidedAt: now,
+  });
+  await ctx.db.patch(agentId, { ownerSessionId });
+  return { agentId, cardId, ownerSessionToken };
 }
 
 describe('event contact reveal', () => {
@@ -128,13 +160,14 @@ describe('event contact reveal', () => {
       eventId: 'demo-event',
       requesterAgentId: requester.agentId as any,
       targetAgentId: target.agentId as any,
+      requesterOwnerSessionToken: requester.ownerSessionToken,
     });
 
     await expect(
       getEventContactRevealHandler(ctx as any, {
         eventId: 'demo-event',
         intentId: intent.id as any,
-        viewerAgentId: requester.agentId as any,
+        ownerSessionToken: requester.ownerSessionToken,
       }),
     ).rejects.toMatchObject({
       data: { code: 'event_contact_reveal_not_found' },
@@ -143,6 +176,7 @@ describe('event contact reveal', () => {
     await upsertEventPrivateContactHandler(ctx as any, {
       eventId: 'demo-event',
       eventAgentId: requester.agentId as any,
+      ownerSessionToken: requester.ownerSessionToken,
       contact: {
         email: 'requester@example.com',
         linkedin: 'https://linkedin.com/in/requester',
@@ -151,6 +185,7 @@ describe('event contact reveal', () => {
     await upsertEventPrivateContactHandler(ctx as any, {
       eventId: 'demo-event',
       eventAgentId: target.agentId as any,
+      ownerSessionToken: target.ownerSessionToken,
       contact: {
         email: 'target@example.com',
         website: 'https://target.example',
@@ -160,7 +195,7 @@ describe('event contact reveal', () => {
     const decision = await decideEventConnectionIntentHandler(ctx as any, {
       eventId: 'demo-event',
       intentId: intent.id as any,
-      recipientAgentId: target.agentId as any,
+      ownerSessionToken: target.ownerSessionToken,
       decision: 'approve',
     });
 
@@ -178,7 +213,7 @@ describe('event contact reveal', () => {
       getEventContactRevealHandler(ctx as any, {
         eventId: 'demo-event',
         intentId: intent.id as any,
-        viewerAgentId: requester.agentId as any,
+        ownerSessionToken: requester.ownerSessionToken,
       }),
     ).resolves.toMatchObject({
       requesterContact: {
@@ -194,7 +229,7 @@ describe('event contact reveal', () => {
       getEventContactRevealHandler(ctx as any, {
         eventId: 'demo-event',
         intentId: intent.id as any,
-        viewerAgentId: outsider.agentId as any,
+        ownerSessionToken: outsider.ownerSessionToken,
       }),
     ).rejects.toMatchObject({
       data: { code: 'event_connection_intent_access_denied' },
@@ -209,17 +244,55 @@ describe('event contact reveal', () => {
       eventId: 'demo-event',
       requesterAgentId: requester.agentId as any,
       targetAgentId: target.agentId as any,
+      requesterOwnerSessionToken: requester.ownerSessionToken,
     });
 
     const decision = await decideEventConnectionIntentHandler(ctx as any, {
       eventId: 'demo-event',
       intentId: intent.id as any,
-      recipientAgentId: target.agentId as any,
+      ownerSessionToken: target.ownerSessionToken,
       decision: 'decline',
     });
 
     expect(decision.intent.status).toBe('recipient_declined');
     expect(decision.reveal).toBeNull();
     expect(tables.eventContactReveals).toHaveLength(0);
+  });
+
+  test('rejects wrong-owner contact updates and forged recipient decisions', async () => {
+    const { ctx } = createMockCtx();
+    const requester = await insertAgentWithCard(ctx, 'requester');
+    const target = await insertAgentWithCard(ctx, 'target');
+    const outsider = await insertAgentWithCard(ctx, 'outsider');
+    const intent = await createEventConnectionIntentHandler(ctx as any, {
+      eventId: 'demo-event',
+      requesterAgentId: requester.agentId as any,
+      targetAgentId: target.agentId as any,
+      requesterOwnerSessionToken: requester.ownerSessionToken,
+    });
+
+    await expect(
+      upsertEventPrivateContactHandler(ctx as any, {
+        eventId: 'demo-event',
+        eventAgentId: requester.agentId as any,
+        ownerSessionToken: outsider.ownerSessionToken,
+        contact: {
+          email: 'forged@example.com',
+        },
+      }),
+    ).rejects.toMatchObject({
+      data: { code: 'invalid_event_owner_token' },
+    } satisfies Partial<ConvexError<{ code: string }>>);
+
+    await expect(
+      decideEventConnectionIntentHandler(ctx as any, {
+        eventId: 'demo-event',
+        intentId: intent.id as any,
+        ownerSessionToken: requester.ownerSessionToken,
+        decision: 'approve',
+      }),
+    ).rejects.toMatchObject({
+      data: { code: 'event_connection_intent_access_denied' },
+    } satisfies Partial<ConvexError<{ code: string }>>);
   });
 });

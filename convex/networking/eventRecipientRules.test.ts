@@ -1,6 +1,7 @@
 import { evaluateRecipientRules, upsertEventRecipientRulesHandler } from './eventRecipientRules';
+import { hashSecret } from './auth';
 
-type TableName = 'eventAgents' | 'eventNetworkingCards' | 'eventRecipientRules';
+type TableName = 'eventAgents' | 'eventNetworkingCards' | 'eventRecipientRules' | 'eventOwnerSessions';
 type Row = Record<string, any> & { _id: string };
 
 function createMockCtx() {
@@ -8,11 +9,13 @@ function createMockCtx() {
     eventAgents: [],
     eventNetworkingCards: [],
     eventRecipientRules: [],
+    eventOwnerSessions: [],
   };
   const counters: Record<TableName, number> = {
     eventAgents: 0,
     eventNetworkingCards: 0,
     eventRecipientRules: 0,
+    eventOwnerSessions: 0,
   };
 
   const db = {
@@ -41,7 +44,7 @@ function createMockCtx() {
         };
         buildQuery(q);
         const rows = tables[tableName].filter((row) =>
-          filters.every(({ field, value }) => row[field] === value),
+          filters.every(({ field, value }) => valuesEqual(row[field], value)),
         );
         return {
           first: async () => rows[0] ?? null,
@@ -52,6 +55,22 @@ function createMockCtx() {
   };
 
   return { ctx: { db }, tables };
+}
+
+function valuesEqual(left: any, right: any) {
+  if (left instanceof ArrayBuffer && right instanceof ArrayBuffer) {
+    return buffersEqual(left, right);
+  }
+  return left === right;
+}
+
+function buffersEqual(left: ArrayBuffer, right: ArrayBuffer) {
+  if (left.byteLength !== right.byteLength) {
+    return false;
+  }
+  const leftBytes = new Uint8Array(left);
+  const rightBytes = new Uint8Array(right);
+  return leftBytes.every((byte, index) => byte === rightBytes[index]);
 }
 
 function findById(tables: Record<TableName, Row[]>, id: string) {
@@ -94,7 +113,19 @@ async function insertApprovedAgent(ctx: ReturnType<typeof createMockCtx>['ctx'],
     approvedAt: now,
   });
   await ctx.db.patch(agentId, { activeCardId: cardId });
-  return { agentId, cardId };
+  const ownerSessionToken = `event_owner_${label}`;
+  const ownerSessionId = await ctx.db.insert('eventOwnerSessions', {
+    eventId: 'demo-event',
+    eventAgentId: agentId,
+    cardId,
+    sessionTokenHash: await hashSecret(ownerSessionToken),
+    status: 'approved',
+    createdAt: now,
+    updatedAt: now,
+    decidedAt: now,
+  });
+  await ctx.db.patch(agentId, { ownerSessionId });
+  return { agentId, cardId, ownerSessionToken };
 }
 
 describe('event recipient rules', () => {
@@ -112,6 +143,7 @@ describe('event recipient rules', () => {
     await upsertEventRecipientRulesHandler(ctx as any, {
       eventId: 'demo-event',
       eventAgentId: recipientRef.agentId as any,
+      ownerSessionToken: recipientRef.ownerSessionToken,
       rules: {
         allowedCategories: ['climate'],
         requiredKeywords: ['operator'],
@@ -149,5 +181,24 @@ describe('event recipient rules', () => {
 
     expect(JSON.stringify(tables.eventRecipientRules)).not.toContain('email');
     expect(JSON.stringify(tables.eventRecipientRules)).not.toContain('company');
+  });
+
+  test('rejects recipient rule mutation with the wrong owner token', async () => {
+    const { ctx } = createMockCtx();
+    const requesterRef = await insertApprovedAgent(ctx, 'requester');
+    const recipientRef = await insertApprovedAgent(ctx, 'recipient');
+
+    await expect(
+      upsertEventRecipientRulesHandler(ctx as any, {
+        eventId: 'demo-event',
+        eventAgentId: recipientRef.agentId as any,
+        ownerSessionToken: requesterRef.ownerSessionToken,
+        rules: {
+          requiredKeywords: ['climate'],
+        },
+      }),
+    ).rejects.toMatchObject({
+      data: { code: 'invalid_event_owner_token' },
+    });
   });
 });

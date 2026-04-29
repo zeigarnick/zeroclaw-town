@@ -256,12 +256,14 @@ export interface EventInboundIntentReview {
 export interface CreateEventConnectionIntentRequest {
   eventId: string;
   requesterAgentId: string;
+  requesterOwnerSessionToken: string;
   targetAgentId: string;
 }
 
 export interface GetEventInboundIntentsRequest {
   eventId: string;
   targetAgentId: string;
+  ownerSessionToken: string;
 }
 
 export interface EventRecipientRules {
@@ -275,6 +277,7 @@ export interface EventRecipientRules {
 export interface UpsertEventRecipientRulesRequest {
   eventId: string;
   eventAgentId: string;
+  ownerSessionToken: string;
   rules: EventRecipientRules;
 }
 
@@ -308,20 +311,21 @@ export interface EventConnectionIntentDecisionResult {
 export interface UpsertEventPrivateContactRequest {
   eventId: string;
   eventAgentId: string;
+  ownerSessionToken: string;
   contact: EventPrivateContact;
 }
 
 export interface DecideEventConnectionIntentRequest {
   eventId: string;
   intentId: string;
-  recipientAgentId: string;
+  ownerSessionToken: string;
   decision: 'approve' | 'decline';
 }
 
 export interface GetEventContactRevealRequest {
   eventId: string;
   intentId: string;
-  viewerAgentId: string;
+  ownerSessionToken: string;
 }
 
 export type EventOwnerReviewStatus =
@@ -1092,6 +1096,7 @@ export class HttpApiAdapter implements IApiAdapter {
       `/events/${req.eventId}/connection-intents`,
       {
         method: 'POST',
+        ownerSessionToken: req.requesterOwnerSessionToken,
         body: {
           requesterAgentId: req.requesterAgentId,
           targetAgentId: req.targetAgentId,
@@ -1111,6 +1116,7 @@ export class HttpApiAdapter implements IApiAdapter {
       `/events/${req.eventId}/agents/${req.targetAgentId}/inbound-intents`,
       {
         method: 'GET',
+        ownerSessionToken: req.ownerSessionToken,
       },
     );
     if (!response.success) {
@@ -1129,6 +1135,7 @@ export class HttpApiAdapter implements IApiAdapter {
       `/events/${req.eventId}/agents/${req.eventAgentId}/recipient-rules`,
       {
         method: 'POST',
+        ownerSessionToken: req.ownerSessionToken,
         body: {
           rules: req.rules,
         },
@@ -1143,6 +1150,7 @@ export class HttpApiAdapter implements IApiAdapter {
       `/events/${req.eventId}/agents/${req.eventAgentId}/private-contact`,
       {
         method: 'POST',
+        ownerSessionToken: req.ownerSessionToken,
         body: {
           contact: req.contact,
         },
@@ -1157,8 +1165,8 @@ export class HttpApiAdapter implements IApiAdapter {
       `/events/${req.eventId}/connection-intents/${req.intentId}/decision`,
       {
         method: 'POST',
+        ownerSessionToken: req.ownerSessionToken,
         body: {
-          recipientAgentId: req.recipientAgentId,
           decision: req.decision,
         },
       },
@@ -1179,9 +1187,7 @@ export class HttpApiAdapter implements IApiAdapter {
       `/events/${req.eventId}/contact-reveals/${req.intentId}`,
       {
         method: 'GET',
-        query: {
-          viewerAgentId: req.viewerAgentId,
-        },
+        ownerSessionToken: req.ownerSessionToken,
       },
     );
     if (!response.success) {
@@ -1195,6 +1201,7 @@ export class HttpApiAdapter implements IApiAdapter {
     options: {
       method: 'GET' | 'POST';
       apiKey?: string;
+      ownerSessionToken?: string;
       body?: Record<string, unknown>;
       query?: Record<string, string | number | undefined>;
     },
@@ -1208,6 +1215,9 @@ export class HttpApiAdapter implements IApiAdapter {
     }
     if (options.apiKey) {
       headers.Authorization = `Bearer ${options.apiKey}`;
+    }
+    if (options.ownerSessionToken) {
+      headers.Authorization = `Bearer ${options.ownerSessionToken}`;
     }
 
     let response: Response;

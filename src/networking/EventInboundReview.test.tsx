@@ -92,6 +92,7 @@ describe('EventInboundReview', () => {
         apiAdapter={apiAdapter}
         eventId="demo-event"
         targetAgentId="eventAgents:2"
+        ownerSessionToken="event_owner_target"
         initialIntents={[fixture]}
         onDecision={jest.fn<any>()}
       />,

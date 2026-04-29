@@ -299,6 +299,7 @@ describe('networking HTTP helpers', () => {
       },
       new Request('https://town.example/api/v1/events/demo-event/connection-intents', {
         method: 'POST',
+        headers: { Authorization: 'Bearer event_owner_requester' },
         body: JSON.stringify({
           requesterAgentId: 'eventAgents:1',
           targetAgentId: 'eventAgents:2',
@@ -322,6 +323,7 @@ describe('networking HTTP helpers', () => {
         eventId: 'demo-event',
         requesterAgentId: 'eventAgents:1',
         targetAgentId: 'eventAgents:2',
+        requesterOwnerSessionToken: 'event_owner_requester',
       },
     });
 
@@ -336,6 +338,7 @@ describe('networking HTTP helpers', () => {
       },
       new Request('https://town.example/api/v1/events/demo-event/connection-intents', {
         method: 'POST',
+        headers: { Authorization: 'Bearer event_owner_requester' },
         body: JSON.stringify({
           requesterAgentId: 'eventAgents:1',
           targetAgentId: 'eventAgents:2',
@@ -352,6 +355,142 @@ describe('networking HTTP helpers', () => {
         message: 'Unexpected request field: message.',
       },
     });
+  });
+
+  test('rejects unauthenticated owner-only event HTTP routes before handlers run', async () => {
+    const ctx = {
+      runMutation: async () => {
+        throw new Error('unexpected mutation');
+      },
+      runQuery: async () => {
+        throw new Error('unexpected query');
+      },
+    };
+    const requests = [
+      new Request('https://town.example/api/v1/events/demo-event/connection-intents', {
+        method: 'POST',
+        body: JSON.stringify({
+          requesterAgentId: 'eventAgents:1',
+          targetAgentId: 'eventAgents:2',
+        }),
+      }),
+      new Request(
+        'https://town.example/api/v1/events/demo-event/agents/eventAgents:2/inbound-intents',
+        { method: 'GET' },
+      ),
+      new Request(
+        'https://town.example/api/v1/events/demo-event/agents/eventAgents:2/recipient-rules',
+        {
+          method: 'POST',
+          body: JSON.stringify({ rules: {} }),
+        },
+      ),
+      new Request(
+        'https://town.example/api/v1/events/demo-event/agents/eventAgents:1/private-contact',
+        {
+          method: 'POST',
+          body: JSON.stringify({ contact: { email: 'attendee@example.com' } }),
+        },
+      ),
+      new Request(
+        'https://town.example/api/v1/events/demo-event/connection-intents/eventConnectionIntents:1/decision',
+        {
+          method: 'POST',
+          body: JSON.stringify({ decision: 'approve' }),
+        },
+      ),
+      new Request(
+        'https://town.example/api/v1/events/demo-event/contact-reveals/eventConnectionIntents:1',
+        { method: 'GET' },
+      ),
+    ];
+
+    for (const request of requests) {
+      const response = await handleNetworkingHttpRequest(ctx, request);
+      expect(response.status).toBe(401);
+      expect(await readJson(response)).toEqual({
+        success: false,
+        error: {
+          code: 'invalid_event_owner_token',
+          message: 'Authorization header is required. Expected Bearer event_owner_*.',
+        },
+      });
+    }
+  });
+
+  test('wraps wrong-owner event capability failures for owner-only HTTP routes', async () => {
+    const wrongOwnerError = new ConvexError({
+      code: 'invalid_event_owner_token',
+      message: 'The event owner token is not valid for this event agent.',
+    });
+    const ctx = {
+      runMutation: async () => {
+        throw wrongOwnerError;
+      },
+      runQuery: async () => {
+        throw wrongOwnerError;
+      },
+    };
+    const requests = [
+      new Request('https://town.example/api/v1/events/demo-event/connection-intents', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer event_owner_wrong' },
+        body: JSON.stringify({
+          requesterAgentId: 'eventAgents:1',
+          targetAgentId: 'eventAgents:2',
+        }),
+      }),
+      new Request(
+        'https://town.example/api/v1/events/demo-event/agents/eventAgents:2/inbound-intents',
+        {
+          method: 'GET',
+          headers: { Authorization: 'Bearer event_owner_wrong' },
+        },
+      ),
+      new Request(
+        'https://town.example/api/v1/events/demo-event/agents/eventAgents:2/recipient-rules',
+        {
+          method: 'POST',
+          headers: { Authorization: 'Bearer event_owner_wrong' },
+          body: JSON.stringify({ rules: {} }),
+        },
+      ),
+      new Request(
+        'https://town.example/api/v1/events/demo-event/agents/eventAgents:1/private-contact',
+        {
+          method: 'POST',
+          headers: { Authorization: 'Bearer event_owner_wrong' },
+          body: JSON.stringify({ contact: { email: 'attendee@example.com' } }),
+        },
+      ),
+      new Request(
+        'https://town.example/api/v1/events/demo-event/connection-intents/eventConnectionIntents:1/decision',
+        {
+          method: 'POST',
+          headers: { Authorization: 'Bearer event_owner_wrong' },
+          body: JSON.stringify({ decision: 'approve' }),
+        },
+      ),
+      new Request(
+        'https://town.example/api/v1/events/demo-event/contact-reveals/eventConnectionIntents:1',
+        {
+          method: 'GET',
+          headers: { Authorization: 'Bearer event_owner_wrong' },
+        },
+      ),
+    ];
+
+    for (const request of requests) {
+      const response = await handleNetworkingHttpRequest(ctx, request);
+      expect(response.status).toBe(401);
+      expect(await readJson(response)).toEqual({
+        success: false,
+        error: {
+          code: 'invalid_event_owner_token',
+          message: 'The event owner token is not valid for this event agent.',
+        },
+      });
+    }
   });
 
   test('routes inbound intent review and recipient rules endpoints', async () => {
@@ -381,6 +520,7 @@ describe('networking HTTP helpers', () => {
         'https://town.example/api/v1/events/demo-event/agents/eventAgents:2/inbound-intents',
         {
           method: 'GET',
+          headers: { Authorization: 'Bearer event_owner_target' },
         },
       ),
     );
@@ -391,6 +531,7 @@ describe('networking HTTP helpers', () => {
       args: {
         eventId: 'demo-event',
         targetAgentId: 'eventAgents:2',
+        ownerSessionToken: 'event_owner_target',
       },
     });
 
@@ -408,6 +549,7 @@ describe('networking HTTP helpers', () => {
         'https://town.example/api/v1/events/demo-event/agents/eventAgents:2/recipient-rules',
         {
           method: 'POST',
+          headers: { Authorization: 'Bearer event_owner_target' },
           body: JSON.stringify({
             rules: {
               blockedAgentIds: ['eventAgents:9'],
@@ -434,6 +576,7 @@ describe('networking HTTP helpers', () => {
       args: {
         eventId: 'demo-event',
         eventAgentId: 'eventAgents:2',
+        ownerSessionToken: 'event_owner_target',
         rules: {
           blockedAgentIds: ['eventAgents:9'],
           requiredKeywords: ['climate'],
@@ -458,6 +601,7 @@ describe('networking HTTP helpers', () => {
         'https://town.example/api/v1/events/demo-event/agents/eventAgents:1/private-contact',
         {
           method: 'POST',
+          headers: { Authorization: 'Bearer event_owner_requester' },
           body: JSON.stringify({
             contact: {
               email: 'attendee@example.com',
@@ -474,6 +618,7 @@ describe('networking HTTP helpers', () => {
       args: {
         eventId: 'demo-event',
         eventAgentId: 'eventAgents:1',
+        ownerSessionToken: 'event_owner_requester',
         contact: {
           email: 'attendee@example.com',
           linkedin: 'https://linkedin.com/in/attendee',
@@ -505,8 +650,8 @@ describe('networking HTTP helpers', () => {
         'https://town.example/api/v1/events/demo-event/connection-intents/eventConnectionIntents:1/decision',
         {
           method: 'POST',
+          headers: { Authorization: 'Bearer event_owner_target' },
           body: JSON.stringify({
-            recipientAgentId: 'eventAgents:2',
             decision: 'approve',
           }),
         },
@@ -519,7 +664,7 @@ describe('networking HTTP helpers', () => {
       args: {
         eventId: 'demo-event',
         intentId: 'eventConnectionIntents:1',
-        recipientAgentId: 'eventAgents:2',
+        ownerSessionToken: 'event_owner_target',
         decision: 'approve',
       },
     });
@@ -535,7 +680,7 @@ describe('networking HTTP helpers', () => {
             id: 'eventContactReveals:1',
             eventId: args.eventId,
             intentId: args.intentId,
-            requesterAgentId: args.viewerAgentId,
+            requesterAgentId: 'eventAgents:1',
             targetAgentId: 'eventAgents:2',
             requesterContact: { email: 'requester@example.com' },
             targetContact: { email: 'target@example.com' },
@@ -543,9 +688,10 @@ describe('networking HTTP helpers', () => {
         },
       },
       new Request(
-        'https://town.example/api/v1/events/demo-event/contact-reveals/eventConnectionIntents:1?viewerAgentId=eventAgents:1',
+        'https://town.example/api/v1/events/demo-event/contact-reveals/eventConnectionIntents:1',
         {
           method: 'GET',
+          headers: { Authorization: 'Bearer event_owner_requester' },
         },
       ),
     );
@@ -556,7 +702,7 @@ describe('networking HTTP helpers', () => {
       args: {
         eventId: 'demo-event',
         intentId: 'eventConnectionIntents:1',
-        viewerAgentId: 'eventAgents:1',
+        ownerSessionToken: 'event_owner_requester',
       },
     });
 
@@ -573,8 +719,8 @@ describe('networking HTTP helpers', () => {
         'https://town.example/api/v1/events/demo-event/connection-intents/eventConnectionIntents:1/decision',
         {
           method: 'POST',
+          headers: { Authorization: 'Bearer event_owner_target' },
           body: JSON.stringify({
-            recipientAgentId: 'eventAgents:2',
             decision: 'approve',
             contact: { email: 'leak@example.com' },
           }),

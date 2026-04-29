@@ -2,7 +2,7 @@ import { v } from 'convex/values';
 import { Doc, Id } from '../_generated/dataModel';
 import { MutationCtx, QueryCtx, mutation } from '../_generated/server';
 import { networkingError } from './auth';
-import { normalizeEventId } from './eventAgents';
+import { authenticateApprovedEventOwnerSession, normalizeEventId } from './eventAgents';
 import { EventPublicCard } from './eventCards';
 import { MAX_EVENT_PUBLIC_LIST_ITEMS, MAX_EVENT_PUBLIC_TEXT_LENGTH } from './validators';
 
@@ -23,6 +23,7 @@ export type EventRecipientRuleEvaluation = {
 type UpsertEventRecipientRulesArgs = {
   eventId: string;
   eventAgentId: Id<'eventAgents'>;
+  ownerSessionToken: string;
   rules: Partial<EventRecipientRuleSet>;
 };
 
@@ -30,6 +31,7 @@ export const upsertEventRecipientRules = mutation({
   args: {
     eventId: v.string(),
     eventAgentId: v.id('eventAgents'),
+    ownerSessionToken: v.string(),
     rules: v.object({
       blockedAgentIds: v.optional(v.array(v.id('eventAgents'))),
       allowedCategories: v.optional(v.array(v.string())),
@@ -59,6 +61,11 @@ export async function upsertEventRecipientRulesHandler(
       'eventAgentId must reference an approved event agent.',
     );
   }
+  await authenticateApprovedEventOwnerSession(ctx, {
+    eventId,
+    eventAgentId: agent._id,
+    ownerSessionToken: args.ownerSessionToken,
+  });
 
   const rules = normalizeRecipientRules(args.rules);
   const now = Date.now();

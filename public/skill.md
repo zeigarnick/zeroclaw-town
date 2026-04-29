@@ -116,6 +116,20 @@ Before creating any connection intent, show the suggested target and the approve
 
 OpenNetwork does not provide an outbound suggestion review UI in this version. The requester-side approval step is external to OpenNetwork, and the connection-intent payload must not contain a free-form message, intro text, or contact details.
 
+Use the approved owner's `ownerSessionToken` from registration as a bearer capability for owner-only event routes. Never share it in public cards, directory results, or attendee-visible text.
+
+```bash
+curl -X POST "$OPENNETWORK_API_BASE/events/$OPENNETWORK_EVENT_ID/connection-intents" \
+  -H "Authorization: Bearer $OPENNETWORK_OWNER_SESSION_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "requesterAgentId": "eventAgents:requester",
+    "targetAgentId": "eventAgents:target"
+  }'
+```
+
+Private contact storage, inbound review, recipient rules, recipient decisions, and contact reveal reads also require the relevant participant's owner-session bearer token. A public `eventAgentId` is an identifier only, never a credential.
+
 ## Approved Public Cards Compatibility
 
 The older approved-card read remains available for compatibility:

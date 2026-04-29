@@ -258,6 +258,7 @@ describe('OwnerDashboard HttpApiAdapter', () => {
     const response = await adapter.createEventConnectionIntent({
       eventId: 'demo-event',
       requesterAgentId: 'eventAgents:1',
+      requesterOwnerSessionToken: 'event_owner_requester',
       targetAgentId: 'eventAgents:2',
     });
 
@@ -268,6 +269,9 @@ describe('OwnerDashboard HttpApiAdapter', () => {
     }
     expect(fetchMock.mock.calls[0][0]).toBe('/api/v1/events/demo-event/connection-intents');
     expect(getRequestInit(fetchMock).method).toBe('POST');
+    expect((getRequestInit(fetchMock).headers as Record<string, string>).Authorization).toBe(
+      'Bearer event_owner_requester',
+    );
     expect(getRequestBody(fetchMock)).toEqual({
       requesterAgentId: 'eventAgents:1',
       targetAgentId: 'eventAgents:2',
@@ -327,6 +331,7 @@ describe('OwnerDashboard HttpApiAdapter', () => {
     const inbound = await adapter.getEventInboundIntents({
       eventId: 'demo-event',
       targetAgentId: 'eventAgents:2',
+      ownerSessionToken: 'event_owner_target',
     });
     expect(isError(inbound)).toBe(false);
     if (!isError(inbound)) {
@@ -337,6 +342,7 @@ describe('OwnerDashboard HttpApiAdapter', () => {
     await adapter.upsertEventRecipientRules({
       eventId: 'demo-event',
       eventAgentId: 'eventAgents:2',
+      ownerSessionToken: 'event_owner_target',
       rules: {
         blockedAgentIds: ['eventAgents:9'],
         requiredKeywords: ['climate'],
@@ -346,8 +352,14 @@ describe('OwnerDashboard HttpApiAdapter', () => {
     expect(fetchMock.mock.calls[0][0]).toBe(
       '/api/v1/events/demo-event/agents/eventAgents:2/inbound-intents',
     );
+    expect((getRequestInit(fetchMock, 0).headers as Record<string, string>).Authorization).toBe(
+      'Bearer event_owner_target',
+    );
     expect(fetchMock.mock.calls[1][0]).toBe(
       '/api/v1/events/demo-event/agents/eventAgents:2/recipient-rules',
+    );
+    expect((getRequestInit(fetchMock, 1).headers as Record<string, string>).Authorization).toBe(
+      'Bearer event_owner_target',
     );
     expect(getRequestBody(fetchMock, 1)).toEqual({
       rules: {
@@ -428,6 +440,7 @@ describe('OwnerDashboard HttpApiAdapter', () => {
     await adapter.upsertEventPrivateContact({
       eventId: 'demo-event',
       eventAgentId: 'eventAgents:1',
+      ownerSessionToken: 'event_owner_requester',
       contact: {
         email: 'requester@example.com',
       },
@@ -435,13 +448,13 @@ describe('OwnerDashboard HttpApiAdapter', () => {
     const decision = await adapter.decideEventConnectionIntent({
       eventId: 'demo-event',
       intentId: 'eventConnectionIntents:1',
-      recipientAgentId: 'eventAgents:2',
+      ownerSessionToken: 'event_owner_target',
       decision: 'approve',
     });
     const reveal = await adapter.getEventContactReveal({
       eventId: 'demo-event',
       intentId: 'eventConnectionIntents:1',
-      viewerAgentId: 'eventAgents:1',
+      ownerSessionToken: 'event_owner_requester',
     });
 
     expect(getRequestBody(fetchMock, 0)).toEqual({
@@ -450,11 +463,16 @@ describe('OwnerDashboard HttpApiAdapter', () => {
       },
     });
     expect(getRequestBody(fetchMock, 1)).toEqual({
-      recipientAgentId: 'eventAgents:2',
       decision: 'approve',
     });
     expect(fetchMock.mock.calls[2][0]).toBe(
-      '/api/v1/events/demo-event/contact-reveals/eventConnectionIntents:1?viewerAgentId=eventAgents%3A1',
+      '/api/v1/events/demo-event/contact-reveals/eventConnectionIntents:1',
+    );
+    expect((getRequestInit(fetchMock, 1).headers as Record<string, string>).Authorization).toBe(
+      'Bearer event_owner_target',
+    );
+    expect((getRequestInit(fetchMock, 2).headers as Record<string, string>).Authorization).toBe(
+      'Bearer event_owner_requester',
     );
     expect(isError(decision)).toBe(false);
     if (!isError(decision)) {

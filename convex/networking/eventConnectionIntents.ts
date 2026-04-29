@@ -2,7 +2,7 @@ import { v } from 'convex/values';
 import { Doc, Id } from '../_generated/dataModel';
 import { MutationCtx, QueryCtx, mutation, query } from '../_generated/server';
 import { networkingError } from './auth';
-import { normalizeEventId } from './eventAgents';
+import { authenticateApprovedEventOwnerSession, normalizeEventId } from './eventAgents';
 import { EventPublicCardView, toEventPublicCardView } from './eventCards';
 import { evaluateRecipientRules } from './eventRecipientRules';
 import { EventConnectionIntentStatus } from './validators';
@@ -31,6 +31,7 @@ type CreateEventConnectionIntentArgs = {
   eventId: string;
   requesterAgentId: Id<'eventAgents'>;
   targetAgentId: Id<'eventAgents'>;
+  requesterOwnerSessionToken: string;
 };
 
 const ACTIVE_INTENT_STATUSES = ['pending_recipient_review', 'recipient_approved'] as const;
@@ -40,6 +41,7 @@ export const createEventConnectionIntent = mutation({
     eventId: v.string(),
     requesterAgentId: v.id('eventAgents'),
     targetAgentId: v.id('eventAgents'),
+    requesterOwnerSessionToken: v.string(),
   },
   handler: (ctx, args) => createEventConnectionIntentHandler(ctx, args),
 });
@@ -48,6 +50,7 @@ export const listEventInboundIntents = query({
   args: {
     eventId: v.string(),
     targetAgentId: v.id('eventAgents'),
+    ownerSessionToken: v.string(),
   },
   handler: (ctx, args) => listEventInboundIntentsHandler(ctx, args),
 });
@@ -70,6 +73,11 @@ export async function createEventConnectionIntentHandler(
   ]);
   assertApprovedEventAgent(requester, eventId, 'requesterAgentId');
   assertApprovedEventAgent(target, eventId, 'targetAgentId');
+  await authenticateApprovedEventOwnerSession(ctx, {
+    eventId,
+    eventAgentId: requester._id,
+    ownerSessionToken: args.requesterOwnerSessionToken,
+  });
 
   const [requesterCard, targetCard] = await Promise.all([
     getApprovedActiveCard(ctx, requester),
@@ -122,11 +130,16 @@ export async function createEventConnectionIntentHandler(
 
 export async function listEventInboundIntentsHandler(
   ctx: QueryCtx,
-  args: { eventId: string; targetAgentId: Id<'eventAgents'> },
+  args: { eventId: string; targetAgentId: Id<'eventAgents'>; ownerSessionToken: string },
 ): Promise<EventInboundIntentReview[]> {
   const eventId = normalizeEventId(args.eventId);
   const target = await ctx.db.get(args.targetAgentId);
   assertApprovedEventAgent(target, eventId, 'targetAgentId');
+  await authenticateApprovedEventOwnerSession(ctx, {
+    eventId,
+    eventAgentId: target._id,
+    ownerSessionToken: args.ownerSessionToken,
+  });
 
   const intents = await ctx.db
     .query('eventConnectionIntents')

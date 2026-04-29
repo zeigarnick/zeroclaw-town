@@ -11,6 +11,7 @@ type EventInboundReviewProps = {
   apiAdapter: IApiAdapter;
   eventId: string;
   targetAgentId: string;
+  ownerSessionToken: string;
   initialIntents?: EventInboundIntentReview[];
   onDecision?: (
     intentId: string,
@@ -33,6 +34,7 @@ export function EventInboundReview({
   apiAdapter,
   eventId,
   targetAgentId,
+  ownerSessionToken,
   initialIntents,
   onDecision,
 }: EventInboundReviewProps) {
@@ -48,7 +50,7 @@ export function EventInboundReview({
     let cancelled = false;
     setIsLoading(true);
     setErrorMessage('');
-    apiAdapter.getEventInboundIntents({ eventId, targetAgentId }).then((response) => {
+    apiAdapter.getEventInboundIntents({ eventId, targetAgentId, ownerSessionToken }).then((response) => {
       if (cancelled) {
         return;
       }
@@ -62,7 +64,7 @@ export function EventInboundReview({
     return () => {
       cancelled = true;
     };
-  }, [apiAdapter, eventId, initialIntents, targetAgentId]);
+  }, [apiAdapter, eventId, initialIntents, ownerSessionToken, targetAgentId]);
 
   const sortedIntents = useMemo(
     () => [...intents].sort((left, right) => right.intent.createdAt - left.intent.createdAt),
@@ -77,7 +79,7 @@ export function EventInboundReview({
       : await apiAdapter.decideEventConnectionIntent({
           eventId,
           intentId,
-          recipientAgentId: targetAgentId,
+          ownerSessionToken,
           decision,
         });
     setPendingIntentId(undefined);
