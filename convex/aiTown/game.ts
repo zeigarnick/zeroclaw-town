@@ -182,6 +182,12 @@ export class Game extends AbstractGame {
     this.pendingEventAvatarLinks.push({ eventAgentId, playerId });
   }
 
+  isEventPlayer(playerId: GameId<'players'>) {
+    return [...this.world.agents.values()].some(
+      (agent) => agent.playerId === playerId && agent.eventAgentId !== undefined,
+    );
+  }
+
   handleInput<Name extends InputNames>(now: number, name: Name, args: InputArgs<Name>) {
     const handler = inputs[name]?.handler;
     if (!handler) {

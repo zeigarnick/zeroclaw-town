@@ -93,6 +93,7 @@ export class Player {
     if (!pathfinding) {
       return;
     }
+    const shouldLogPathfindingWarnings = !game.isEventPlayer(this.id);
 
     // Stop pathfinding if we've reached our destination.
     if (pathfinding.state.kind === 'moving' && pointsEqual(pathfinding.destination, position)) {
@@ -101,7 +102,9 @@ export class Player {
 
     // Stop pathfinding if we've timed out.
     if (pathfinding.started + PATHFINDING_TIMEOUT < now) {
-      console.warn(`Timing out pathfinding for ${this.id}`);
+      if (shouldLogPathfindingWarnings) {
+        console.warn(`Timing out pathfinding for ${this.id}`);
+      }
       stopPlayer(this);
     }
 
@@ -122,11 +125,13 @@ export class Player {
         stopPlayer(this);
       } else {
         if (route.newDestination) {
-          console.warn(
-            `Updating destination from ${JSON.stringify(
-              pathfinding.destination,
-            )} to ${JSON.stringify(route.newDestination)}`,
-          );
+          if (shouldLogPathfindingWarnings) {
+            console.warn(
+              `Updating destination from ${JSON.stringify(
+                pathfinding.destination,
+              )} to ${JSON.stringify(route.newDestination)}`,
+            );
+          }
           pathfinding.destination = route.newDestination;
         }
         pathfinding.state = { kind: 'moving', path: route.path };
@@ -152,7 +157,9 @@ export class Player {
     const collisionReason = blocked(game, now, position, this.id);
     if (collisionReason !== null) {
       const backoff = Math.random() * PATHFINDING_BACKOFF;
-      console.warn(`Stopping path for ${this.id}, waiting for ${backoff}ms: ${collisionReason}`);
+      if (!game.isEventPlayer(this.id)) {
+        console.warn(`Stopping path for ${this.id}, waiting for ${backoff}ms: ${collisionReason}`);
+      }
       this.pathfinding.state = {
         kind: 'waiting',
         until: now + backoff,
