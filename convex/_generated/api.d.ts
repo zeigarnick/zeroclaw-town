@@ -56,6 +56,7 @@ import type * as networking_meetings from "../networking/meetings.js";
 import type * as networking_townProjection from "../networking/townProjection.js";
 import type * as networking_validators from "../networking/validators.js";
 import type * as testing from "../testing.js";
+import type * as townNpcs from "../townNpcs.js";
 import type * as util_FastIntegerCompression from "../util/FastIntegerCompression.js";
 import type * as util_assertNever from "../util/assertNever.js";
 import type * as util_asyncMap from "../util/asyncMap.js";
@@ -122,6 +123,7 @@ declare const fullApi: ApiFromModules<{
   "networking/townProjection": typeof networking_townProjection;
   "networking/validators": typeof networking_validators;
   testing: typeof testing;
+  townNpcs: typeof townNpcs;
   "util/FastIntegerCompression": typeof util_FastIntegerCompression;
   "util/assertNever": typeof util_assertNever;
   "util/asyncMap": typeof util_asyncMap;
