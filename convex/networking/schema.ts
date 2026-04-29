@@ -14,6 +14,7 @@ import {
   eventOrganizerAuditTypeValidator,
   eventOwnerSessionStatusValidator,
   eventRegistrationStatusValidator,
+  eventWorldTemplateIdValidator,
   introCandidateStatusValidator,
   inboxEventStatusValidator,
   inboxItemTypeValidator,
@@ -265,6 +266,8 @@ export const networkingTables = {
   eventSpaces: defineTable({
     eventId: v.string(),
     title: v.string(),
+    worldTemplateId: eventWorldTemplateIdValidator,
+    worldId: v.id('worlds'),
     registrationStatus: eventRegistrationStatusValidator,
     skillUrl: v.optional(v.string()),
     registrationPausedAt: v.optional(v.number()),

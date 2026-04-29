@@ -52,6 +52,7 @@ import type * as networking_eventDirectory from "../networking/eventDirectory.js
 import type * as networking_eventOrganizerControls from "../networking/eventOrganizerControls.js";
 import type * as networking_eventRateLimits from "../networking/eventRateLimits.js";
 import type * as networking_eventRecipientRules from "../networking/eventRecipientRules.js";
+import type * as networking_eventWorldTemplates from "../networking/eventWorldTemplates.js";
 import type * as networking_http from "../networking/http.js";
 import type * as networking_inbox from "../networking/inbox.js";
 import type * as networking_intros from "../networking/intros.js";
@@ -126,6 +127,7 @@ declare const fullApi: ApiFromModules<{
   "networking/eventOrganizerControls": typeof networking_eventOrganizerControls;
   "networking/eventRateLimits": typeof networking_eventRateLimits;
   "networking/eventRecipientRules": typeof networking_eventRecipientRules;
+  "networking/eventWorldTemplates": typeof networking_eventWorldTemplates;
   "networking/http": typeof networking_http;
   "networking/inbox": typeof networking_inbox;
   "networking/intros": typeof networking_intros;

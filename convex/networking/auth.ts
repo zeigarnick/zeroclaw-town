@@ -31,6 +31,7 @@ export type NetworkingErrorCode =
   | 'invalid_event_connection_intent'
   | 'invalid_event_owner_session_status'
   | 'invalid_event_organizer_token'
+  | 'invalid_event_world_template'
   | 'invalid_card_status'
   | 'invalid_card_type'
   | 'invalid_agent_slug'

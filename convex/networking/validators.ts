@@ -97,6 +97,10 @@ export const eventRegistrationStatuses = ['open', 'paused'] as const;
 export type EventRegistrationStatus = (typeof eventRegistrationStatuses)[number];
 export const eventRegistrationStatusValidator = v.union(v.literal('open'), v.literal('paused'));
 
+export const eventWorldTemplateIds = ['clawport-terminal'] as const;
+export type EventWorldTemplateId = (typeof eventWorldTemplateIds)[number];
+export const eventWorldTemplateIdValidator = v.union(v.literal('clawport-terminal'));
+
 export const eventAgentStatuses = [
   'pending_owner_review',
   'approved',
