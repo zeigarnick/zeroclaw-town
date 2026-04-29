@@ -12,6 +12,7 @@ import { useServerGame } from '../hooks/serverGame.ts';
 import type { NetworkingTownProjection } from '../../convex/networking/townProjection.ts';
 import PlayerDetails from './PlayerDetails.tsx';
 import type { SelectElement } from './Player.tsx';
+import { EventMatchAlerts } from '../networking/EventMatchAlerts.tsx';
 import { EventPublicCardPanel } from '../networking/EventPublicCardPanel.tsx';
 import type { EventTownMarker } from '../networking/eventTownMarkers.ts';
 
@@ -79,6 +80,7 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
             </ConvexProvider>
           </Stage>
         </div>
+        <EventMatchAlerts activity={networkingProjection?.eventActivity} />
         {selectedEventMarker && (
           <EventPublicCardPanel
             marker={selectedEventMarker}

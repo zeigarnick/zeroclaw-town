@@ -2,6 +2,11 @@ import { v } from 'convex/values';
 import { Doc, Id } from '../_generated/dataModel';
 import { QueryCtx, query } from '../_generated/server';
 import { GameId } from '../aiTown/ids';
+import {
+  countEventMatchActivities,
+  EventActivityView,
+  listRecentEventActivityHandler,
+} from './eventActivity';
 import type { EventAvatarConfig, EventPublicCard } from './eventCards';
 
 export type NetworkingTownStatus = 'matched' | 'pending_meeting' | 'talking' | 'intro_ready';
@@ -43,6 +48,11 @@ export type NetworkingTownProjection = {
   agents: NetworkingTownAgent[];
   agentsByPlayerId: Record<string, NetworkingTownAgent>;
   statusCounts: Record<NetworkingTownStatus, number>;
+  eventActivity?: {
+    recent: EventActivityView[];
+    matchCount: number;
+    updatedAt: number;
+  };
   updatedAt: number;
 };
 
@@ -288,6 +298,13 @@ export async function getTownProjectionHandler(
     projectedAgents.sort((left, right) => left.displayName.localeCompare(right.displayName));
   }
 
+  const eventActivity = args.eventId
+    ? await collectEventActivitySummary(ctx, args.eventId)
+    : undefined;
+  if (eventActivity) {
+    updatedAt = Math.max(updatedAt, eventActivity.updatedAt);
+  }
+
   const agentsByPlayerId: Record<string, NetworkingTownAgent> = {};
   for (const agent of projectedAgents) {
     if (agent.playerId) {
@@ -299,7 +316,20 @@ export async function getTownProjectionHandler(
     agents: projectedAgents,
     agentsByPlayerId,
     statusCounts,
+    eventActivity,
     updatedAt,
+  };
+}
+
+async function collectEventActivitySummary(ctx: QueryCtx, eventId: string) {
+  const [recent, matchCount] = await Promise.all([
+    listRecentEventActivityHandler(ctx, { eventId, limit: 5 }),
+    countEventMatchActivities(ctx, eventId),
+  ]);
+  return {
+    recent,
+    matchCount,
+    updatedAt: recent.reduce((latest, activity) => Math.max(latest, activity.updatedAt), 0),
   };
 }
 

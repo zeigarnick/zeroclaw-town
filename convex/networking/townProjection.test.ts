@@ -9,11 +9,25 @@ type TableName =
   | 'agentConversations'
   | 'introCandidates'
   | 'eventAgents'
-  | 'eventNetworkingCards';
+  | 'eventNetworkingCards'
+  | 'eventActivityEvents';
 
 type Row = Record<string, any> & { _id: string };
 
-function createMockCtx(tables: Record<TableName, Row[]>) {
+function createMockCtx(tableOverrides: Partial<Record<TableName, Row[]>>) {
+  const tables: Record<TableName, Row[]> = {
+    networkAgents: [],
+    playerDescriptions: [],
+    matchCards: [],
+    recommendations: [],
+    meetings: [],
+    agentConversations: [],
+    introCandidates: [],
+    eventAgents: [],
+    eventNetworkingCards: [],
+    eventActivityEvents: [],
+    ...tableOverrides,
+  };
   const db = {
     query: (tableName: TableName) => ({
       withIndex: (_indexName: string, buildQuery: (q: any) => any) => {
@@ -191,6 +205,32 @@ describe('networking town projection', () => {
           21,
         ),
       ],
+      eventActivityEvents: [
+        eventActivityEvent(
+          'eventActivityEvents:1',
+          'demo-event',
+          'Cedar Scout 123',
+          'Orbit Builder 456',
+          'eventConnectionIntents:1',
+          30,
+        ),
+        eventActivityEvent(
+          'eventActivityEvents:2',
+          'demo-event',
+          'Cedar Scout 123',
+          'Harbor Builder 789',
+          'eventConnectionIntents:2',
+          31,
+        ),
+        eventActivityEvent(
+          'eventActivityEvents:3',
+          'other-event',
+          'Other Scout',
+          'Other Builder',
+          'eventConnectionIntents:3',
+          32,
+        ),
+      ],
     });
 
     const projection = await getTownProjectionHandler(ctx as any, {
@@ -220,6 +260,35 @@ describe('networking town projection', () => {
     expect(JSON.stringify(projection)).not.toContain('founder');
     expect(JSON.stringify(projection)).not.toContain('example');
     expect(JSON.stringify(projection)).not.toContain('Private Pending');
+    expect(projection.statusCounts).toEqual({
+      matched: 0,
+      pending_meeting: 0,
+      talking: 0,
+      intro_ready: 0,
+    });
+    expect(projection.eventActivity).toMatchObject({
+      matchCount: 2,
+      recent: [
+        {
+          type: 'match_created',
+          requesterDisplayName: 'Cedar Scout 123',
+          targetDisplayName: 'Harbor Builder 789',
+          payload: {
+            matchKind: 'recipient_approved',
+          },
+        },
+        {
+          type: 'match_created',
+          requesterDisplayName: 'Cedar Scout 123',
+          targetDisplayName: 'Orbit Builder 456',
+          payload: {
+            matchKind: 'recipient_approved',
+          },
+        },
+      ],
+    });
+    expect(JSON.stringify(projection.eventActivity)).not.toContain('sourceIntentId');
+    expect(JSON.stringify(projection.eventActivity)).not.toContain('eventConnectionIntents');
   });
 });
 
@@ -399,5 +468,28 @@ function eventCard(
     status,
     createdAt: updatedAt,
     updatedAt,
+  };
+}
+
+function eventActivityEvent(
+  _id: string,
+  eventId: string,
+  requesterDisplayName: string,
+  targetDisplayName: string,
+  sourceIntentId: string,
+  createdAt: number,
+) {
+  return {
+    _id,
+    eventId,
+    type: 'match_created',
+    requesterDisplayName,
+    targetDisplayName,
+    sourceIntentId,
+    payload: {
+      matchKind: 'recipient_approved',
+    },
+    createdAt,
+    updatedAt: createdAt,
   };
 }
