@@ -214,6 +214,15 @@ export interface EventDirectoryResult {
   updatedAt: number;
 }
 
+export interface EventSpaceConfig {
+  eventId: string;
+  title: string;
+  registrationStatus: 'open' | 'paused';
+  skillUrl?: string;
+  skillUrlRotatedAt?: number;
+  updatedAt: number;
+}
+
 export interface SearchEventDirectoryRequest {
   eventId: string;
   q?: string;
@@ -407,6 +416,7 @@ export interface IApiAdapter {
   reviewEventOwnerCard(
     req: ReviewEventOwnerCardRequest,
   ): Promise<ApiResponse<EventOwnerReviewData>>;
+  getEventSpaceConfig(eventId: string): Promise<ApiResponse<EventSpaceConfig | null>>;
   searchEventDirectory(
     req: SearchEventDirectoryRequest,
   ): Promise<ApiResponse<EventDirectoryResult[]>>;
@@ -680,6 +690,23 @@ function normalizeEventDirectoryResult(value: unknown): EventDirectoryResult {
     avatarConfig: normalizeAvatarConfig(row.avatarConfig),
     publicCard: normalizeEventPublicCard(row.publicCard),
     approvedAt: typeof row.approvedAt === 'number' ? row.approvedAt : undefined,
+    updatedAt: typeof row.updatedAt === 'number' ? row.updatedAt : 0,
+  };
+}
+
+function normalizeEventSpaceConfig(value: unknown): EventSpaceConfig | null {
+  if (value === null) {
+    return null;
+  }
+  const row = asRecord(value);
+  const registrationStatus = row.registrationStatus === 'paused' ? 'paused' : 'open';
+  return {
+    eventId: typeof row.eventId === 'string' ? row.eventId : '',
+    title: typeof row.title === 'string' ? row.title : '',
+    registrationStatus,
+    skillUrl: typeof row.skillUrl === 'string' ? row.skillUrl : undefined,
+    skillUrlRotatedAt:
+      typeof row.skillUrlRotatedAt === 'number' ? row.skillUrlRotatedAt : undefined,
     updatedAt: typeof row.updatedAt === 'number' ? row.updatedAt : 0,
   };
 }
@@ -1064,6 +1091,16 @@ export class HttpApiAdapter implements IApiAdapter {
       return response;
     }
     return { success: true, data: normalizeEventOwnerReview(response.data) };
+  }
+
+  async getEventSpaceConfig(eventId: string): Promise<ApiResponse<EventSpaceConfig | null>> {
+    const response = await this.request<unknown>(`/events/${eventId}/space`, {
+      method: 'GET',
+    });
+    if (!response.success) {
+      return response;
+    }
+    return { success: true, data: normalizeEventSpaceConfig(response.data) };
   }
 
   async searchEventDirectory(

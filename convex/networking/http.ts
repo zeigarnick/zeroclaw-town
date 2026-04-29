@@ -64,6 +64,11 @@ const functions = {
       'networking/eventDirectory:searchEventDirectory',
     ),
   },
+  eventSpaces: {
+    getEventSpaceConfig: makeFunctionReference<'query'>(
+      'networking/eventSpaces:getEventSpaceConfig',
+    ),
+  },
   eventConnectionIntents: {
     createEventConnectionIntent: makeFunctionReference<'mutation'>(
       'networking/eventConnectionIntents:createEventConnectionIntent',
@@ -219,6 +224,18 @@ export async function handleNetworkingHttpRequest(
         });
         return jsonSuccess(data);
       }
+    }
+
+    if (
+      request.method === 'GET' &&
+      route[0] === 'events' &&
+      route[2] === 'space' &&
+      route.length === 3
+    ) {
+      const data = await ctx.runQuery(functions.eventSpaces.getEventSpaceConfig, {
+        eventId: requirePathId(route[1], 'eventId'),
+      });
+      return jsonSuccess(data);
     }
 
     if (

@@ -82,6 +82,7 @@ export default function Home() {
             <EventQrOverlay
               eventId={eventQrConfig.eventId}
               skillUrl={eventQrConfig.skillUrl}
+              apiAdapter={apiAdapter}
             />
             <ToastContainer position="bottom-right" autoClose={2000} closeOnClick theme="dark" />
           </>

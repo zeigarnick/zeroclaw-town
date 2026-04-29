@@ -279,6 +279,50 @@ describe('networking HTTP helpers', () => {
     });
   });
 
+  test('routes public event space reads for rotated skill URLs', async () => {
+    const calls: Array<{ kind: string; args: any }> = [];
+    const response = await handleNetworkingHttpRequest(
+      {
+        runMutation: async () => {
+          throw new Error('unexpected mutation');
+        },
+        runQuery: async (_funcRef, args) => {
+          calls.push({ kind: 'query', args });
+          return {
+            eventId: args.eventId,
+            title: 'Demo Event',
+            registrationStatus: 'open',
+            skillUrl: 'https://event.example/skill.md',
+            updatedAt: 1710000000000,
+          };
+        },
+      },
+      new Request('https://town.example/api/v1/events/demo-event/space', {
+        method: 'GET',
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await readJson(response)).toEqual({
+      success: true,
+      data: {
+        eventId: 'demo-event',
+        title: 'Demo Event',
+        registrationStatus: 'open',
+        skillUrl: 'https://event.example/skill.md',
+        updatedAt: 1710000000000,
+      },
+    });
+    expect(calls).toEqual([
+      {
+        kind: 'query',
+        args: {
+          eventId: 'demo-event',
+        },
+      },
+    ]);
+  });
+
   test('routes minimal event connection intents and rejects extra fields', async () => {
     const calls: Array<{ kind: string; args: any }> = [];
     const response = await handleNetworkingHttpRequest(
