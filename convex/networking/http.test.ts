@@ -280,6 +280,80 @@ describe('networking HTTP helpers', () => {
     });
   });
 
+  test('routes minimal event connection intents and rejects extra fields', async () => {
+    const calls: Array<{ kind: string; args: any }> = [];
+    const response = await handleNetworkingHttpRequest(
+      {
+        runMutation: async (_funcRef, args) => {
+          calls.push({ kind: 'mutation', args });
+          return {
+            eventId: args.eventId,
+            requesterAgentId: args.requesterAgentId,
+            targetAgentId: args.targetAgentId,
+            status: 'pending_recipient_review',
+          };
+        },
+        runQuery: async () => {
+          throw new Error('unexpected query');
+        },
+      },
+      new Request('https://town.example/api/v1/events/demo-event/connection-intents', {
+        method: 'POST',
+        body: JSON.stringify({
+          requesterAgentId: 'eventAgents:1',
+          targetAgentId: 'eventAgents:2',
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await readJson(response)).toEqual({
+      success: true,
+      data: {
+        eventId: 'demo-event',
+        requesterAgentId: 'eventAgents:1',
+        targetAgentId: 'eventAgents:2',
+        status: 'pending_recipient_review',
+      },
+    });
+    expect(calls[0]).toMatchObject({
+      kind: 'mutation',
+      args: {
+        eventId: 'demo-event',
+        requesterAgentId: 'eventAgents:1',
+        targetAgentId: 'eventAgents:2',
+      },
+    });
+
+    const extraFieldResponse = await handleNetworkingHttpRequest(
+      {
+        runMutation: async () => {
+          throw new Error('unexpected mutation');
+        },
+        runQuery: async () => {
+          throw new Error('unexpected query');
+        },
+      },
+      new Request('https://town.example/api/v1/events/demo-event/connection-intents', {
+        method: 'POST',
+        body: JSON.stringify({
+          requesterAgentId: 'eventAgents:1',
+          targetAgentId: 'eventAgents:2',
+          message: 'please connect us',
+        }),
+      }),
+    );
+
+    expect(extraFieldResponse.status).toBe(400);
+    expect(await readJson(extraFieldResponse)).toEqual({
+      success: false,
+      error: {
+        code: 'invalid_request',
+        message: 'Unexpected request field: message.',
+      },
+    });
+  });
+
   test('wraps representative route errors in stable JSON envelopes', async () => {
     const response = await handleNetworkingHttpRequest(
       {

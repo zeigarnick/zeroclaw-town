@@ -9,6 +9,7 @@ import {
   eventAvatarAssetStatusValidator,
   eventAvatarCategoryValidator,
   eventCardStatusValidator,
+  eventConnectionIntentStatusValidator,
   eventOwnerSessionStatusValidator,
   eventRegistrationStatusValidator,
   introCandidateStatusValidator,
@@ -325,6 +326,32 @@ export const networkingTables = {
     .index('by_session_token_hash', ['sessionTokenHash'])
     .index('by_event_and_status', ['eventId', 'status'])
     .index('by_agent', ['eventAgentId']),
+
+  eventConnectionIntents: defineTable({
+    eventId: v.string(),
+    requesterAgentId: v.id('eventAgents'),
+    targetAgentId: v.id('eventAgents'),
+    requesterCardId: v.id('eventNetworkingCards'),
+    targetCardId: v.id('eventNetworkingCards'),
+    status: eventConnectionIntentStatusValidator,
+    dedupeKey: v.string(),
+    filterResult: v.object({
+      allowed: v.boolean(),
+      reasons: v.array(v.string()),
+      evaluatedAt: v.number(),
+    }),
+    auditMetadata: v.object({
+      source: v.literal('event_connection_intent_api'),
+      requesterOwnerApprovalExternal: v.boolean(),
+    }),
+    decidedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index('by_event_and_status', ['eventId', 'status'])
+    .index('by_requester_and_status', ['requesterAgentId', 'status'])
+    .index('by_target_and_status', ['targetAgentId', 'status'])
+    .index('by_dedupe_key', ['dedupeKey']),
 
   eventAvatarAssets: defineTable({
     category: eventAvatarCategoryValidator,

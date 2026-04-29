@@ -227,6 +227,33 @@ export interface SearchEventDirectoryRequest {
   favoriteMedia?: string[];
 }
 
+export type EventConnectionIntentStatus =
+  | 'pending_recipient_review'
+  | 'auto_rejected'
+  | 'recipient_approved'
+  | 'recipient_declined';
+
+export interface EventConnectionIntent {
+  id: string;
+  eventId: string;
+  requesterAgentId: string;
+  targetAgentId: string;
+  status: EventConnectionIntentStatus;
+  filterResult: {
+    allowed: boolean;
+    reasons: string[];
+    evaluatedAt: number;
+  };
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface CreateEventConnectionIntentRequest {
+  eventId: string;
+  requesterAgentId: string;
+  targetAgentId: string;
+}
+
 export type EventOwnerReviewStatus =
   | 'pending'
   | 'approved'
@@ -309,6 +336,9 @@ export interface IApiAdapter {
   searchEventDirectory(
     req: SearchEventDirectoryRequest,
   ): Promise<ApiResponse<EventDirectoryResult[]>>;
+  createEventConnectionIntent(
+    req: CreateEventConnectionIntentRequest,
+  ): Promise<ApiResponse<EventConnectionIntent>>;
 }
 
 type FetchLike = typeof fetch;
@@ -565,6 +595,36 @@ function normalizeEventDirectoryResult(value: unknown): EventDirectoryResult {
     avatarConfig: normalizeAvatarConfig(row.avatarConfig),
     publicCard: normalizeEventPublicCard(row.publicCard),
     approvedAt: typeof row.approvedAt === 'number' ? row.approvedAt : undefined,
+    updatedAt: typeof row.updatedAt === 'number' ? row.updatedAt : 0,
+  };
+}
+
+function normalizeEventConnectionIntentStatus(value: unknown): EventConnectionIntentStatus {
+  if (
+    value === 'auto_rejected' ||
+    value === 'recipient_approved' ||
+    value === 'recipient_declined'
+  ) {
+    return value;
+  }
+  return 'pending_recipient_review';
+}
+
+function normalizeEventConnectionIntent(value: unknown): EventConnectionIntent {
+  const row = asRecord(value);
+  const filterResult = asRecord(row.filterResult);
+  return {
+    id: normalizeId(row),
+    eventId: typeof row.eventId === 'string' ? row.eventId : '',
+    requesterAgentId: typeof row.requesterAgentId === 'string' ? row.requesterAgentId : '',
+    targetAgentId: typeof row.targetAgentId === 'string' ? row.targetAgentId : '',
+    status: normalizeEventConnectionIntentStatus(row.status),
+    filterResult: {
+      allowed: typeof filterResult.allowed === 'boolean' ? filterResult.allowed : false,
+      reasons: toArray(filterResult.reasons),
+      evaluatedAt: typeof filterResult.evaluatedAt === 'number' ? filterResult.evaluatedAt : 0,
+    },
+    createdAt: typeof row.createdAt === 'number' ? row.createdAt : 0,
     updatedAt: typeof row.updatedAt === 'number' ? row.updatedAt : 0,
   };
 }
@@ -895,6 +955,25 @@ export class HttpApiAdapter implements IApiAdapter {
       return response;
     }
     return { success: true, data: response.data.map((item) => normalizeEventDirectoryResult(item)) };
+  }
+
+  async createEventConnectionIntent(
+    req: CreateEventConnectionIntentRequest,
+  ): Promise<ApiResponse<EventConnectionIntent>> {
+    const response = await this.request<unknown>(
+      `/events/${req.eventId}/connection-intents`,
+      {
+        method: 'POST',
+        body: {
+          requesterAgentId: req.requesterAgentId,
+          targetAgentId: req.targetAgentId,
+        },
+      },
+    );
+    if (!response.success) {
+      return response;
+    }
+    return { success: true, data: normalizeEventConnectionIntent(response.data) };
   }
 
   private async request<T>(

@@ -233,6 +233,47 @@ describe('OwnerDashboard HttpApiAdapter', () => {
     expect(getRequestInit(fetchMock).method).toBe('GET');
   });
 
+  test('creates minimal event connection intents without message fields', async () => {
+    const fetchMock = createFetchMock({
+      body: {
+        success: true,
+        data: {
+          _id: 'eventConnectionIntents:1',
+          eventId: 'demo-event',
+          requesterAgentId: 'eventAgents:1',
+          targetAgentId: 'eventAgents:2',
+          status: 'pending_recipient_review',
+          filterResult: {
+            allowed: true,
+            reasons: ['no_recipient_rules_configured'],
+            evaluatedAt: 1710000000000,
+          },
+          createdAt: 1710000000000,
+          updatedAt: 1710000000000,
+        },
+      },
+    });
+    const adapter = new HttpApiAdapter('/api/v1', fetchMock as typeof fetch);
+
+    const response = await adapter.createEventConnectionIntent({
+      eventId: 'demo-event',
+      requesterAgentId: 'eventAgents:1',
+      targetAgentId: 'eventAgents:2',
+    });
+
+    expect(isError(response)).toBe(false);
+    if (!isError(response)) {
+      expect(response.data.status).toBe('pending_recipient_review');
+      expect(response.data.filterResult.allowed).toBe(true);
+    }
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/v1/events/demo-event/connection-intents');
+    expect(getRequestInit(fetchMock).method).toBe('POST');
+    expect(getRequestBody(fetchMock)).toEqual({
+      requesterAgentId: 'eventAgents:1',
+      targetAgentId: 'eventAgents:2',
+    });
+  });
+
   test('maps meeting request/action routes to recommendationId and meetingId endpoints', async () => {
     const fetchMock = createFetchMock(
       {

@@ -143,6 +143,20 @@ export const eventOwnerSessionStatusValidator = v.union(
   v.literal('changes_requested'),
 );
 
+export const eventConnectionIntentStatuses = [
+  'pending_recipient_review',
+  'auto_rejected',
+  'recipient_approved',
+  'recipient_declined',
+] as const;
+export type EventConnectionIntentStatus = (typeof eventConnectionIntentStatuses)[number];
+export const eventConnectionIntentStatusValidator = v.union(
+  v.literal('pending_recipient_review'),
+  v.literal('auto_rejected'),
+  v.literal('recipient_approved'),
+  v.literal('recipient_declined'),
+);
+
 export const eventAvatarCategories = [
   'hair',
   'skinTone',

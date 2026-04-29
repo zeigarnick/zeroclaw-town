@@ -64,6 +64,11 @@ const functions = {
       'networking/eventDirectory:searchEventDirectory',
     ),
   },
+  eventConnectionIntents: {
+    createEventConnectionIntent: makeFunctionReference<'mutation'>(
+      'networking/eventConnectionIntents:createEventConnectionIntent',
+    ),
+  },
   cards: {
     createCard: makeFunctionReference<'mutation'>('networking/cards:createCard'),
     listCards: makeFunctionReference<'query'>('networking/cards:listCards'),
@@ -198,6 +203,25 @@ export async function handleNetworkingHttpRequest(
           favoriteMedia: optionalQueryParamList(url.searchParams, 'favoriteMedia'),
         },
       });
+      return jsonSuccess(data);
+    }
+
+    if (
+      request.method === 'POST' &&
+      route[0] === 'events' &&
+      route[2] === 'connection-intents' &&
+      route.length === 3
+    ) {
+      const body = await parseJsonObject(request);
+      requireExactBodyKeys(body, ['requesterAgentId', 'targetAgentId']);
+      const data = await ctx.runMutation(
+        functions.eventConnectionIntents.createEventConnectionIntent,
+        {
+          eventId: requirePathId(route[1], 'eventId'),
+          requesterAgentId: requireString(body.requesterAgentId, 'requesterAgentId'),
+          targetAgentId: requireString(body.targetAgentId, 'targetAgentId'),
+        },
+      );
       return jsonSuccess(data);
     }
 
@@ -511,6 +535,18 @@ function parseOwnerMetadata(value: unknown): OwnerMetadata | undefined {
   };
 }
 
+function requireExactBodyKeys(body: Record<string, unknown>, allowedKeys: string[]) {
+  const allowed = new Set(allowedKeys);
+  const unknownKeys = Object.keys(body).filter((key) => !allowed.has(key));
+  if (unknownKeys.length > 0) {
+    throw new RouteError(
+      'invalid_request',
+      `Unexpected request field: ${unknownKeys[0]}.`,
+      400,
+    );
+  }
+}
+
 function optionalVerificationMethod(value: unknown): 'tweet' | 'oauth' | undefined {
   if (value === undefined) {
     return undefined;
@@ -674,6 +710,8 @@ function statusForNetworkingError(code: NetworkingErrorCode) {
   if (
     code === 'pending_claim' ||
     code.endsWith('_access_denied') ||
+    code === 'event_agent_not_approved' ||
+    code === 'event_connection_intent_not_actionable' ||
     code === 'recommendation_not_actionable'
   ) {
     return 403;
@@ -686,6 +724,7 @@ function statusForNetworkingError(code: NetworkingErrorCode) {
   if (
     code === 'duplicate_agent_slug' ||
     code === 'duplicate_event_agent' ||
+    code === 'duplicate_event_connection_intent' ||
     code === 'meeting_already_exists' ||
     code === 'duplicate_client_message_id'
   ) {
