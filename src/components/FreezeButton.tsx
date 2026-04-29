@@ -45,7 +45,7 @@ export default function FreezeButton({ eventId }: { eventId?: string }) {
     <button
       type="button"
       onClick={() => void flipSwitch()}
-      className="button pointer-events-auto size-10 bg-transparent p-0 text-xl text-white shadow-solid focus:outline-none focus:ring-2 focus:ring-clay-100 disabled:opacity-60 sm:size-12"
+      className="button hud-button pointer-events-auto bg-transparent text-white shadow-solid focus:outline-none focus:ring-2 focus:ring-clay-100 disabled:opacity-60"
       title={label}
       aria-label={label}
       aria-pressed={frozen}
@@ -53,16 +53,26 @@ export default function FreezeButton({ eventId }: { eventId?: string }) {
     >
       <div className="flex h-full w-full items-center justify-center bg-clay-700">
         {frozen ? (
-          <div aria-hidden="true" className="relative size-5 sm:size-6">
-            <span className="absolute left-[35%] top-[20%] block h-[60%] w-[18%] bg-white" />
-            <span className="absolute left-[53%] top-[31%] block h-[38%] w-[18%] bg-white" />
-            <span className="absolute left-[71%] top-[42%] block h-[16%] w-[18%] bg-white" />
-          </div>
+          <svg
+            aria-hidden="true"
+            className="size-5 [image-rendering:pixelated]"
+            viewBox="0 0 24 24"
+            shapeRendering="crispEdges"
+          >
+            <rect x="7" y="5" width="4" height="14" fill="white" />
+            <rect x="11" y="8" width="4" height="8" fill="white" />
+            <rect x="15" y="11" width="4" height="2" fill="white" />
+          </svg>
         ) : (
-          <div aria-hidden="true" className="flex size-5 justify-center gap-1 sm:size-6">
-            <span className="block h-full w-1.5 bg-white sm:w-2" />
-            <span className="block h-full w-1.5 bg-white sm:w-2" />
-          </div>
+          <svg
+            aria-hidden="true"
+            className="size-5 [image-rendering:pixelated]"
+            viewBox="0 0 24 24"
+            shapeRendering="crispEdges"
+          >
+            <rect x="7" y="4" width="4" height="16" fill="white" />
+            <rect x="13" y="4" width="4" height="16" fill="white" />
+          </svg>
         )}
       </div>
     </button>

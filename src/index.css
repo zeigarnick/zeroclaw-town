@@ -180,6 +180,36 @@ body {
   transform: none;
 }
 
+.button.hud-button {
+  width: 48px;
+  min-width: 48px;
+  height: 48px;
+  border-width: 12px;
+  padding: 0;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.button.hud-button > div {
+  width: 100%;
+  height: 100%;
+  line-height: 1;
+}
+
+.button.hud-button > div > span {
+  transform: none;
+}
+
+@media (max-width: 640px) {
+  .button.hud-button {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    border-width: 10px;
+    font-size: 16px;
+  }
+}
+
 p[contenteditable='true']:empty::before {
   content: attr(placeholder);
   color: #aaa;

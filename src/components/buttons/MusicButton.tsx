@@ -61,7 +61,7 @@ export default function MusicButton() {
     <button
       type="button"
       onClick={() => void flipSwitch()}
-      className="button pointer-events-auto size-10 bg-transparent p-0 text-xl text-white shadow-solid focus:outline-none focus:ring-2 focus:ring-clay-100 disabled:opacity-50 sm:size-12"
+      className="button hud-button pointer-events-auto bg-transparent text-white shadow-solid focus:outline-none focus:ring-2 focus:ring-clay-100 disabled:opacity-50"
       title={isPlaying ? 'Mute music (M)' : 'Play music (M)'}
       aria-label={isPlaying ? 'Mute music' : 'Play music'}
       aria-pressed={isPlaying}
@@ -71,8 +71,8 @@ export default function MusicButton() {
           <img
             className={
               isPlaying
-                ? 'size-5 opacity-100 [image-rendering:pixelated] sm:size-6'
-                : 'size-5 opacity-55 [image-rendering:pixelated] sm:size-6'
+                ? 'size-5 opacity-100 [image-rendering:pixelated]'
+                : 'size-5 opacity-55 [image-rendering:pixelated]'
             }
             src={volumeImg}
             alt=""
@@ -81,16 +81,13 @@ export default function MusicButton() {
           {isPlaying ? (
             <span
               aria-hidden="true"
-              className="absolute right-1.5 top-1.5 flex h-2.5 items-end gap-0.5 sm:right-2 sm:top-2 sm:h-3"
+              className="absolute right-0.5 top-0.5 flex h-2.5 items-end gap-0.5"
             >
               <span className="block h-1 w-1 bg-white" />
               <span className="block h-2 w-1 bg-white" />
             </span>
           ) : (
-            <span
-              aria-hidden="true"
-              className="absolute h-6 w-1 rotate-45 bg-white shadow-solid sm:h-7"
-            />
+            <span aria-hidden="true" className="absolute h-6 w-1 rotate-45 bg-white shadow-solid" />
           )}
         </span>
       </div>
