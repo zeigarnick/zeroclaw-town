@@ -13,10 +13,17 @@ describe('event world templates', () => {
     expect(template.id).toBe(DEFAULT_EVENT_WORLD_TEMPLATE_ID);
     expect(template.displayName).toBe('Clawport Terminal');
     expect(template.mapModule.serializedWorldMap).toMatchObject({
-      width: 24,
-      height: 18,
-      tileSetUrl: '/ai-town/assets/clawport-terminal/clawport-terminal-tileset.png',
+      width: 46,
+      height: 34,
+      tileSetUrl: '/ai-town/assets/clawport-terminal/empty-tileset.png',
     });
+    expect(template.mapModule.serializedWorldMap.fixedSprites).toContainEqual(
+      expect.objectContaining({
+        url: '/ai-town/assets/clawport-terminal/background.png',
+        width: 1472,
+        height: 1088,
+      }),
+    );
   });
 
   test('exposes typed catalog metadata', () => {

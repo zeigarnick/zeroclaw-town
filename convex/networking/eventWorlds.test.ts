@@ -105,9 +105,9 @@ describe('event worlds', () => {
     expect(tables.maps).toEqual([
       expect.objectContaining({
         worldId: eventWorld.worldId,
-        width: 24,
-        height: 18,
-        tileSetUrl: '/ai-town/assets/clawport-terminal/clawport-terminal-tileset.png',
+        width: 46,
+        height: 34,
+        tileSetUrl: '/ai-town/assets/clawport-terminal/empty-tileset.png',
       }),
     ]);
     expect(scheduled).toEqual([
@@ -182,7 +182,7 @@ describe('event worlds', () => {
     expect(tables.maps[0]).toMatchObject({
       _id: mapId,
       worldId: eventWorld.worldId,
-      tileSetUrl: '/ai-town/assets/clawport-terminal/clawport-terminal-tileset.png',
+      tileSetUrl: '/ai-town/assets/clawport-terminal/empty-tileset.png',
     });
   });
 

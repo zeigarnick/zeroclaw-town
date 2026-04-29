@@ -176,7 +176,7 @@ describe('event agent handlers', () => {
     expect(tables.maps).toEqual([
       expect.objectContaining({
         worldId: tables.worlds[0]._id,
-        tileSetUrl: '/ai-town/assets/clawport-terminal/clawport-terminal-tileset.png',
+        tileSetUrl: '/ai-town/assets/clawport-terminal/empty-tileset.png',
       }),
     ]);
     expect(tables.eventAgents).toHaveLength(1);

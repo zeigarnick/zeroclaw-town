@@ -25,7 +25,7 @@ export type EventWorldTemplate = {
 const templates = {
   'clawport-terminal': {
     id: 'clawport-terminal',
-    revision: '2026-04-29-cozy-harbor-terminal-v3',
+    revision: '2026-04-29-full-background-v1',
     displayName: 'Clawport Terminal',
     description: 'A compact terminal-harbor event floor for QR onboarding and attendee markers.',
     mapModule: clawportTerminalMap as { serializedWorldMap: SerializedWorldMap },
