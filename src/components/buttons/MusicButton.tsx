@@ -6,19 +6,18 @@ import { api } from '../../../convex/_generated/api';
 
 export default function MusicButton() {
   const musicUrl = useQuery(api.music.getBackgroundMusic);
+  const fallbackMusicUrl = `${import.meta.env.BASE_URL}assets/background.mp3`;
+  const playableMusicUrl = musicUrl ?? fallbackMusicUrl;
   const [isPlaying, setPlaying] = useState(false);
   const loadedMusicUrlRef = useRef<string | null>(null);
 
   const flipSwitch = useCallback(async () => {
-    if (!musicUrl) {
-      return;
-    }
-    if (loadedMusicUrlRef.current !== musicUrl) {
+    if (loadedMusicUrlRef.current !== playableMusicUrl) {
       if (loadedMusicUrlRef.current) {
         sound.remove('background');
       }
-      sound.add('background', musicUrl).loop = true;
-      loadedMusicUrlRef.current = musicUrl;
+      sound.add('background', playableMusicUrl).loop = true;
+      loadedMusicUrlRef.current = playableMusicUrl;
     }
 
     if (isPlaying) {
@@ -27,9 +26,14 @@ export default function MusicButton() {
       return;
     }
 
-    await sound.play('background');
-    setPlaying(true);
-  }, [isPlaying, musicUrl]);
+    try {
+      await sound.play('background');
+      setPlaying(true);
+    } catch (error) {
+      console.warn('Unable to play background music', error);
+      setPlaying(false);
+    }
+  }, [isPlaying, playableMusicUrl]);
 
   const handleKeyPress = useCallback(
     (event: { key: string }) => {
@@ -61,7 +65,6 @@ export default function MusicButton() {
       title={isPlaying ? 'Mute music (M)' : 'Play music (M)'}
       aria-label={isPlaying ? 'Mute music' : 'Play music'}
       aria-pressed={isPlaying}
-      disabled={!musicUrl}
     >
       <div className="flex h-full w-full items-center justify-center bg-clay-700">
         <span className="flex h-full w-full items-center justify-center">
