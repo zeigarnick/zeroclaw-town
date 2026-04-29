@@ -92,4 +92,18 @@ describe('event legacy removal', () => {
     expect(appSource).not.toContain("currentView === 'dashboard'");
     expect(appSource).not.toContain('>Dashboard<');
   });
+
+  test('retained legacy gates have removal triggers in the tech debt tracker', () => {
+    const tracker = readFileSync(
+      join(process.cwd(), 'docs/exec-plans/tech-debt-tracker.md'),
+      'utf8',
+    );
+    expect(tracker).toContain('TD-EW4-001');
+    expect(tracker).toContain('OPENNETWORK_ENABLE_LEGACY_DEMO_SEED');
+    expect(tracker).toContain('Delete the legacy demo seed path');
+    expect(tracker).toContain('TD-EW4-002');
+    expect(tracker).toContain('AGORA_ENABLE_TOWN_NPCS');
+    expect(tracker).toContain('OPENNETWORK_EVENT_MODE');
+    expect(tracker).toContain('Remove or move inherited NPC/vector matching');
+  });
 });
