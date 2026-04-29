@@ -219,6 +219,21 @@ describe('event organizer credentials', () => {
     expect(JSON.stringify(listed)).not.toContain(created.organizerApiKey);
   });
 
+  test('blocks viewer keys from listing organizer key inventory', async () => {
+    const { ctx } = createMockCtx();
+    const viewerKey = generateEventOrganizerApiKey();
+    await insertKey(ctx, viewerKey, { role: 'viewer' });
+
+    await expect(
+      listOrganizerApiKeysHandler(ctx as any, {
+        eventId: 'demo-event',
+        organizerApiKey: viewerKey,
+      }),
+    ).rejects.toMatchObject({
+      data: { code: 'event_scope_mismatch' },
+    } satisfies Partial<ConvexError<{ code: string }>>);
+  });
+
   test('revokes organizer keys without allowing the last active key to be revoked', async () => {
     const { ctx, tables } = createMockCtx();
     const primaryKey = generateEventOrganizerApiKey();

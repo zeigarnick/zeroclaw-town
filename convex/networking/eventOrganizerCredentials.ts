@@ -141,10 +141,11 @@ export async function listOrganizerApiKeysHandler(
   args: { eventId: string; organizerApiKey: string },
 ): Promise<RedactedOrganizerApiKey[]> {
   const eventId = normalizeEventId(args.eventId);
-  await authenticateEventOrganizerApiKey(ctx, {
+  const actor = await authenticateEventOrganizerApiKey(ctx, {
     eventId,
     organizerApiKey: args.organizerApiKey,
   });
+  assertCanManageKeys(actor);
   const keys = await ctx.db
     .query('eventOrganizerApiKeys')
     .withIndex('by_event_created_at', (q) => q.eq('eventId', eventId))
