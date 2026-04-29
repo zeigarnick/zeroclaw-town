@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@clerk/clerk-react": "^4.27.0",
+    "@convex-dev/rate-limiter": "^0.3.2",
     "@pixi/react": "^7.1.0",
     "@pixi/sound": "^5.2.0",
     "@tailwindcss/forms": "^0.5.3",

@@ -8,11 +8,6 @@
  * @module
  */
 
-import type {
-  ApiFromModules,
-  FilterApi,
-  FunctionReference,
-} from "convex/server";
 import type * as agent_conversation from "../agent/conversation.js";
 import type * as agent_embeddingsCache from "../agent/embeddingsCache.js";
 import type * as agent_memory from "../agent/memory.js";
@@ -48,8 +43,15 @@ import type * as networking_cardText from "../networking/cardText.js";
 import type * as networking_cards from "../networking/cards.js";
 import type * as networking_conversations from "../networking/conversations.js";
 import type * as networking_demoSeed from "../networking/demoSeed.js";
+import type * as networking_eventActivity from "../networking/eventActivity.js";
 import type * as networking_eventAgents from "../networking/eventAgents.js";
 import type * as networking_eventCards from "../networking/eventCards.js";
+import type * as networking_eventConnectionIntents from "../networking/eventConnectionIntents.js";
+import type * as networking_eventContactReveal from "../networking/eventContactReveal.js";
+import type * as networking_eventDirectory from "../networking/eventDirectory.js";
+import type * as networking_eventOrganizerControls from "../networking/eventOrganizerControls.js";
+import type * as networking_eventRateLimits from "../networking/eventRateLimits.js";
+import type * as networking_eventRecipientRules from "../networking/eventRecipientRules.js";
 import type * as networking_http from "../networking/http.js";
 import type * as networking_inbox from "../networking/inbox.js";
 import type * as networking_intros from "../networking/intros.js";
@@ -73,14 +75,12 @@ import type * as util_types from "../util/types.js";
 import type * as util_xxhash from "../util/xxhash.js";
 import type * as world from "../world.js";
 
-/**
- * A utility for referencing Convex functions in your app's API.
- *
- * Usage:
- * ```js
- * const myFunctionReference = api.myModule.myFunction;
- * ```
- */
+import type {
+  ApiFromModules,
+  FilterApi,
+  FunctionReference,
+} from "convex/server";
+
 declare const fullApi: ApiFromModules<{
   "agent/conversation": typeof agent_conversation;
   "agent/embeddingsCache": typeof agent_embeddingsCache;
@@ -117,8 +117,15 @@ declare const fullApi: ApiFromModules<{
   "networking/cards": typeof networking_cards;
   "networking/conversations": typeof networking_conversations;
   "networking/demoSeed": typeof networking_demoSeed;
+  "networking/eventActivity": typeof networking_eventActivity;
   "networking/eventAgents": typeof networking_eventAgents;
   "networking/eventCards": typeof networking_eventCards;
+  "networking/eventConnectionIntents": typeof networking_eventConnectionIntents;
+  "networking/eventContactReveal": typeof networking_eventContactReveal;
+  "networking/eventDirectory": typeof networking_eventDirectory;
+  "networking/eventOrganizerControls": typeof networking_eventOrganizerControls;
+  "networking/eventRateLimits": typeof networking_eventRateLimits;
+  "networking/eventRecipientRules": typeof networking_eventRecipientRules;
   "networking/http": typeof networking_http;
   "networking/inbox": typeof networking_inbox;
   "networking/intros": typeof networking_intros;
@@ -142,11 +149,33 @@ declare const fullApi: ApiFromModules<{
   "util/xxhash": typeof util_xxhash;
   world: typeof world;
 }>;
+
+/**
+ * A utility for referencing Convex functions in your app's public API.
+ *
+ * Usage:
+ * ```js
+ * const myFunctionReference = api.myModule.myFunction;
+ * ```
+ */
 export declare const api: FilterApi<
   typeof fullApi,
   FunctionReference<any, "public">
 >;
+
+/**
+ * A utility for referencing Convex functions in your app's internal API.
+ *
+ * Usage:
+ * ```js
+ * const myFunctionReference = internal.myModule.myFunction;
+ * ```
+ */
 export declare const internal: FilterApi<
   typeof fullApi,
   FunctionReference<any, "internal">
 >;
+
+export declare const components: {
+  rateLimiter: import("@convex-dev/rate-limiter/_generated/component.js").ComponentApi<"rateLimiter">;
+};

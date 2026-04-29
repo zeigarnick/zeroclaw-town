@@ -27,6 +27,7 @@ export type NetworkingErrorCode =
   | 'invalid_event_owner_token'
   | 'event_owner_session_not_found'
   | 'event_registration_paused'
+  | 'event_rate_limited'
   | 'invalid_event_connection_intent'
   | 'invalid_event_owner_session_status'
   | 'invalid_event_organizer_token'

@@ -12,6 +12,7 @@ import {
   toEventPublicCardView,
 } from './eventCards';
 import { writeEventOrganizerAuditEvent } from './eventOrganizerControls';
+import { enforceEventRateLimit } from './eventRateLimits';
 import {
   EventAgentStatus,
   EventCardStatus,
@@ -66,6 +67,11 @@ export async function registerEventAgentHandler(
 ) {
   const eventId = normalizeEventId(args.eventId);
   const agentIdentifier = normalizeAgentIdentifier(args.agentIdentifier);
+  await enforceEventRateLimit(ctx, 'eventRegistrationPerRequester', [
+    eventId,
+    agentIdentifier,
+  ]);
+  await enforceEventRateLimit(ctx, 'eventRegistrationPerEvent', [eventId]);
   const publicCard = normalizeEventPublicCard(args.publicCard);
   const avatarConfig =
     args.avatarConfig === undefined
@@ -195,6 +201,11 @@ export async function decideOwnerReviewHandler(
   decision: Exclude<EventCardStatus, 'pending_owner_review' | 'revoked'>,
 ): Promise<EventOwnerReview> {
   const { session, agent, card } = await getOwnerReviewRows(ctx, args.reviewToken);
+  await enforceEventRateLimit(ctx, 'eventOwnerReviewDecision', [
+    session.eventId,
+    agent._id,
+    decision,
+  ]);
   if (
     session.status !== 'pending' ||
     agent.approvalStatus !== 'pending_owner_review' ||

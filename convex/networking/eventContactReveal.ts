@@ -1,10 +1,11 @@
 import { v } from 'convex/values';
 import { Doc, Id } from '../_generated/dataModel';
-import { MutationCtx, QueryCtx, mutation, query } from '../_generated/server';
+import { MutationCtx, mutation } from '../_generated/server';
 import { networkingError } from './auth';
 import { createMatchActivityForApprovedIntent } from './eventActivity';
 import { toEventConnectionIntentView } from './eventConnectionIntents';
 import { authenticateApprovedEventOwnerSession, normalizeEventId } from './eventAgents';
+import { enforceEventRateLimit } from './eventRateLimits';
 import { MAX_EVENT_PUBLIC_TEXT_LENGTH } from './validators';
 
 export type EventPrivateContact = {
@@ -77,7 +78,7 @@ export const decideEventConnectionIntent = mutation({
   handler: (ctx, args) => decideEventConnectionIntentHandler(ctx, args),
 });
 
-export const getEventContactReveal = query({
+export const getEventContactReveal = mutation({
   args: {
     eventId: v.string(),
     intentId: v.id('eventConnectionIntents'),
@@ -91,6 +92,7 @@ export async function upsertEventPrivateContactHandler(
   args: UpsertEventPrivateContactArgs,
 ) {
   const eventId = normalizeEventId(args.eventId);
+  await enforceEventRateLimit(ctx, 'eventContactReveal', [eventId, args.eventAgentId]);
   const agent = await ctx.db.get(args.eventAgentId);
   if (!agent || agent.eventId !== eventId) {
     throw networkingError(
@@ -150,6 +152,7 @@ export async function decideEventConnectionIntentHandler(
   args: DecideEventConnectionIntentArgs,
 ) {
   const eventId = normalizeEventId(args.eventId);
+  await enforceEventRateLimit(ctx, 'eventContactReveal', [eventId, args.intentId, args.decision]);
   const recipientAuth = await authenticateApprovedEventOwnerSession(ctx, {
     eventId,
     ownerSessionToken: args.ownerSessionToken,
@@ -197,10 +200,11 @@ export async function decideEventConnectionIntentHandler(
 }
 
 export async function getEventContactRevealHandler(
-  ctx: QueryCtx,
+  ctx: MutationCtx,
   args: GetEventContactRevealArgs,
 ): Promise<EventContactRevealView> {
   const eventId = normalizeEventId(args.eventId);
+  await enforceEventRateLimit(ctx, 'eventContactReveal', [eventId, args.intentId]);
   const viewerAuth = await authenticateApprovedEventOwnerSession(ctx, {
     eventId,
     ownerSessionToken: args.ownerSessionToken,

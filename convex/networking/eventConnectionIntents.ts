@@ -4,6 +4,7 @@ import { MutationCtx, QueryCtx, mutation, query } from '../_generated/server';
 import { networkingError } from './auth';
 import { authenticateApprovedEventOwnerSession, normalizeEventId } from './eventAgents';
 import { EventPublicCardView, toEventPublicCardView } from './eventCards';
+import { enforceEventRateLimit } from './eventRateLimits';
 import { evaluateRecipientRules } from './eventRecipientRules';
 import { EventConnectionIntentStatus } from './validators';
 
@@ -66,6 +67,11 @@ export async function createEventConnectionIntentHandler(
       'requesterAgentId and targetAgentId must be different event agents.',
     );
   }
+  await enforceEventRateLimit(ctx, 'eventConnectionIntent', [
+    eventId,
+    args.requesterAgentId,
+    args.targetAgentId,
+  ]);
 
   const [requester, target] = await Promise.all([
     ctx.db.get(args.requesterAgentId),

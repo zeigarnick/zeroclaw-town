@@ -231,11 +231,8 @@ describe('networking HTTP helpers', () => {
     const calls: Array<{ kind: string; args: any }> = [];
     const response = await handleNetworkingHttpRequest(
       {
-        runMutation: async () => {
-          throw new Error('unexpected mutation');
-        },
-        runQuery: async (_funcRef, args) => {
-          calls.push({ kind: 'query', args });
+        runMutation: async (_funcRef, args) => {
+          calls.push({ kind: 'mutation', args });
           return [
             {
               eventId: args.eventId,
@@ -244,6 +241,9 @@ describe('networking HTTP helpers', () => {
               publicCard: { role: 'Founder', offers: ['GTM help'] },
             },
           ];
+        },
+        runQuery: async () => {
+          throw new Error('unexpected query');
         },
       },
       new Request(
@@ -267,7 +267,7 @@ describe('networking HTTP helpers', () => {
       ],
     });
     expect(calls[0]).toMatchObject({
-      kind: 'query',
+      kind: 'mutation',
       args: {
         eventId: 'demo-event',
         filters: {
@@ -671,11 +671,8 @@ describe('networking HTTP helpers', () => {
 
     const revealResponse = await handleNetworkingHttpRequest(
       {
-        runMutation: async () => {
-          throw new Error('unexpected mutation');
-        },
-        runQuery: async (_funcRef, args) => {
-          calls.push({ kind: 'query', args });
+        runMutation: async (_funcRef, args) => {
+          calls.push({ kind: 'mutation', args });
           return {
             id: 'eventContactReveals:1',
             eventId: args.eventId,
@@ -685,6 +682,9 @@ describe('networking HTTP helpers', () => {
             requesterContact: { email: 'requester@example.com' },
             targetContact: { email: 'target@example.com' },
           };
+        },
+        runQuery: async () => {
+          throw new Error('unexpected query');
         },
       },
       new Request(
@@ -698,7 +698,7 @@ describe('networking HTTP helpers', () => {
 
     expect(revealResponse.status).toBe(200);
     expect(calls[2]).toMatchObject({
-      kind: 'query',
+      kind: 'mutation',
       args: {
         eventId: 'demo-event',
         intentId: 'eventConnectionIntents:1',

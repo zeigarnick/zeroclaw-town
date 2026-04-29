@@ -2,6 +2,7 @@ import { v } from 'convex/values';
 import { Doc, Id } from '../_generated/dataModel';
 import { MutationCtx, QueryCtx, mutation, query } from '../_generated/server';
 import { networkingError } from './auth';
+import { enforceEventRateLimit } from './eventRateLimits';
 import { EventOrganizerAuditType, MAX_EVENT_REVIEW_NOTE_LENGTH } from './validators';
 
 const MAX_SKILL_URL_LENGTH = 2048;
@@ -119,6 +120,7 @@ export async function pauseEventRegistrationHandler(
 ) {
   assertOrganizerCapability(args.organizerToken);
   const eventId = normalizeEventId(args.eventId);
+  await enforceEventRateLimit(ctx, 'eventOrganizerAction', [eventId, 'pause']);
   const now = Date.now();
   const eventSpace = await getOrCreateEventSpace(ctx, eventId, now);
   await ctx.db.patch(eventSpace._id, {
@@ -143,6 +145,7 @@ export async function resumeEventRegistrationHandler(
 ) {
   assertOrganizerCapability(args.organizerToken);
   const eventId = normalizeEventId(args.eventId);
+  await enforceEventRateLimit(ctx, 'eventOrganizerAction', [eventId, 'resume']);
   const now = Date.now();
   const eventSpace = await getOrCreateEventSpace(ctx, eventId, now);
   await ctx.db.patch(eventSpace._id, {
@@ -166,6 +169,7 @@ export async function rotateEventSkillUrlHandler(
 ) {
   assertOrganizerCapability(args.organizerToken);
   const eventId = normalizeEventId(args.eventId);
+  await enforceEventRateLimit(ctx, 'eventOrganizerAction', [eventId, 'rotate-skill-url']);
   const skillUrl = normalizeSkillUrl(args.skillUrl);
   const now = Date.now();
   const eventSpace = await getOrCreateEventSpace(ctx, eventId, now);
@@ -197,6 +201,11 @@ export async function revokeEventAgentHandler(
 ) {
   assertOrganizerCapability(args.organizerToken);
   const eventId = normalizeEventId(args.eventId);
+  await enforceEventRateLimit(ctx, 'eventOrganizerAction', [
+    eventId,
+    args.remove ? 'remove-agent' : 'revoke-agent',
+    args.eventAgentId,
+  ]);
   const reason = normalizeOptionalReason(args.reason);
   const agent = await ctx.db.get(args.eventAgentId);
   if (!agent || agent.eventId !== eventId) {
@@ -269,6 +278,10 @@ export async function listSuspiciousRegistrationsHandler(
 ): Promise<SuspiciousEventRegistration[]> {
   assertOrganizerCapability(args.organizerToken);
   const eventId = normalizeEventId(args.eventId);
+  await enforceEventRateLimit(ctx, 'eventOrganizerAction', [
+    eventId,
+    'list-suspicious-registrations',
+  ]);
   const limit = normalizeLimit(args.limit);
   const agents = await ctx.db
     .query('eventAgents')
@@ -298,6 +311,10 @@ export async function listHighVolumeRequestersHandler(
 ): Promise<HighVolumeRequester[]> {
   assertOrganizerCapability(args.organizerToken);
   const eventId = normalizeEventId(args.eventId);
+  await enforceEventRateLimit(ctx, 'eventOrganizerAction', [
+    eventId,
+    'list-high-volume-requesters',
+  ]);
   const threshold = Math.max(1, Math.floor(args.threshold ?? 3));
   const limit = normalizeLimit(args.limit);
   const auditEvents = await ctx.db

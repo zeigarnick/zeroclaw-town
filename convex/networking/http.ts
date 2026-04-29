@@ -60,7 +60,7 @@ const functions = {
     ),
   },
   eventDirectory: {
-    searchEventDirectory: makeFunctionReference<'query'>(
+    searchEventDirectory: makeFunctionReference<'mutation'>(
       'networking/eventDirectory:searchEventDirectory',
     ),
   },
@@ -84,7 +84,7 @@ const functions = {
     decideEventConnectionIntent: makeFunctionReference<'mutation'>(
       'networking/eventContactReveal:decideEventConnectionIntent',
     ),
-    getEventContactReveal: makeFunctionReference<'query'>(
+    getEventContactReveal: makeFunctionReference<'mutation'>(
       'networking/eventContactReveal:getEventContactReveal',
     ),
   },
@@ -231,7 +231,7 @@ export async function handleNetworkingHttpRequest(
       route[2] === 'directory' &&
       route.length === 3
     ) {
-      const data = await ctx.runQuery(functions.eventDirectory.searchEventDirectory, {
+      const data = await ctx.runMutation(functions.eventDirectory.searchEventDirectory, {
         eventId: requirePathId(route[1], 'eventId'),
         filters: {
           q: optionalQueryParam(url.searchParams, 'q'),
@@ -345,7 +345,7 @@ export async function handleNetworkingHttpRequest(
       route[2] === 'contact-reveals' &&
       route.length === 4
     ) {
-      const data = await ctx.runQuery(functions.eventContactReveal.getEventContactReveal, {
+      const data = await ctx.runMutation(functions.eventContactReveal.getEventContactReveal, {
         eventId: requirePathId(route[1], 'eventId'),
         intentId: requirePathId(route[3], 'intentId'),
         ownerSessionToken: requireEventOwnerToken(request.headers.get('Authorization')),
@@ -1048,6 +1048,10 @@ function statusForNetworkingError(code: NetworkingErrorCode) {
 
   if (code === 'invalid_event_owner_token' || code === 'invalid_event_organizer_token') {
     return 401;
+  }
+
+  if (code === 'event_rate_limited') {
+    return 429;
   }
 
   if (

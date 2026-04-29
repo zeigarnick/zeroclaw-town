@@ -1,8 +1,9 @@
 import { v } from 'convex/values';
-import { QueryCtx, query } from '../_generated/server';
+import { MutationCtx, mutation } from '../_generated/server';
 import { networkingError } from './auth';
 import { normalizeEventId } from './eventAgents';
 import { EventPublicCard, EventPublicCardView, toEventPublicCardView } from './eventCards';
+import { enforceEventRateLimit } from './eventRateLimits';
 import { MAX_EVENT_PUBLIC_LIST_ITEMS, MAX_EVENT_PUBLIC_TEXT_LENGTH } from './validators';
 
 export type EventDirectoryFilters = {
@@ -22,7 +23,7 @@ export type SearchEventDirectoryArgs = {
   filters?: EventDirectoryFilters;
 };
 
-export const searchEventDirectory = query({
+export const searchEventDirectory = mutation({
   args: {
     eventId: v.string(),
     filters: v.optional(
@@ -43,11 +44,15 @@ export const searchEventDirectory = query({
 });
 
 export async function searchEventDirectoryHandler(
-  ctx: QueryCtx,
+  ctx: MutationCtx,
   args: SearchEventDirectoryArgs,
 ): Promise<EventPublicCardView[]> {
   const eventId = normalizeEventId(args.eventId);
   const filters = normalizeFilters(args.filters);
+  await enforceEventRateLimit(ctx, 'eventDirectorySearch', [
+    eventId,
+    JSON.stringify(filters),
+  ]);
   const cards = await ctx.db
     .query('eventNetworkingCards')
     .withIndex('by_event_and_status', (q) => q.eq('eventId', eventId).eq('status', 'approved'))
