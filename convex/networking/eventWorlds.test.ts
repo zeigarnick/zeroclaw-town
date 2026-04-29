@@ -3,26 +3,41 @@ import {
 } from './eventWorldTemplates';
 import {
   createEventWorld,
+  ensureEventWorldAvatars,
   ensureEventSpaceWorld,
 } from './eventWorlds';
 
-type TableName = 'eventSpaces' | 'worlds' | 'worldStatus' | 'maps' | 'engines';
+type TableName =
+  | 'eventSpaces'
+  | 'eventAgents'
+  | 'eventNetworkingCards'
+  | 'worlds'
+  | 'worldStatus'
+  | 'maps'
+  | 'engines'
+  | 'inputs';
 type Row = Record<string, any> & { _id: string };
 
 function createMockCtx() {
   const tables: Record<TableName, Row[]> = {
     eventSpaces: [],
+    eventAgents: [],
+    eventNetworkingCards: [],
     worlds: [],
     worldStatus: [],
     maps: [],
     engines: [],
+    inputs: [],
   };
   const counters: Record<TableName, number> = {
     eventSpaces: 0,
+    eventAgents: 0,
+    eventNetworkingCards: 0,
     worlds: 0,
     worldStatus: 0,
     maps: 0,
     engines: 0,
+    inputs: 0,
   };
   const scheduled: Array<{ delayMs: number; args: Record<string, any> }> = [];
 
@@ -66,6 +81,12 @@ function createMockCtx() {
           first: async () => rows[0] ?? null,
           unique: async () => rows[0] ?? null,
           collect: async () => rows,
+          order: (direction: 'asc' | 'desc') => ({
+            first: async () =>
+              [...rows].sort((left, right) =>
+                direction === 'desc' ? right.number - left.number : left.number - right.number,
+              )[0] ?? null,
+          }),
         };
       },
     }),
@@ -221,5 +242,81 @@ describe('event worlds', () => {
     expect(tables.maps.map((map) => map.worldId).sort()).toEqual(
       [first.worldId, second.worldId].sort(),
     );
+  });
+
+  test('enqueues approved event agents as real town avatars idempotently', async () => {
+    const { ctx, tables } = createMockCtx();
+    const eventWorld = await createEventWorld(ctx as any, { now: 123 });
+    const eventSpaceId = await ctx.db.insert('eventSpaces', {
+      eventId: 'demo-event',
+      title: 'Demo Event',
+      worldTemplateId: eventWorld.worldTemplateId,
+      worldTemplateRevision: eventWorld.worldTemplateRevision,
+      worldId: eventWorld.worldId,
+      registrationStatus: 'open',
+      createdAt: 123,
+      updatedAt: 123,
+    });
+    const eventAgentId = await ctx.db.insert('eventAgents', {
+      eventId: 'demo-event',
+      agentIdentifier: 'private-id',
+      publicMarkerSlug: 'public-avatar',
+      displayName: 'Cedar Scout 123',
+      avatarConfig: {
+        hair: 'curly',
+        skinTone: 'tone-3',
+        clothing: 'jacket',
+      },
+      approvalStatus: 'approved',
+      createdAt: 123,
+      updatedAt: 123,
+      approvedAt: 123,
+    });
+    const cardId = await ctx.db.insert('eventNetworkingCards', {
+      eventId: 'demo-event',
+      eventAgentId,
+      publicCard: {
+        role: 'Founder',
+        category: 'Climate',
+        offers: ['GTM help'],
+        wants: ['seed feedback'],
+        hobbies: [],
+        interests: [],
+        favoriteMedia: [],
+      },
+      status: 'approved',
+      createdAt: 123,
+      updatedAt: 123,
+      approvedAt: 123,
+    });
+    await ctx.db.patch(eventAgentId, { activeCardId: cardId });
+
+    const first = await ensureEventWorldAvatars(
+      ctx as any,
+      (await ctx.db.get(eventSpaceId)) as any,
+      { now: 456 },
+    );
+    const second = await ensureEventWorldAvatars(
+      ctx as any,
+      (await ctx.db.get(eventSpaceId)) as any,
+      { now: 789 },
+    );
+
+    expect(first).toEqual({ enqueued: 1, skipped: 0 });
+    expect(second).toEqual({ enqueued: 0, skipped: 1 });
+    expect(tables.inputs).toEqual([
+      expect.objectContaining({
+        engineId: eventWorld.engineId,
+        number: 0,
+        name: 'createEventAgentAvatar',
+        args: expect.objectContaining({
+          eventAgentId,
+          displayName: 'Cedar Scout 123',
+          description: expect.stringContaining('Offers: GTM help'),
+          character: expect.stringMatching(/^f[1-8]$/),
+        }),
+      }),
+    ]);
+    expect(JSON.stringify(tables.inputs)).not.toContain('private-id');
   });
 });

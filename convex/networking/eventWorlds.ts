@@ -2,12 +2,14 @@ import { internal } from '../_generated/api';
 import { Doc, Id } from '../_generated/dataModel';
 import { MutationCtx } from '../_generated/server';
 import { createEngine } from '../aiTown/main';
+import { insertInput } from '../aiTown/insertInput';
 import { ENGINE_ACTION_DURATION } from '../constants';
 import {
   DEFAULT_EVENT_WORLD_TEMPLATE_ID,
   resolveEventWorldTemplate,
 } from './eventWorldTemplates';
 import { EventWorldTemplateId } from './validators';
+import type { EventAvatarConfig, EventPublicCard } from './eventCards';
 
 type EventWorldSelection = {
   worldTemplateId?: EventWorldTemplateId;
@@ -110,6 +112,60 @@ export async function ensureEventSpaceWorld(
   return updated;
 }
 
+export async function ensureEventWorldAvatars(
+  ctx: MutationCtx,
+  eventSpace: Doc<'eventSpaces'>,
+  selection: { now?: number } = {},
+) {
+  const now = selection.now ?? Date.now();
+  const space = eventSpace.worldId
+    ? eventSpace
+    : await ensureEventSpaceWorld(ctx, eventSpace, { now });
+  if (!space.worldId) {
+    return { enqueued: 0, skipped: 0 };
+  }
+  const worldStatus = await ctx.db
+    .query('worldStatus')
+    .withIndex('worldId', (q) => q.eq('worldId', space.worldId!))
+    .first();
+  if (!worldStatus) {
+    return { enqueued: 0, skipped: 0 };
+  }
+
+  const pendingInputs = await ctx.db
+    .query('inputs')
+    .withIndex('byInputNumber', (q) => q.eq('engineId', worldStatus.engineId))
+    .collect();
+  const agents = await ctx.db
+    .query('eventAgents')
+    .withIndex('by_event_and_status', (q) =>
+      q.eq('eventId', space.eventId).eq('approvalStatus', 'approved'),
+    )
+    .collect();
+
+  let enqueued = 0;
+  let skipped = 0;
+  for (const agent of agents) {
+    if (agent.townPlayerId || hasPendingEventAvatarInput(pendingInputs, agent._id)) {
+      skipped += 1;
+      continue;
+    }
+    const card = agent.activeCardId ? await ctx.db.get(agent.activeCardId) : null;
+    if (!card || card.eventId !== space.eventId || card.status !== 'approved') {
+      skipped += 1;
+      continue;
+    }
+    await insertInput(ctx, space.worldId, 'createEventAgentAvatar', {
+      eventAgentId: agent._id,
+      displayName: agent.displayName,
+      description: describeEventAvatar(agent.avatarConfig, card.publicCard),
+      character: characterForEventAgent(`${agent.eventId}:${agent.publicMarkerSlug ?? agent._id}`),
+    });
+    enqueued += 1;
+  }
+  return { enqueued, skipped };
+}
+
 export async function syncEventWorldMapByWorldId(
   ctx: MutationCtx,
   worldId: Id<'worlds'>,
@@ -162,4 +218,43 @@ export async function syncEventWorldMapFromTemplate(
     updatedAt: selection.now ?? Date.now(),
   });
   return true;
+}
+
+function hasPendingEventAvatarInput(
+  inputs: Array<{ name: string; args?: any; returnValue?: unknown }>,
+  eventAgentId: Id<'eventAgents'>,
+) {
+  return inputs.some(
+    (input) =>
+      input.name === 'createEventAgentAvatar' &&
+      !input.returnValue &&
+      input.args?.eventAgentId === eventAgentId,
+  );
+}
+
+function describeEventAvatar(avatar: EventAvatarConfig, card: EventPublicCard) {
+  const cardParts = [
+    card.role ? `Role: ${card.role}` : undefined,
+    card.category ? `Category: ${card.category}` : undefined,
+    card.offers.length > 0 ? `Offers: ${card.offers.join(', ')}` : undefined,
+    card.wants.length > 0 ? `Wants: ${card.wants.join(', ')}` : undefined,
+    card.lookingFor ? `Looking for: ${card.lookingFor}` : undefined,
+  ].filter(Boolean);
+  const avatarParts = [
+    `Hair: ${avatar.hair}`,
+    `Skin tone: ${avatar.skinTone}`,
+    `Clothing: ${avatar.clothing}`,
+    avatar.hat ? `Hat: ${avatar.hat}` : undefined,
+    avatar.accessory ? `Accessory: ${avatar.accessory}` : undefined,
+  ].filter(Boolean);
+  return [...avatarParts, ...cardParts].join(' | ');
+}
+
+function characterForEventAgent(seed: string) {
+  const characters = ['f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8'];
+  let hash = 0;
+  for (const char of seed) {
+    hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+  }
+  return characters[hash % characters.length];
 }

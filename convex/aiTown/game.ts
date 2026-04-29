@@ -46,6 +46,12 @@ const gameStateDiff = v.object({
       playerId,
     }),
   ),
+  eventAvatarLinks: v.array(
+    v.object({
+      eventAgentId: v.id('eventAgents'),
+      playerId,
+    }),
+  ),
 });
 type GameStateDiff = Infer<typeof gameStateDiff>;
 
@@ -67,6 +73,10 @@ export class Game extends AbstractGame {
   pendingOperations: Array<{ name: string; args: any }> = [];
   pendingNetworkingAvatarLinks: Array<{
     networkAgentId: Id<'networkAgents'>;
+    playerId: GameId<'players'>;
+  }> = [];
+  pendingEventAvatarLinks: Array<{
+    eventAgentId: Id<'eventAgents'>;
     playerId: GameId<'players'>;
   }> = [];
 
@@ -168,6 +178,10 @@ export class Game extends AbstractGame {
     this.pendingNetworkingAvatarLinks.push({ networkAgentId, playerId });
   }
 
+  linkEventAvatar(eventAgentId: Id<'eventAgents'>, playerId: GameId<'players'>) {
+    this.pendingEventAvatarLinks.push({ eventAgentId, playerId });
+  }
+
   handleInput<Name extends InputNames>(now: number, name: Name, args: InputArgs<Name>) {
     const handler = inputs[name]?.handler;
     if (!handler) {
@@ -251,9 +265,11 @@ export class Game extends AbstractGame {
       world: { ...this.world.serialize(), historicalLocations },
       agentOperations: this.pendingOperations,
       networkingAvatarLinks: this.pendingNetworkingAvatarLinks,
+      eventAvatarLinks: this.pendingEventAvatarLinks,
     };
     this.pendingOperations = [];
     this.pendingNetworkingAvatarLinks = [];
+    this.pendingEventAvatarLinks = [];
     if (this.descriptionsModified) {
       result.playerDescriptions = serializeMap(this.playerDescriptions);
       result.agentDescriptions = serializeMap(this.agentDescriptions);
@@ -321,6 +337,17 @@ export class Game extends AbstractGame {
         continue;
       }
       await ctx.db.patch(networkAgent._id, {
+        townPlayerId: link.playerId,
+        updatedAt: Date.now(),
+      });
+    }
+
+    for (const link of diff.eventAvatarLinks) {
+      const eventAgent = await ctx.db.get(link.eventAgentId);
+      if (!eventAgent) {
+        continue;
+      }
+      await ctx.db.patch(eventAgent._id, {
         townPlayerId: link.playerId,
         updatedAt: Date.now(),
       });

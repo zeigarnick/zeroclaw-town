@@ -1,7 +1,8 @@
 import { ObjectType, v } from 'convex/values';
 import { GameId, parseGameId } from './ids';
 import { agentId, conversationId, playerId } from './ids';
-import { serializedPlayer } from './player';
+import { Player, serializedPlayer } from './player';
+import { Conversation } from './conversation';
 import { Game } from './game';
 import {
   ACTION_TIMEOUT,
@@ -22,10 +23,12 @@ import { distance } from '../util/geometry';
 import { internal } from '../_generated/api';
 import { movePlayer } from './movement';
 import { insertInput } from './insertInput';
+import { Id } from '../_generated/dataModel';
 
 export class Agent {
   id: GameId<'agents'>;
   playerId: GameId<'players'>;
+  eventAgentId?: Id<'eventAgents'>;
   toRemember?: GameId<'conversations'>;
   lastConversation?: number;
   lastInviteAttempt?: number;
@@ -36,10 +39,12 @@ export class Agent {
   };
 
   constructor(serialized: SerializedAgent) {
-    const { id, lastConversation, lastInviteAttempt, inProgressOperation } = serialized;
+    const { id, eventAgentId, lastConversation, lastInviteAttempt, inProgressOperation } =
+      serialized;
     const playerId = parseGameId('players', serialized.playerId);
     this.id = parseGameId('agents', id);
     this.playerId = playerId;
+    this.eventAgentId = eventAgentId;
     this.toRemember =
       serialized.toRemember !== undefined
         ? parseGameId('conversations', serialized.toRemember)
@@ -63,6 +68,10 @@ export class Agent {
       delete this.inProgressOperation;
     }
     const conversation = game.world.playerConversation(player);
+    if (this.eventAgentId) {
+      this.tickEventAgent(game, now, player, conversation);
+      return;
+    }
     const member = conversation?.participants.get(player.id);
 
     const recentlyAttemptedInvite =
@@ -235,6 +244,24 @@ export class Agent {
     }
   }
 
+  tickEventAgent(game: Game, now: number, player: Player, conversation: Conversation | undefined) {
+    if (conversation) {
+      conversation.leave(game, now, player);
+      return;
+    }
+    const doingActivity = player.activity && player.activity.until > now;
+    if (player.pathfinding || doingActivity) {
+      return;
+    }
+    this.startOperation(game, now, 'agentDoSomething', {
+      worldId: game.worldId,
+      player: player.serialize(),
+      otherFreePlayers: [],
+      agent: this.serialize(),
+      map: game.worldMap.serialize(),
+    });
+  }
+
   startOperation<Name extends keyof AgentOperations>(
     game: Game,
     now: number,
@@ -260,6 +287,7 @@ export class Agent {
     return {
       id: this.id,
       playerId: this.playerId,
+      eventAgentId: this.eventAgentId,
       toRemember: this.toRemember,
       lastConversation: this.lastConversation,
       lastInviteAttempt: this.lastInviteAttempt,
@@ -271,6 +299,7 @@ export class Agent {
 export const serializedAgent = {
   id: agentId,
   playerId: playerId,
+  eventAgentId: v.optional(v.id('eventAgents')),
   toRemember: v.optional(conversationId),
   lastConversation: v.optional(v.number()),
   lastInviteAttempt: v.optional(v.number()),

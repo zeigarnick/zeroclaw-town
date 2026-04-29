@@ -9,7 +9,7 @@ import { engineInsertInput } from './engine/abstractGame';
 import { hashSecret, networkingError } from './networking/auth';
 import { Doc, Id } from './_generated/dataModel';
 import { pruneDefaultWorldNpcsHandler, pruneWorldNpcs, townNpcsEnabled } from './townNpcs';
-import { syncEventWorldMapByWorldId } from './networking/eventWorlds';
+import { ensureEventWorldAvatars, syncEventWorldMapByWorldId } from './networking/eventWorlds';
 
 const HUMAN_INPUT_NAMES = new Set([
   'moveTo',
@@ -88,6 +88,13 @@ export const heartbeatWorld = mutation({
     }
     if (!worldStatus.isDefault) {
       await syncEventWorldMapByWorldId(ctx, worldStatus.worldId, { now });
+      const eventSpace = await ctx.db
+        .query('eventSpaces')
+        .withIndex('by_world_id', (q) => q.eq('worldId', worldStatus.worldId))
+        .first();
+      if (eventSpace) {
+        await ensureEventWorldAvatars(ctx, eventSpace, { now });
+      }
     }
   },
 });

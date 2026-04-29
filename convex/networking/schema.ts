@@ -1,5 +1,6 @@
 import { defineTable } from 'convex/server';
 import { v } from 'convex/values';
+import { playerId } from '../aiTown/ids';
 import { EMBEDDING_DIMENSION } from '../util/llm';
 import {
   cardStatusValidator,
@@ -298,6 +299,7 @@ export const networkingTables = {
     approvalStatus: eventAgentStatusValidator,
     ownerSessionId: v.optional(v.id('eventOwnerSessions')),
     activeCardId: v.optional(v.id('eventNetworkingCards')),
+    townPlayerId: v.optional(playerId),
     createdAt: v.number(),
     updatedAt: v.number(),
     approvedAt: v.optional(v.number()),

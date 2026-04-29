@@ -198,4 +198,52 @@ export const agentInputs = {
       return { agentId, playerId };
     },
   }),
+  createEventAgentAvatar: inputHandler({
+    args: {
+      eventAgentId: v.id('eventAgents'),
+      displayName: v.string(),
+      description: v.string(),
+      character: v.string(),
+    },
+    handler: (game, now, args) => {
+      const existingAgent = [...game.world.agents.values()].find(
+        (agent) => agent.eventAgentId === args.eventAgentId,
+      );
+      if (existingAgent) {
+        game.linkEventAvatar(args.eventAgentId as Id<'eventAgents'>, existingAgent.playerId);
+        return { playerId: existingAgent.playerId };
+      }
+
+      const playerId = Player.join(
+        game,
+        now,
+        args.displayName,
+        args.character,
+        args.description,
+      );
+      const agentId = game.allocId('agents');
+      game.world.agents.set(
+        agentId,
+        new Agent({
+          id: agentId,
+          playerId,
+          eventAgentId: args.eventAgentId as Id<'eventAgents'>,
+          inProgressOperation: undefined,
+          lastConversation: undefined,
+          lastInviteAttempt: undefined,
+          toRemember: undefined,
+        }),
+      );
+      game.agentDescriptions.set(
+        agentId,
+        new AgentDescription({
+          agentId,
+          identity: args.description,
+          plan: 'Wander the event space and move toward approved matches.',
+        }),
+      );
+      game.linkEventAvatar(args.eventAgentId as Id<'eventAgents'>, playerId);
+      return { agentId, playerId };
+    },
+  }),
 };

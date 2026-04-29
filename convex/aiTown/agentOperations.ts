@@ -110,6 +110,19 @@ export const agentDoSomething = internalAction({
     const recentlyAttemptedInvite =
       agent.lastInviteAttempt && now < agent.lastInviteAttempt + CONVERSATION_COOLDOWN;
     const recentActivity = player.activity && now < player.activity.until + ACTIVITY_COOLDOWN;
+    if (agent.eventAgentId) {
+      await sleep(Math.random() * 1000);
+      await ctx.runMutation(internal.aiTown.main.sendInput, {
+        worldId: args.worldId,
+        name: 'finishDoSomething',
+        args: {
+          operationId: args.operationId,
+          agentId: agent.id,
+          destination: wanderDestination(map),
+        },
+      });
+      return;
+    }
     // Decide whether to do an activity or wander somewhere.
     if (!player.pathfinding) {
       if (recentActivity || justLeftConversation) {

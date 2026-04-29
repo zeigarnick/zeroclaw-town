@@ -11,7 +11,7 @@ import {
   normalizeEventPublicCard,
   toEventPublicCardView,
 } from './eventCards';
-import { createEventWorld, ensureEventSpaceWorld } from './eventWorlds';
+import { createEventWorld, ensureEventSpaceWorld, ensureEventWorldAvatars } from './eventWorlds';
 import { writeEventOrganizerAuditEvent } from './eventOrganizerControls';
 import { enforceEventRateLimit } from './eventRateLimits';
 import { createPublicEventMarkerSlug, ensurePublicEventMarkerSlug } from './eventMarkerIdentity';
@@ -261,6 +261,10 @@ export async function decideOwnerReviewHandler(
     updatedAt: now,
     decidedAt: now,
   });
+  if (decision === 'approved') {
+    const eventSpace = await getOrCreateEventSpace(ctx, session.eventId, now);
+    await ensureEventWorldAvatars(ctx, eventSpace, { now });
+  }
 
   const updatedSession = await ctx.db.get(session._id);
   const updatedAgent = await ctx.db.get(agent._id);
