@@ -68,6 +68,14 @@ const functions = {
     createEventConnectionIntent: makeFunctionReference<'mutation'>(
       'networking/eventConnectionIntents:createEventConnectionIntent',
     ),
+    listEventInboundIntents: makeFunctionReference<'query'>(
+      'networking/eventConnectionIntents:listEventInboundIntents',
+    ),
+  },
+  eventRecipientRules: {
+    upsertEventRecipientRules: makeFunctionReference<'mutation'>(
+      'networking/eventRecipientRules:upsertEventRecipientRules',
+    ),
   },
   cards: {
     createCard: makeFunctionReference<'mutation'>('networking/cards:createCard'),
@@ -222,6 +230,38 @@ export async function handleNetworkingHttpRequest(
           targetAgentId: requireString(body.targetAgentId, 'targetAgentId'),
         },
       );
+      return jsonSuccess(data);
+    }
+
+    if (
+      request.method === 'GET' &&
+      route[0] === 'events' &&
+      route[2] === 'agents' &&
+      route[4] === 'inbound-intents' &&
+      route.length === 5
+    ) {
+      const data = await ctx.runQuery(functions.eventConnectionIntents.listEventInboundIntents, {
+        eventId: requirePathId(route[1], 'eventId'),
+        targetAgentId: requirePathId(route[3], 'targetAgentId'),
+      });
+      return jsonSuccess(data);
+    }
+
+    if (
+      request.method === 'POST' &&
+      route[0] === 'events' &&
+      route[2] === 'agents' &&
+      route[4] === 'recipient-rules' &&
+      route.length === 5
+    ) {
+      const body = await parseJsonObject(request);
+      requireExactBodyKeys(body, ['rules']);
+      const rules = parseRecipientRules(body.rules);
+      const data = await ctx.runMutation(functions.eventRecipientRules.upsertEventRecipientRules, {
+        eventId: requirePathId(route[1], 'eventId'),
+        eventAgentId: requirePathId(route[3], 'eventAgentId'),
+        rules,
+      });
       return jsonSuccess(data);
     }
 
@@ -532,6 +572,27 @@ function parseOwnerMetadata(value: unknown): OwnerMetadata | undefined {
     xProfileUrl: optionalString(owner.xProfileUrl, 'owner.xProfileUrl'),
     verificationMethod: optionalVerificationMethod(owner.verificationMethod),
     websiteUrl: optionalString(owner.websiteUrl, 'owner.websiteUrl'),
+  };
+}
+
+function parseRecipientRules(value: unknown) {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new RouteError('invalid_request', 'rules must be an object.', 400);
+  }
+  const rules = value as Record<string, unknown>;
+  requireExactBodyKeys(rules, [
+    'blockedAgentIds',
+    'allowedCategories',
+    'blockedCategories',
+    'requiredKeywords',
+    'blockedKeywords',
+  ]);
+  return {
+    blockedAgentIds: optionalStringArray(rules.blockedAgentIds, 'rules.blockedAgentIds'),
+    allowedCategories: optionalStringArray(rules.allowedCategories, 'rules.allowedCategories'),
+    blockedCategories: optionalStringArray(rules.blockedCategories, 'rules.blockedCategories'),
+    requiredKeywords: optionalStringArray(rules.requiredKeywords, 'rules.requiredKeywords'),
+    blockedKeywords: optionalStringArray(rules.blockedKeywords, 'rules.blockedKeywords'),
   };
 }
 

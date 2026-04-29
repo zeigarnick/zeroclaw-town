@@ -354,6 +354,94 @@ describe('networking HTTP helpers', () => {
     });
   });
 
+  test('routes inbound intent review and recipient rules endpoints', async () => {
+    const calls: Array<{ kind: string; args: any }> = [];
+    const inboundResponse = await handleNetworkingHttpRequest(
+      {
+        runMutation: async () => {
+          throw new Error('unexpected mutation');
+        },
+        runQuery: async (_funcRef, args) => {
+          calls.push({ kind: 'query', args });
+          return [
+            {
+              intent: {
+                id: 'eventConnectionIntents:1',
+                status: 'pending_recipient_review',
+              },
+              requester: {
+                eventAgentId: args.targetAgentId,
+                displayName: 'Cedar Scout 123',
+              },
+            },
+          ];
+        },
+      },
+      new Request(
+        'https://town.example/api/v1/events/demo-event/agents/eventAgents:2/inbound-intents',
+        {
+          method: 'GET',
+        },
+      ),
+    );
+
+    expect(inboundResponse.status).toBe(200);
+    expect(calls[0]).toMatchObject({
+      kind: 'query',
+      args: {
+        eventId: 'demo-event',
+        targetAgentId: 'eventAgents:2',
+      },
+    });
+
+    const rulesResponse = await handleNetworkingHttpRequest(
+      {
+        runMutation: async (_funcRef, args) => {
+          calls.push({ kind: 'mutation', args });
+          return { eventAgentId: args.eventAgentId, rules: args.rules };
+        },
+        runQuery: async () => {
+          throw new Error('unexpected query');
+        },
+      },
+      new Request(
+        'https://town.example/api/v1/events/demo-event/agents/eventAgents:2/recipient-rules',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            rules: {
+              blockedAgentIds: ['eventAgents:9'],
+              requiredKeywords: ['climate'],
+            },
+          }),
+        },
+      ),
+    );
+
+    expect(rulesResponse.status).toBe(200);
+    expect(await readJson(rulesResponse)).toEqual({
+      success: true,
+      data: {
+        eventAgentId: 'eventAgents:2',
+        rules: {
+          blockedAgentIds: ['eventAgents:9'],
+          requiredKeywords: ['climate'],
+        },
+      },
+    });
+    expect(calls[1]).toMatchObject({
+      kind: 'mutation',
+      args: {
+        eventId: 'demo-event',
+        eventAgentId: 'eventAgents:2',
+        rules: {
+          blockedAgentIds: ['eventAgents:9'],
+          requiredKeywords: ['climate'],
+        },
+      },
+    });
+  });
+
   test('wraps representative route errors in stable JSON envelopes', async () => {
     const response = await handleNetworkingHttpRequest(
       {

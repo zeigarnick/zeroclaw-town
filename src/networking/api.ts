@@ -248,10 +248,34 @@ export interface EventConnectionIntent {
   updatedAt: number;
 }
 
+export interface EventInboundIntentReview {
+  intent: EventConnectionIntent;
+  requester: EventDirectoryResult;
+}
+
 export interface CreateEventConnectionIntentRequest {
   eventId: string;
   requesterAgentId: string;
   targetAgentId: string;
+}
+
+export interface GetEventInboundIntentsRequest {
+  eventId: string;
+  targetAgentId: string;
+}
+
+export interface EventRecipientRules {
+  blockedAgentIds?: string[];
+  allowedCategories?: string[];
+  blockedCategories?: string[];
+  requiredKeywords?: string[];
+  blockedKeywords?: string[];
+}
+
+export interface UpsertEventRecipientRulesRequest {
+  eventId: string;
+  eventAgentId: string;
+  rules: EventRecipientRules;
 }
 
 export type EventOwnerReviewStatus =
@@ -339,6 +363,10 @@ export interface IApiAdapter {
   createEventConnectionIntent(
     req: CreateEventConnectionIntentRequest,
   ): Promise<ApiResponse<EventConnectionIntent>>;
+  getEventInboundIntents(
+    req: GetEventInboundIntentsRequest,
+  ): Promise<ApiResponse<EventInboundIntentReview[]>>;
+  upsertEventRecipientRules(req: UpsertEventRecipientRulesRequest): Promise<ApiResponse<unknown>>;
 }
 
 type FetchLike = typeof fetch;
@@ -626,6 +654,14 @@ function normalizeEventConnectionIntent(value: unknown): EventConnectionIntent {
     },
     createdAt: typeof row.createdAt === 'number' ? row.createdAt : 0,
     updatedAt: typeof row.updatedAt === 'number' ? row.updatedAt : 0,
+  };
+}
+
+function normalizeEventInboundIntentReview(value: unknown): EventInboundIntentReview {
+  const row = asRecord(value);
+  return {
+    intent: normalizeEventConnectionIntent(row.intent),
+    requester: normalizeEventDirectoryResult(row.requester),
   };
 }
 
@@ -974,6 +1010,38 @@ export class HttpApiAdapter implements IApiAdapter {
       return response;
     }
     return { success: true, data: normalizeEventConnectionIntent(response.data) };
+  }
+
+  async getEventInboundIntents(
+    req: GetEventInboundIntentsRequest,
+  ): Promise<ApiResponse<EventInboundIntentReview[]>> {
+    const response = await this.request<unknown[]>(
+      `/events/${req.eventId}/agents/${req.targetAgentId}/inbound-intents`,
+      {
+        method: 'GET',
+      },
+    );
+    if (!response.success) {
+      return response;
+    }
+    return {
+      success: true,
+      data: response.data.map((item) => normalizeEventInboundIntentReview(item)),
+    };
+  }
+
+  async upsertEventRecipientRules(
+    req: UpsertEventRecipientRulesRequest,
+  ): Promise<ApiResponse<unknown>> {
+    return await this.request<unknown>(
+      `/events/${req.eventId}/agents/${req.eventAgentId}/recipient-rules`,
+      {
+        method: 'POST',
+        body: {
+          rules: req.rules,
+        },
+      },
+    );
   }
 
   private async request<T>(

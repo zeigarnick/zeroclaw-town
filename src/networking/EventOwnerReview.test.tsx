@@ -54,6 +54,8 @@ function createApiAdapter(overrides: Partial<IApiAdapter> = {}): IApiAdapter {
     reviewEventOwnerCard: jest.fn<any>(),
     searchEventDirectory: jest.fn<any>(),
     createEventConnectionIntent: jest.fn<any>(),
+    getEventInboundIntents: jest.fn<any>(),
+    upsertEventRecipientRules: jest.fn<any>(),
     ...overrides,
   };
 }

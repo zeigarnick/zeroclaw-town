@@ -1,8 +1,10 @@
 import { v } from 'convex/values';
 import { Doc, Id } from '../_generated/dataModel';
-import { MutationCtx, mutation } from '../_generated/server';
+import { MutationCtx, QueryCtx, mutation, query } from '../_generated/server';
 import { networkingError } from './auth';
 import { normalizeEventId } from './eventAgents';
+import { EventPublicCardView, toEventPublicCardView } from './eventCards';
+import { evaluateRecipientRules } from './eventRecipientRules';
 import { EventConnectionIntentStatus } from './validators';
 
 export type EventConnectionIntentView = {
@@ -20,6 +22,11 @@ export type EventConnectionIntentView = {
   updatedAt: number;
 };
 
+export type EventInboundIntentReview = {
+  intent: EventConnectionIntentView;
+  requester: EventPublicCardView;
+};
+
 type CreateEventConnectionIntentArgs = {
   eventId: string;
   requesterAgentId: Id<'eventAgents'>;
@@ -35,6 +42,14 @@ export const createEventConnectionIntent = mutation({
     targetAgentId: v.id('eventAgents'),
   },
   handler: (ctx, args) => createEventConnectionIntentHandler(ctx, args),
+});
+
+export const listEventInboundIntents = query({
+  args: {
+    eventId: v.string(),
+    targetAgentId: v.id('eventAgents'),
+  },
+  handler: (ctx, args) => listEventInboundIntentsHandler(ctx, args),
 });
 
 export async function createEventConnectionIntentHandler(
@@ -60,6 +75,12 @@ export async function createEventConnectionIntentHandler(
     getApprovedActiveCard(ctx, requester),
     getApprovedActiveCard(ctx, target),
   ]);
+  const filterResult = await evaluateRecipientRules(ctx, {
+    eventId,
+    requesterAgent: requester,
+    requesterCard,
+    recipientAgent: target,
+  });
   const dedupeKey = getIntentDedupeKey(eventId, requester._id, target._id);
   const existing = await ctx.db
     .query('eventConnectionIntents')
@@ -79,13 +100,9 @@ export async function createEventConnectionIntentHandler(
     targetAgentId: target._id,
     requesterCardId: requesterCard._id,
     targetCardId: targetCard._id,
-    status: 'pending_recipient_review',
+    status: filterResult.allowed ? 'pending_recipient_review' : 'auto_rejected',
     dedupeKey,
-    filterResult: {
-      allowed: true,
-      reasons: ['no_recipient_rules_configured'],
-      evaluatedAt: now,
-    },
+    filterResult,
     auditMetadata: {
       source: 'event_connection_intent_api',
       requesterOwnerApprovalExternal: true,
@@ -101,6 +118,49 @@ export async function createEventConnectionIntentHandler(
     );
   }
   return toEventConnectionIntentView(intent);
+}
+
+export async function listEventInboundIntentsHandler(
+  ctx: QueryCtx,
+  args: { eventId: string; targetAgentId: Id<'eventAgents'> },
+): Promise<EventInboundIntentReview[]> {
+  const eventId = normalizeEventId(args.eventId);
+  const target = await ctx.db.get(args.targetAgentId);
+  assertApprovedEventAgent(target, eventId, 'targetAgentId');
+
+  const intents = await ctx.db
+    .query('eventConnectionIntents')
+    .withIndex('by_target_and_status', (q) =>
+      q.eq('targetAgentId', args.targetAgentId).eq('status', 'pending_recipient_review'),
+    )
+    .collect();
+
+  const reviews: EventInboundIntentReview[] = [];
+  for (const intent of intents) {
+    if (intent.eventId !== eventId) {
+      continue;
+    }
+    const [requesterAgent, requesterCard] = await Promise.all([
+      ctx.db.get(intent.requesterAgentId),
+      ctx.db.get(intent.requesterCardId),
+    ]);
+    if (
+      !requesterAgent ||
+      !requesterCard ||
+      requesterAgent.approvalStatus !== 'approved' ||
+      requesterCard.status !== 'approved' ||
+      requesterAgent.eventId !== eventId ||
+      requesterCard.eventId !== eventId
+    ) {
+      continue;
+    }
+    reviews.push({
+      intent: toEventConnectionIntentView(intent),
+      requester: toEventPublicCardView(requesterAgent, requesterCard),
+    });
+  }
+
+  return reviews.sort((left, right) => right.intent.createdAt - left.intent.createdAt);
 }
 
 export function toEventConnectionIntentView(

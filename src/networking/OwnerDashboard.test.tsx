@@ -274,6 +274,89 @@ describe('OwnerDashboard HttpApiAdapter', () => {
     });
   });
 
+  test('lists inbound event intents and upserts compact recipient rules', async () => {
+    const fetchMock = createFetchMock(
+      {
+        body: {
+          success: true,
+          data: [
+            {
+              intent: {
+                _id: 'eventConnectionIntents:1',
+                eventId: 'demo-event',
+                requesterAgentId: 'eventAgents:1',
+                targetAgentId: 'eventAgents:2',
+                status: 'pending_recipient_review',
+                filterResult: {
+                  allowed: true,
+                  reasons: ['recipient_rules_allowed'],
+                  evaluatedAt: 1710000000000,
+                },
+                createdAt: 1710000000000,
+                updatedAt: 1710000000000,
+              },
+              requester: {
+                _id: 'eventNetworkingCards:1',
+                eventId: 'demo-event',
+                eventAgentId: 'eventAgents:1',
+                displayName: 'Cedar Scout 123',
+                avatarConfig: {
+                  hair: 'curly',
+                  skinTone: 'tone-3',
+                  clothing: 'jacket',
+                },
+                publicCard: {
+                  role: 'Founder',
+                  offers: ['GTM help'],
+                },
+                updatedAt: 1710000000000,
+              },
+            },
+          ],
+        },
+      },
+      {
+        body: {
+          success: true,
+          data: { eventAgentId: 'eventAgents:2' },
+        },
+      },
+    );
+    const adapter = new HttpApiAdapter('/api/v1', fetchMock as typeof fetch);
+
+    const inbound = await adapter.getEventInboundIntents({
+      eventId: 'demo-event',
+      targetAgentId: 'eventAgents:2',
+    });
+    expect(isError(inbound)).toBe(false);
+    if (!isError(inbound)) {
+      expect(inbound.data[0].requester.displayName).toBe('Cedar Scout 123');
+      expect(JSON.stringify(inbound.data)).not.toContain('email');
+    }
+
+    await adapter.upsertEventRecipientRules({
+      eventId: 'demo-event',
+      eventAgentId: 'eventAgents:2',
+      rules: {
+        blockedAgentIds: ['eventAgents:9'],
+        requiredKeywords: ['climate'],
+      },
+    });
+
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      '/api/v1/events/demo-event/agents/eventAgents:2/inbound-intents',
+    );
+    expect(fetchMock.mock.calls[1][0]).toBe(
+      '/api/v1/events/demo-event/agents/eventAgents:2/recipient-rules',
+    );
+    expect(getRequestBody(fetchMock, 1)).toEqual({
+      rules: {
+        blockedAgentIds: ['eventAgents:9'],
+        requiredKeywords: ['climate'],
+      },
+    });
+  });
+
   test('maps meeting request/action routes to recommendationId and meetingId endpoints', async () => {
     const fetchMock = createFetchMock(
       {

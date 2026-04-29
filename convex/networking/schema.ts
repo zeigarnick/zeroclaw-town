@@ -353,6 +353,23 @@ export const networkingTables = {
     .index('by_target_and_status', ['targetAgentId', 'status'])
     .index('by_dedupe_key', ['dedupeKey']),
 
+  eventRecipientRules: defineTable({
+    eventId: v.string(),
+    eventAgentId: v.id('eventAgents'),
+    rules: v.object({
+      blockedAgentIds: v.array(v.id('eventAgents')),
+      allowedCategories: v.array(v.string()),
+      blockedCategories: v.array(v.string()),
+      requiredKeywords: v.array(v.string()),
+      blockedKeywords: v.array(v.string()),
+    }),
+    approvedAt: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index('by_event_agent', ['eventAgentId'])
+    .index('by_event', ['eventId']),
+
   eventAvatarAssets: defineTable({
     category: eventAvatarCategoryValidator,
     assetId: v.string(),

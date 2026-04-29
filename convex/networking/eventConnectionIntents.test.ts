@@ -1,7 +1,15 @@
 import { ConvexError } from 'convex/values';
-import { createEventConnectionIntentHandler } from './eventConnectionIntents';
+import {
+  createEventConnectionIntentHandler,
+  listEventInboundIntentsHandler,
+} from './eventConnectionIntents';
+import { upsertEventRecipientRulesHandler } from './eventRecipientRules';
 
-type TableName = 'eventAgents' | 'eventNetworkingCards' | 'eventConnectionIntents';
+type TableName =
+  | 'eventAgents'
+  | 'eventNetworkingCards'
+  | 'eventConnectionIntents'
+  | 'eventRecipientRules';
 type Row = Record<string, any> & { _id: string };
 
 function createMockCtx() {
@@ -9,11 +17,13 @@ function createMockCtx() {
     eventAgents: [],
     eventNetworkingCards: [],
     eventConnectionIntents: [],
+    eventRecipientRules: [],
   };
   const counters: Record<TableName, number> = {
     eventAgents: 0,
     eventNetworkingCards: 0,
     eventConnectionIntents: 0,
+    eventRecipientRules: 0,
   };
 
   const db = {
@@ -199,5 +209,48 @@ describe('event connection intents', () => {
     ).rejects.toMatchObject({
       data: { code: 'duplicate_event_connection_intent' },
     } satisfies Partial<ConvexError<{ code: string }>>);
+  });
+
+  test('applies recipient rules and excludes auto-rejected intents from inbound review', async () => {
+    const { ctx, tables } = createMockCtx();
+    const requester = await insertAgentWithCard(ctx, { agentIdentifier: 'requester' });
+    const blockedRequester = await insertAgentWithCard(ctx, { agentIdentifier: 'blocked' });
+    const target = await insertAgentWithCard(ctx, { agentIdentifier: 'target' });
+
+    await upsertEventRecipientRulesHandler(ctx as any, {
+      eventId: 'demo-event',
+      eventAgentId: target.agentId as any,
+      rules: {
+        blockedAgentIds: [blockedRequester.agentId as any],
+        requiredKeywords: ['climate'],
+      },
+    });
+
+    const allowed = await createEventConnectionIntentHandler(ctx as any, {
+      eventId: 'demo-event',
+      requesterAgentId: requester.agentId as any,
+      targetAgentId: target.agentId as any,
+    });
+    const rejected = await createEventConnectionIntentHandler(ctx as any, {
+      eventId: 'demo-event',
+      requesterAgentId: blockedRequester.agentId as any,
+      targetAgentId: target.agentId as any,
+    });
+
+    expect(allowed.status).toBe('pending_recipient_review');
+    expect(allowed.filterResult.reasons).toEqual(['recipient_rules_allowed']);
+    expect(rejected.status).toBe('auto_rejected');
+    expect(rejected.filterResult.reasons).toEqual(['requester_blocked_by_recipient_rule']);
+
+    const inbound = await listEventInboundIntentsHandler(ctx as any, {
+      eventId: 'demo-event',
+      targetAgentId: target.agentId as any,
+    });
+
+    expect(inbound).toHaveLength(1);
+    expect(inbound[0].intent.id).toBe(tables.eventConnectionIntents[0]._id);
+    expect(inbound[0].requester.displayName).toContain('Cedar Scout');
+    expect(JSON.stringify(inbound)).not.toContain('agentIdentifier');
+    expect(JSON.stringify(inbound)).not.toContain('contact');
   });
 });
