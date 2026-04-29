@@ -10,8 +10,8 @@
     "allowCrossWaveBatching": false,
     "replanAfterWaveCompletion": true
   },
-  "currentWave": "wave-03",
-  "nextRecommended": "wave-03",
+  "currentWave": "wave-04",
+  "nextRecommended": "wave-04",
   "storyMap": {
     "US-001": "Host Public Event Skill",
     "US-002": "Display QR Code In Town",
