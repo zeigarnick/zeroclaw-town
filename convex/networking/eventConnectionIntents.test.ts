@@ -306,6 +306,21 @@ describe('event connection intents', () => {
     } satisfies Partial<ConvexError<{ code: string }>>);
   });
 
+  test('rejects malformed inbound target IDs as domain errors', async () => {
+    const { ctx } = createMockCtx();
+    (ctx.db as any).normalizeId = () => null;
+
+    await expect(
+      listEventInboundIntentsHandler(ctx as any, {
+        eventId: 'demo-event',
+        targetAgentId: 'eventAgents:2',
+        ownerSessionToken: 'event_owner_target',
+      }),
+    ).rejects.toMatchObject({
+      data: { code: 'event_agent_not_found' },
+    } satisfies Partial<ConvexError<{ code: string }>>);
+  });
+
   test('rejects forged requester owner tokens for intent creation', async () => {
     const { ctx } = createMockCtx();
     const requester = await insertAgentWithCard(ctx, { agentIdentifier: 'requester' });

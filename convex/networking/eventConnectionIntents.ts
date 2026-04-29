@@ -30,8 +30,8 @@ export type EventInboundIntentReview = {
 
 type CreateEventConnectionIntentArgs = {
   eventId: string;
-  requesterAgentId: Id<'eventAgents'>;
-  targetAgentId: Id<'eventAgents'>;
+  requesterAgentId: string;
+  targetAgentId: string;
   requesterOwnerSessionToken: string;
 };
 
@@ -40,8 +40,8 @@ const ACTIVE_INTENT_STATUSES = ['pending_recipient_review', 'recipient_approved'
 export const createEventConnectionIntent = mutation({
   args: {
     eventId: v.string(),
-    requesterAgentId: v.id('eventAgents'),
-    targetAgentId: v.id('eventAgents'),
+    requesterAgentId: v.string(),
+    targetAgentId: v.string(),
     requesterOwnerSessionToken: v.string(),
   },
   handler: (ctx, args) => createEventConnectionIntentHandler(ctx, args),
@@ -50,7 +50,7 @@ export const createEventConnectionIntent = mutation({
 export const listEventInboundIntents = query({
   args: {
     eventId: v.string(),
-    targetAgentId: v.id('eventAgents'),
+    targetAgentId: v.string(),
     ownerSessionToken: v.string(),
   },
   handler: (ctx, args) => listEventInboundIntentsHandler(ctx, args),
@@ -61,7 +61,9 @@ export async function createEventConnectionIntentHandler(
   args: CreateEventConnectionIntentArgs,
 ): Promise<EventConnectionIntentView> {
   const eventId = normalizeEventId(args.eventId);
-  if (args.requesterAgentId === args.targetAgentId) {
+  const requesterAgentId = normalizeEventAgentId(ctx, args.requesterAgentId, 'requesterAgentId');
+  const targetAgentId = normalizeEventAgentId(ctx, args.targetAgentId, 'targetAgentId');
+  if (requesterAgentId === targetAgentId) {
     throw networkingError(
       'invalid_event_connection_intent',
       'requesterAgentId and targetAgentId must be different event agents.',
@@ -69,13 +71,13 @@ export async function createEventConnectionIntentHandler(
   }
   await enforceEventRateLimit(ctx, 'eventConnectionIntent', [
     eventId,
-    args.requesterAgentId,
-    args.targetAgentId,
+    requesterAgentId,
+    targetAgentId,
   ]);
 
   const [requester, target] = await Promise.all([
-    ctx.db.get(args.requesterAgentId),
-    ctx.db.get(args.targetAgentId),
+    ctx.db.get(requesterAgentId),
+    ctx.db.get(targetAgentId),
   ]);
   assertApprovedEventAgent(requester, eventId, 'requesterAgentId');
   assertApprovedEventAgent(target, eventId, 'targetAgentId');
@@ -136,10 +138,11 @@ export async function createEventConnectionIntentHandler(
 
 export async function listEventInboundIntentsHandler(
   ctx: QueryCtx,
-  args: { eventId: string; targetAgentId: Id<'eventAgents'>; ownerSessionToken: string },
+  args: { eventId: string; targetAgentId: string; ownerSessionToken: string },
 ): Promise<EventInboundIntentReview[]> {
   const eventId = normalizeEventId(args.eventId);
-  const target = await ctx.db.get(args.targetAgentId);
+  const targetAgentId = normalizeEventAgentId(ctx, args.targetAgentId, 'targetAgentId');
+  const target = await ctx.db.get(targetAgentId);
   assertApprovedEventAgent(target, eventId, 'targetAgentId');
   await authenticateApprovedEventOwnerSession(ctx, {
     eventId,
@@ -150,7 +153,7 @@ export async function listEventInboundIntentsHandler(
   const intents = await ctx.db
     .query('eventConnectionIntents')
     .withIndex('by_target_and_status', (q) =>
-      q.eq('targetAgentId', args.targetAgentId).eq('status', 'pending_recipient_review'),
+      q.eq('targetAgentId', targetAgentId).eq('status', 'pending_recipient_review'),
     )
     .collect();
 
@@ -239,4 +242,22 @@ function getIntentDedupeKey(
   targetAgentId: Id<'eventAgents'>,
 ) {
   return `${eventId}:${requesterAgentId}->${targetAgentId}`;
+}
+
+function normalizeEventAgentId(
+  ctx: QueryCtx | MutationCtx,
+  value: string,
+  fieldName: string,
+): Id<'eventAgents'> {
+  const normalizeId = (ctx.db as { normalizeId?: QueryCtx['db']['normalizeId'] }).normalizeId;
+  const eventAgentId = normalizeId
+    ? normalizeId('eventAgents', value)
+    : (value as Id<'eventAgents'>);
+  if (!eventAgentId) {
+    throw networkingError(
+      'event_agent_not_found',
+      `${fieldName} must reference an event agent in this event.`,
+    );
+  }
+  return eventAgentId;
 }
