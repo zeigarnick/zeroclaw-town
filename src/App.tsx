@@ -8,37 +8,14 @@ import { useState } from 'react';
 import MusicButton from './components/buttons/MusicButton.tsx';
 import InteractButton from './components/buttons/InteractButton.tsx';
 import FreezeButton from './components/FreezeButton.tsx';
+import { EventInboundReview } from './networking/EventInboundReview.tsx';
 import { EventOwnerReview } from './networking/EventOwnerReview.tsx';
 import { EventQrOverlay } from './networking/EventQrOverlay.tsx';
 import { apiAdapter } from './networking/api.ts';
+import { AppView, parseInitialRoute } from './networking/eventRoutes.ts';
 
-type AppView = 'town' | 'eventReview';
-
-type InitialRoute = {
-  claimToken: string;
-  eventReview?: {
-    eventId: string;
-    reviewToken: string;
-  };
-};
-
-function getInitialRoute(): InitialRoute {
-  const pathname = window.location.pathname.replace(/^\/ai-town(?=\/)/, '');
-  const pathMatch = pathname.match(/^\/claim\/([^/?#]+)/);
-  if (pathMatch) {
-    return { claimToken: decodeURIComponent(pathMatch[1]) };
-  }
-  const eventReviewMatch = pathname.match(/^\/event-review\/([^/?#]+)\/([^/?#]+)/);
-  if (eventReviewMatch) {
-    return {
-      claimToken: '',
-      eventReview: {
-        eventId: decodeURIComponent(eventReviewMatch[1]),
-        reviewToken: decodeURIComponent(eventReviewMatch[2]),
-      },
-    };
-  }
-  return { claimToken: new URLSearchParams(window.location.search).get('claimToken') ?? '' };
+function getInitialRoute() {
+  return parseInitialRoute(window.location.pathname, window.location.search);
 }
 
 function getEventQrConfig() {
@@ -55,7 +32,7 @@ export default function Home() {
   const initialRoute = getInitialRoute();
   const eventQrConfig = getEventQrConfig();
   const [currentView, setCurrentView] = useState<AppView>(
-    initialRoute.eventReview ? 'eventReview' : 'town',
+    initialRoute.eventReview ? 'eventReview' : initialRoute.inboundReview ? 'inboundReview' : 'town',
   );
   return (
     <main className="relative overflow-hidden bg-black font-body" style={{ height: '100dvh' }}>
@@ -100,6 +77,14 @@ export default function Home() {
                   apiAdapter={apiAdapter}
                   eventId={initialRoute.eventReview.eventId}
                   reviewToken={initialRoute.eventReview.reviewToken}
+                />
+              )}
+              {initialRoute.inboundReview && (
+                <EventInboundReview
+                  apiAdapter={apiAdapter}
+                  eventId={initialRoute.inboundReview.eventId}
+                  targetAgentId={initialRoute.inboundReview.targetAgentId}
+                  ownerSessionToken={initialRoute.inboundReview.ownerSessionToken}
                 />
               )}
             </div>
