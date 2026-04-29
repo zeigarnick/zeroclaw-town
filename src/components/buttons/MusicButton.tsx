@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import volumeImg from '../../../assets/volume.svg';
 import { sound } from '@pixi/sound';
-import Button from './Button';
 import { useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 
@@ -55,15 +54,21 @@ export default function MusicButton() {
   }, []);
 
   return (
-    <>
-      <Button
-        onClick={() => void flipSwitch()}
-        className="hidden lg:block"
-        title="Play AI generated music (press m to play/mute)"
-        imgUrl={volumeImg}
-      >
-        {isPlaying ? 'Mute' : 'Music'}
-      </Button>
-    </>
+    <button
+      type="button"
+      onClick={() => void flipSwitch()}
+      className="pointer-events-auto inline-flex size-10 items-center justify-center rounded-md border-2 border-brown-900 bg-brown-900/90 text-white shadow-solid transition hover:bg-clay-700 focus:outline-none focus:ring-2 focus:ring-clay-100"
+      title={isPlaying ? 'Mute music (M)' : 'Play music (M)'}
+      aria-label={isPlaying ? 'Mute music' : 'Play music'}
+      aria-pressed={isPlaying}
+      disabled={!musicUrl}
+    >
+      <img
+        className={isPlaying ? 'size-5 opacity-100' : 'size-5 opacity-80'}
+        src={volumeImg}
+        alt=""
+        aria-hidden="true"
+      />
+    </button>
   );
 }

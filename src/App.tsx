@@ -6,7 +6,6 @@ import { ToastContainer } from 'react-toastify';
 // import LoginButton from './components/buttons/LoginButton.tsx';
 import { useState } from 'react';
 import MusicButton from './components/buttons/MusicButton.tsx';
-import InteractButton from './components/buttons/InteractButton.tsx';
 import FreezeButton from './components/FreezeButton.tsx';
 import { EventInboundReview } from './networking/EventInboundReview.tsx';
 import { EventOwnerReview } from './networking/EventOwnerReview.tsx';
@@ -52,9 +51,10 @@ export default function Home() {
             <Game />
 
             <div className="absolute bottom-4 left-4 z-10 flex flex-wrap gap-3 pointer-events-none">
-              <FreezeButton />
+              <FreezeButton eventId={eventQrConfig.eventId} />
+            </div>
+            <div className="absolute right-4 top-4 z-20 pointer-events-none sm:right-5 sm:top-5">
               <MusicButton />
-              <InteractButton />
             </div>
             <EventQrOverlay
               eventId={eventQrConfig.eventId}

@@ -66,9 +66,12 @@ export const stopAllowed = query({
 });
 
 export const stop = mutation({
-  handler: async (ctx) => {
+  args: {
+    worldId: v.optional(v.id('worlds')),
+  },
+  handler: async (ctx, args) => {
     if (process.env.STOP_NOT_ALLOWED) throw new Error('Stop not allowed');
-    const { worldStatus, engine } = await getDefaultWorld(ctx.db);
+    const { worldStatus, engine } = await getWorldForControl(ctx.db, args.worldId);
     if (worldStatus.status === 'inactive' || worldStatus.status === 'stoppedByDeveloper') {
       if (engine.running) {
         throw new Error(`Engine ${engine._id} isn't stopped?`);
@@ -83,8 +86,11 @@ export const stop = mutation({
 });
 
 export const resume = mutation({
-  handler: async (ctx) => {
-    const { worldStatus, engine } = await getDefaultWorld(ctx.db);
+  args: {
+    worldId: v.optional(v.id('worlds')),
+  },
+  handler: async (ctx, args) => {
+    const { worldStatus, engine } = await getWorldForControl(ctx.db, args.worldId);
     if (worldStatus.status === 'running') {
       if (!engine.running) {
         throw new Error(`Engine ${engine._id} isn't running?`);
@@ -118,6 +124,24 @@ async function getDefaultWorld(db: DatabaseReader) {
     .first();
   if (!worldStatus) {
     throw new Error('No default world found');
+  }
+  const engine = await db.get(worldStatus.engineId);
+  if (!engine) {
+    throw new Error(`Engine ${worldStatus.engineId} not found`);
+  }
+  return { worldStatus, engine };
+}
+
+async function getWorldForControl(db: DatabaseReader, worldId?: Id<'worlds'>) {
+  if (!worldId) {
+    return getDefaultWorld(db);
+  }
+  const worldStatus = await db
+    .query('worldStatus')
+    .withIndex('worldId', (q) => q.eq('worldId', worldId))
+    .first();
+  if (!worldStatus) {
+    throw new Error(`No world status found for ${worldId}`);
   }
   const engine = await db.get(worldStatus.engineId);
   if (!engine) {

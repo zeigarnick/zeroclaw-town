@@ -1,12 +1,23 @@
 import { useMutation, useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import Button from './buttons/Button';
+import { Id } from '../../convex/_generated/dataModel';
 
-export default function FreezeButton() {
+type FreezeWorldStatus = {
+  worldId: Id<'worlds'>;
+  status: 'running' | 'stoppedByDeveloper' | 'inactive';
+} | null | undefined;
+
+export default function FreezeButton({ eventId }: { eventId?: string }) {
   const stopAllowed = useQuery(api.testing.stopAllowed) ?? false;
   const defaultWorld = useQuery(api.world.defaultWorldStatus);
+  const eventWorld = useQuery(
+    api.world.eventWorldStatus,
+    eventId ? { eventId } : 'skip',
+  ) as FreezeWorldStatus;
+  const worldStatus = eventWorld ?? defaultWorld;
 
-  const frozen = defaultWorld?.status === 'stoppedByDeveloper';
+  const frozen = worldStatus?.status === 'stoppedByDeveloper';
 
   const unfreeze = useMutation(api.testing.resume);
   const freeze = useMutation(api.testing.stop);
@@ -14,10 +25,10 @@ export default function FreezeButton() {
   const flipSwitch = async () => {
     if (frozen) {
       console.log('Unfreezing');
-      await unfreeze();
+      await unfreeze(worldStatus?.worldId ? { worldId: worldStatus.worldId } : {});
     } else {
       console.log('Freezing');
-      await freeze();
+      await freeze(worldStatus?.worldId ? { worldId: worldStatus.worldId } : {});
     }
   };
 
