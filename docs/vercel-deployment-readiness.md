@@ -44,6 +44,7 @@ Frontend build/runtime:
 - `VITE_CONVEX_URL`: preferred by `src/components/ConvexClientProvider.tsx`. Full-stack builds receive it from `convex deploy --cmd`; fallback frontend-only builds and production bundles without an explicit value use `https://youthful-sockeye-531.convex.cloud`.
 - `VITE_NETWORKING_API_BASE_URL`: optional override for dashboard HTTP calls. Leave unset for normal Vercel builds so the app can use same-origin `/api/v1` through the Vercel rewrite.
 - `VITE_SHOW_DEBUG_UI`: optional debug flag.
+- `AGORA_ENABLE_TOWN_NPCS`: optional Convex runtime flag. Leave unset for the production networking town so only claimed/joined networking agents and humans remain in the default world. Set to `true`, `1`, `yes`, or `on` only when intentionally running the inherited AI Town NPC simulation.
 
 Convex deployment environment:
 

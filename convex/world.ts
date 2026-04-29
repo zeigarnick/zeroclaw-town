@@ -8,6 +8,7 @@ import { kickEngine, startEngine, stopEngine } from './aiTown/main';
 import { engineInsertInput } from './engine/abstractGame';
 import { hashSecret } from './networking/auth';
 import { Doc, Id } from './_generated/dataModel';
+import { pruneDefaultWorldNpcsHandler, pruneWorldNpcs, townNpcsEnabled } from './townNpcs';
 
 const HUMAN_INPUT_NAMES = new Set([
   'moveTo',
@@ -59,7 +60,23 @@ export const heartbeatWorld = mutation({
       await ctx.db.patch(worldStatus._id, { status: 'running' });
       await startEngine(ctx, worldStatus.worldId);
     }
+    if (worldStatus.isDefault && !townNpcsEnabled()) {
+      await pruneWorldNpcs(ctx, worldStatus.worldId);
+    }
   },
+});
+
+export const pruneDefaultWorldNpcsNow = mutation({
+  handler: async (ctx) => {
+    if (townNpcsEnabled()) {
+      return { skipped: true, reason: 'town_npcs_enabled' as const };
+    }
+    return await pruneDefaultWorldNpcsHandler(ctx);
+  },
+});
+
+export const pruneDefaultWorldNpcs = internalMutation({
+  handler: pruneDefaultWorldNpcsHandler,
 });
 
 export const stopInactiveWorlds = internalMutation({

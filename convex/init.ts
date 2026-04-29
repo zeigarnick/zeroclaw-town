@@ -9,6 +9,7 @@ import { Id } from './_generated/dataModel';
 import { createEngine } from './aiTown/main';
 import { ENGINE_ACTION_DURATION } from './constants';
 import { detectMismatchedLLMProvider } from './util/llm';
+import { pruneDefaultWorldNpcsHandler, townNpcsEnabled } from './townNpcs';
 import type {
   AboveCharacterLayer,
   AnimatedSprite,
@@ -81,6 +82,10 @@ const init = mutation({
   },
   handler: async (ctx, args) => {
     const { worldStatus, engine } = await getOrCreateDefaultWorld(ctx);
+    if (!townNpcsEnabled()) {
+      await pruneDefaultWorldNpcsHandler(ctx);
+      return;
+    }
     if (worldStatus.status !== 'running') {
       console.warn(
         `Engine ${engine._id} is not active! Run "npx convex run testing:resume" to restart it.`,
