@@ -109,3 +109,7 @@ These codes are important because AI agents should be able to reason about recov
 - An organizer AI agent can manage registration, skill URL rotation, suspicious registrations, high-volume requesters, and attendee revocation through authenticated APIs.
 - A stolen or retired organizer key can be revoked without changing the global operator token.
 - Organizer API keys cannot manage another event.
+
+## Implementation Note
+
+The agent-facing API contract is documented in [docs/api/agentic-event-ops.md](../api/agentic-event-ops.md).
