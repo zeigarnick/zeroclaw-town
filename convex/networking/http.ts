@@ -116,6 +116,20 @@ const functions = {
       'networking/eventOrganizerControls:listHighVolumeRequesters',
     ),
   },
+  eventOrganizerCredentials: {
+    redeemOrganizerInvite: makeFunctionReference<'mutation'>(
+      'networking/eventOrganizerCredentials:redeemOrganizerInvite',
+    ),
+    listOrganizerApiKeys: makeFunctionReference<'mutation'>(
+      'networking/eventOrganizerCredentials:listOrganizerApiKeys',
+    ),
+    createOrganizerApiKey: makeFunctionReference<'mutation'>(
+      'networking/eventOrganizerCredentials:createOrganizerApiKey',
+    ),
+    revokeOrganizerApiKey: makeFunctionReference<'mutation'>(
+      'networking/eventOrganizerCredentials:revokeOrganizerApiKey',
+    ),
+  },
   eventOperatorControls: {
     createOrUpdateEvent: makeFunctionReference<'mutation'>(
       'networking/eventOperatorControls:createOrUpdateEvent',
@@ -223,6 +237,67 @@ export async function handleNetworkingHttpRequest(
         inviteBaseUrl: optionalString(body.inviteBaseUrl, 'inviteBaseUrl') ?? `${url.origin}/event-admin/invite`,
         expiresAt: optionalNumber(body.expiresAt, 'expiresAt'),
         expiresInMs: optionalNumber(body.expiresInMs, 'expiresInMs'),
+      });
+      return jsonSuccess(data);
+    }
+
+    if (
+      request.method === 'POST' &&
+      route[0] === 'organizer' &&
+      route[1] === 'invites' &&
+      route[3] === 'redeem' &&
+      route.length === 4
+    ) {
+      const body = await parseJsonObject(request);
+      const data = await ctx.runMutation(functions.eventOrganizerCredentials.redeemOrganizerInvite, {
+        inviteToken: requirePathId(route[2], 'inviteToken'),
+        label: optionalString(body.label, 'label'),
+      });
+      return jsonSuccess(data);
+    }
+
+    if (
+      request.method === 'GET' &&
+      route[0] === 'organizer' &&
+      route[1] === 'events' &&
+      route[3] === 'api-keys' &&
+      route.length === 4
+    ) {
+      const data = await ctx.runMutation(functions.eventOrganizerCredentials.listOrganizerApiKeys, {
+        eventId: requirePathId(route[2], 'eventId'),
+        organizerApiKey: requireEventOrganizerApiKey(request.headers.get('Authorization')),
+      });
+      return jsonSuccess(data);
+    }
+
+    if (
+      request.method === 'POST' &&
+      route[0] === 'organizer' &&
+      route[1] === 'events' &&
+      route[3] === 'api-keys' &&
+      route.length === 4
+    ) {
+      const body = await parseJsonObject(request);
+      const data = await ctx.runMutation(functions.eventOrganizerCredentials.createOrganizerApiKey, {
+        eventId: requirePathId(route[2], 'eventId'),
+        organizerApiKey: requireEventOrganizerApiKey(request.headers.get('Authorization')),
+        label: optionalString(body.label, 'label'),
+      });
+      return jsonSuccess(data);
+    }
+
+    if (
+      request.method === 'POST' &&
+      route[0] === 'organizer' &&
+      route[1] === 'events' &&
+      route[3] === 'api-keys' &&
+      route[5] === 'revoke' &&
+      route.length === 6
+    ) {
+      const data = await ctx.runMutation(functions.eventOrganizerCredentials.revokeOrganizerApiKey, {
+        eventId: requirePathId(route[2], 'eventId'),
+        organizerApiKey: requireEventOrganizerApiKey(request.headers.get('Authorization')),
+        keyId: requirePathId(route[4], 'keyId'),
       });
       return jsonSuccess(data);
     }
@@ -842,6 +917,27 @@ function requireOrganizerToken(authorizationHeader: string | null) {
     throw new RouteError(
       'invalid_event_organizer_token',
       'Authorization header must be in the form: Bearer <organizer-token>.',
+      401,
+    );
+  }
+
+  return token;
+}
+
+function requireEventOrganizerApiKey(authorizationHeader: string | null) {
+  if (!authorizationHeader) {
+    throw new RouteError(
+      'invalid_event_organizer_token',
+      'Authorization header is required. Expected Bearer event_org_*.',
+      401,
+    );
+  }
+
+  const [scheme, token, extra] = authorizationHeader.trim().split(/\s+/);
+  if (scheme !== 'Bearer' || !token || extra || !token.startsWith('event_org_')) {
+    throw new RouteError(
+      'invalid_event_organizer_token',
+      'Authorization header must be in the form: Bearer event_org_*.',
       401,
     );
   }

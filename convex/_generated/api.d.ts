@@ -53,6 +53,7 @@ import type * as networking_eventMarkerIdentity from "../networking/eventMarkerI
 import type * as networking_eventOperatorControls from "../networking/eventOperatorControls.js";
 import type * as networking_eventOrganizerAuth from "../networking/eventOrganizerAuth.js";
 import type * as networking_eventOrganizerControls from "../networking/eventOrganizerControls.js";
+import type * as networking_eventOrganizerCredentials from "../networking/eventOrganizerCredentials.js";
 import type * as networking_eventRateLimits from "../networking/eventRateLimits.js";
 import type * as networking_eventRecipientRules from "../networking/eventRecipientRules.js";
 import type * as networking_eventSpaces from "../networking/eventSpaces.js";
@@ -133,6 +134,7 @@ declare const fullApi: ApiFromModules<{
   "networking/eventOperatorControls": typeof networking_eventOperatorControls;
   "networking/eventOrganizerAuth": typeof networking_eventOrganizerAuth;
   "networking/eventOrganizerControls": typeof networking_eventOrganizerControls;
+  "networking/eventOrganizerCredentials": typeof networking_eventOrganizerCredentials;
   "networking/eventRateLimits": typeof networking_eventRateLimits;
   "networking/eventRecipientRules": typeof networking_eventRecipientRules;
   "networking/eventSpaces": typeof networking_eventSpaces;

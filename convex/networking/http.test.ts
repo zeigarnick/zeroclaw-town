@@ -524,6 +524,130 @@ describe('networking HTTP helpers', () => {
     });
   });
 
+  test('routes organizer invite redemption and key management', async () => {
+    const calls: Array<{ kind: string; args: any }> = [];
+    const ctx = {
+      runMutation: async (_funcRef: unknown, args: any) => {
+        calls.push({ kind: 'mutation', args });
+        if ('inviteToken' in args) {
+          return {
+            eventId: 'demo-event',
+            organizerApiKey: 'event_org_created',
+            keyPrefix: 'event_org_cr',
+          };
+        }
+        if ('keyId' in args) {
+          return {
+            keyId: args.keyId,
+            status: 'revoked',
+          };
+        }
+        return [];
+      },
+      runQuery: async () => {
+        throw new Error('unexpected query');
+      },
+    };
+
+    const redeemResponse = await handleNetworkingHttpRequest(
+      ctx,
+      new Request(
+        'https://town.example/api/v1/organizer/invites/event_org_invite_route/redeem',
+        {
+          method: 'POST',
+          body: JSON.stringify({ label: 'Organizer agent' }),
+        },
+      ),
+    );
+    const listResponse = await handleNetworkingHttpRequest(
+      ctx,
+      new Request('https://town.example/api/v1/organizer/events/demo-event/api-keys', {
+        method: 'GET',
+        headers: { Authorization: 'Bearer event_org_active' },
+      }),
+    );
+    const createResponse = await handleNetworkingHttpRequest(
+      ctx,
+      new Request('https://town.example/api/v1/organizer/events/demo-event/api-keys', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer event_org_active' },
+        body: JSON.stringify({ label: 'Secondary key' }),
+      }),
+    );
+    const revokeResponse = await handleNetworkingHttpRequest(
+      ctx,
+      new Request(
+        'https://town.example/api/v1/organizer/events/demo-event/api-keys/eventOrganizerApiKeys:2/revoke',
+        {
+          method: 'POST',
+          headers: { Authorization: 'Bearer event_org_active' },
+        },
+      ),
+    );
+
+    expect(redeemResponse.status).toBe(200);
+    expect(listResponse.status).toBe(200);
+    expect(createResponse.status).toBe(200);
+    expect(revokeResponse.status).toBe(200);
+    expect(calls).toEqual([
+      {
+        kind: 'mutation',
+        args: {
+          inviteToken: 'event_org_invite_route',
+          label: 'Organizer agent',
+        },
+      },
+      {
+        kind: 'mutation',
+        args: {
+          eventId: 'demo-event',
+          organizerApiKey: 'event_org_active',
+        },
+      },
+      {
+        kind: 'mutation',
+        args: {
+          eventId: 'demo-event',
+          organizerApiKey: 'event_org_active',
+          label: 'Secondary key',
+        },
+      },
+      {
+        kind: 'mutation',
+        args: {
+          eventId: 'demo-event',
+          organizerApiKey: 'event_org_active',
+          keyId: 'eventOrganizerApiKeys:2',
+        },
+      },
+    ]);
+  });
+
+  test('rejects unauthenticated organizer key routes before handlers run', async () => {
+    const response = await handleNetworkingHttpRequest(
+      {
+        runMutation: async () => {
+          throw new Error('unexpected mutation');
+        },
+        runQuery: async () => {
+          throw new Error('unexpected query');
+        },
+      },
+      new Request('https://town.example/api/v1/organizer/events/demo-event/api-keys', {
+        method: 'GET',
+      }),
+    );
+
+    expect(response.status).toBe(401);
+    expect(await readJson(response)).toEqual({
+      success: false,
+      error: {
+        code: 'invalid_event_organizer_token',
+        message: 'Authorization header is required. Expected Bearer event_org_*.',
+      },
+    });
+  });
+
   test('routes organizer review lists through mutations for component rate limiting', async () => {
     const calls: Array<{ kind: string; args: any }> = [];
     const ctx = {
