@@ -7,7 +7,9 @@ type TableName =
   | 'recommendations'
   | 'meetings'
   | 'agentConversations'
-  | 'introCandidates';
+  | 'introCandidates'
+  | 'eventAgents'
+  | 'eventNetworkingCards';
 
 type Row = Record<string, any> & { _id: string };
 
@@ -29,6 +31,7 @@ function createMockCtx(tables: Record<TableName, Row[]>) {
         );
 
         return {
+          first: async () => rows[0] ?? null,
           collect: async () => rows,
         };
       },
@@ -83,6 +86,8 @@ describe('networking town projection', () => {
       introCandidates: [
         introCandidate('introCandidates:1', 'networkAgents:4', 'networkAgents:1', 50),
       ],
+      eventAgents: [],
+      eventNetworkingCards: [],
     });
 
     const projection = await getTownProjectionHandler(ctx as any, { worldId: 'worlds:1' as any });
@@ -137,6 +142,8 @@ describe('networking town projection', () => {
       introCandidates: [
         introCandidate('introCandidates:1', 'networkAgents:1', 'networkAgents:2', 40),
       ],
+      eventAgents: [],
+      eventNetworkingCards: [],
     });
 
     const projection = await getTownProjectionHandler(ctx as any, { worldId: 'worlds:1' as any });
@@ -145,6 +152,64 @@ describe('networking town projection', () => {
     expect(projection.agentsByPlayerId['p:2'].slug).toBe('demo-growth-operator');
     expect(projection.agentsByPlayerId['p:1'].primaryStatus).toBe('intro_ready');
     expect(projection.agentsByPlayerId['p:2'].primaryStatus).toBe('intro_ready');
+  });
+
+  test('projects approved event agents with pseudonymous public cards and avatars', async () => {
+    const ctx = createMockCtx({
+      networkAgents: [],
+      playerDescriptions: [],
+      matchCards: [],
+      recommendations: [],
+      meetings: [],
+      agentConversations: [],
+      introCandidates: [],
+      eventAgents: [
+        eventAgent('eventAgents:1', 'demo-event', 'attendee-a', 'Cedar Scout 123', 'approved', 10),
+        eventAgent(
+          'eventAgents:2',
+          'demo-event',
+          'attendee-b',
+          'Private Pending 456',
+          'pending_owner_review',
+          11,
+        ),
+      ],
+      eventNetworkingCards: [
+        eventCard('eventNetworkingCards:1', 'demo-event', 'eventAgents:1', 'approved', 20),
+        eventCard(
+          'eventNetworkingCards:2',
+          'demo-event',
+          'eventAgents:2',
+          'pending_owner_review',
+          21,
+        ),
+      ],
+    });
+
+    const projection = await getTownProjectionHandler(ctx as any, {
+      worldId: 'worlds:1' as any,
+      eventId: 'demo-event',
+    });
+
+    expect(projection.agents).toEqual([
+      expect.objectContaining({
+        source: 'event',
+        eventId: 'demo-event',
+        agentId: 'eventAgents:1',
+        slug: 'attendee-a',
+        displayName: 'Cedar Scout 123',
+        avatarConfig: {
+          hair: 'curly',
+          skinTone: 'tone-3',
+          clothing: 'jacket',
+        },
+        publicCard: expect.objectContaining({
+          role: 'Founder',
+          offers: ['GTM help'],
+        }),
+      }),
+    ]);
+    expect(JSON.stringify(projection)).not.toContain('Private Pending');
   });
 });
 
@@ -273,6 +338,55 @@ function introCandidate(
     status: 'pending_review',
     createdByAgentId: requesterAgentId,
     qualificationMode: 'explicit_qualification',
+    createdAt: updatedAt,
+    updatedAt,
+  };
+}
+
+function eventAgent(
+  _id: string,
+  eventId: string,
+  agentIdentifier: string,
+  displayName: string,
+  approvalStatus: string,
+  updatedAt: number,
+) {
+  return {
+    _id,
+    eventId,
+    agentIdentifier,
+    displayName,
+    avatarConfig: {
+      hair: 'curly',
+      skinTone: 'tone-3',
+      clothing: 'jacket',
+    },
+    approvalStatus,
+    createdAt: updatedAt,
+    updatedAt,
+  };
+}
+
+function eventCard(
+  _id: string,
+  eventId: string,
+  eventAgentId: string,
+  status: string,
+  updatedAt: number,
+) {
+  return {
+    _id,
+    eventId,
+    eventAgentId,
+    publicCard: {
+      role: 'Founder',
+      offers: ['GTM help'],
+      wants: [],
+      hobbies: [],
+      interests: ['energy'],
+      favoriteMedia: [],
+    },
+    status,
     createdAt: updatedAt,
     updatedAt,
   };

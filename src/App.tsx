@@ -10,6 +10,7 @@ import InteractButton from './components/buttons/InteractButton.tsx';
 import FreezeButton from './components/FreezeButton.tsx';
 import { OwnerDashboard } from './networking/OwnerDashboard.tsx';
 import { EventOwnerReview } from './networking/EventOwnerReview.tsx';
+import { EventQrOverlay } from './networking/EventQrOverlay.tsx';
 import { apiAdapter } from './networking/api.ts';
 
 type AppView = 'town' | 'dashboard' | 'eventReview';
@@ -40,8 +41,19 @@ function getInitialRoute(): InitialRoute {
   return { claimToken: new URLSearchParams(window.location.search).get('claimToken') ?? '' };
 }
 
+function getEventQrConfig() {
+  const env = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env ?? {};
+  const eventId = env.VITE_OPENNETWORK_EVENT_ID ?? 'main-event';
+  const configuredSkillUrl = env.VITE_OPENNETWORK_EVENT_SKILL_URL;
+  const skillUrl =
+    configuredSkillUrl ??
+    new URL('/skill.md', window.location.origin || 'http://localhost:5173').toString();
+  return { eventId, skillUrl };
+}
+
 export default function Home() {
   const initialRoute = getInitialRoute();
+  const eventQrConfig = getEventQrConfig();
   const [currentView, setCurrentView] = useState<AppView>(
     initialRoute.eventReview ? 'eventReview' : initialRoute.claimToken ? 'dashboard' : 'town',
   );
@@ -73,6 +85,10 @@ export default function Home() {
               <MusicButton />
               <InteractButton />
             </div>
+            <EventQrOverlay
+              eventId={eventQrConfig.eventId}
+              skillUrl={eventQrConfig.skillUrl}
+            />
             <ToastContainer position="bottom-right" autoClose={2000} closeOnClick theme="dark" />
           </>
         ) : currentView === 'dashboard' ? (

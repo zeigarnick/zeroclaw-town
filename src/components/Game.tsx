@@ -14,6 +14,7 @@ import PlayerDetails from './PlayerDetails.tsx';
 import type { SelectElement } from './Player.tsx';
 
 export const SHOW_DEBUG_UI = !!import.meta.env.VITE_SHOW_DEBUG_UI;
+const EVENT_ID = import.meta.env.VITE_OPENNETWORK_EVENT_ID ?? 'main-event';
 
 export default function Game() {
   const convex = useConvex();
@@ -31,7 +32,7 @@ export default function Game() {
   const game = useServerGame(worldId);
   const networkingProjection = useQuery(
     api.networking.townProjection.get,
-    worldId ? { worldId } : 'skip',
+    worldId ? { worldId, eventId: EVENT_ID } : 'skip',
   ) as NetworkingTownProjection | undefined;
 
   // Send a periodic heartbeat to our world to keep it alive.

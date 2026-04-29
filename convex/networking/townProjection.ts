@@ -2,6 +2,7 @@ import { v } from 'convex/values';
 import { Doc, Id } from '../_generated/dataModel';
 import { QueryCtx, query } from '../_generated/server';
 import { GameId } from '../aiTown/ids';
+import type { EventAvatarConfig, EventPublicCard } from './eventCards';
 
 export type NetworkingTownStatus = 'matched' | 'pending_meeting' | 'talking' | 'intro_ready';
 
@@ -19,10 +20,14 @@ export type NetworkingTownRelationship = {
 };
 
 export type NetworkingTownAgent = {
-  agentId: Id<'networkAgents'>;
+  source: 'legacy' | 'event';
+  agentId: Id<'networkAgents'> | Id<'eventAgents'>;
+  eventId?: string;
   slug: string;
   displayName: string;
   description?: string;
+  avatarConfig?: EventAvatarConfig;
+  publicCard?: EventPublicCard;
   playerId?: GameId<'players'>;
   primaryStatus?: NetworkingTownStatus;
   cards: NetworkingTownCard[];
@@ -67,13 +72,14 @@ const DEMO_TOWN_PLAYER_NAME_BY_AGENT_SLUG: Record<string, string> = {
 export const get = query({
   args: {
     worldId: v.id('worlds'),
+    eventId: v.optional(v.string()),
   },
   handler: (ctx, args) => getTownProjectionHandler(ctx, args),
 });
 
 export async function getTownProjectionHandler(
   ctx: QueryCtx,
-  args: { worldId: Id<'worlds'> },
+  args: { worldId: Id<'worlds'>; eventId?: string },
 ): Promise<NetworkingTownProjection> {
   const agents = await ctx.db
     .query('networkAgents')
@@ -242,7 +248,7 @@ export async function getTownProjectionHandler(
   }
 
   const statusCounts = createEmptyStatusCounts();
-  const projectedAgents = Array.from(accumulators.values())
+  const projectedAgents: NetworkingTownAgent[] = Array.from(accumulators.values())
     .map((accumulator) => {
       const counts = {
         matched: accumulator.matchedAgents.size,
@@ -255,6 +261,7 @@ export async function getTownProjectionHandler(
         statusCounts[primaryStatus] += 1;
       }
       return {
+        source: 'legacy' as const,
         agentId: accumulator.agent._id,
         slug: accumulator.agent.slug,
         displayName: accumulator.agent.displayName,
@@ -272,6 +279,15 @@ export async function getTownProjectionHandler(
     })
     .sort((left, right) => left.displayName.localeCompare(right.displayName));
 
+  if (args.eventId) {
+    const eventAgents = await collectApprovedEventAgents(ctx, args.eventId);
+    for (const eventAgent of eventAgents) {
+      projectedAgents.push(eventAgent);
+      updatedAt = Math.max(updatedAt, eventAgent.updatedAt);
+    }
+    projectedAgents.sort((left, right) => left.displayName.localeCompare(right.displayName));
+  }
+
   const agentsByPlayerId: Record<string, NetworkingTownAgent> = {};
   for (const agent of projectedAgents) {
     if (agent.playerId) {
@@ -285,6 +301,48 @@ export async function getTownProjectionHandler(
     statusCounts,
     updatedAt,
   };
+}
+
+async function collectApprovedEventAgents(
+  ctx: QueryCtx,
+  eventId: string,
+): Promise<NetworkingTownAgent[]> {
+  const agents = await ctx.db
+    .query('eventAgents')
+    .withIndex('by_event_and_status', (q) =>
+      q.eq('eventId', eventId).eq('approvalStatus', 'approved'),
+    )
+    .collect();
+  const projectedAgents: NetworkingTownAgent[] = [];
+  for (const agent of agents) {
+    const approvedCard = await ctx.db
+      .query('eventNetworkingCards')
+      .withIndex('by_agent_and_status', (q) =>
+        q.eq('eventAgentId', agent._id).eq('status', 'approved'),
+      )
+      .first();
+    if (!approvedCard) {
+      continue;
+    }
+    projectedAgents.push({
+      source: 'event',
+      eventId: agent.eventId,
+      agentId: agent._id,
+      slug: agent.agentIdentifier,
+      displayName: agent.displayName,
+      description: approvedCard.publicCard.category ?? approvedCard.publicCard.role,
+      avatarConfig: agent.avatarConfig,
+      publicCard: approvedCard.publicCard,
+      cards: [],
+      matchedAgents: [],
+      pendingMeetingAgents: [],
+      talkingAgents: [],
+      introReadyAgents: [],
+      counts: createEmptyStatusCounts(),
+      updatedAt: Math.max(agent.updatedAt, approvedCard.updatedAt),
+    });
+  }
+  return projectedAgents;
 }
 
 async function collectOpenConversations(
