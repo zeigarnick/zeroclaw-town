@@ -15,6 +15,7 @@ type TableName =
   | 'eventPrivateContacts'
   | 'eventContactReveals'
   | 'eventActivityEvents'
+  | 'eventActivityAggregates'
   | 'eventOwnerSessions';
 type Row = Record<string, any> & { _id: string };
 
@@ -27,6 +28,7 @@ function createMockCtx() {
     eventPrivateContacts: [],
     eventContactReveals: [],
     eventActivityEvents: [],
+    eventActivityAggregates: [],
     eventOwnerSessions: [],
   };
   const counters: Record<TableName, number> = {
@@ -37,6 +39,7 @@ function createMockCtx() {
     eventPrivateContacts: 0,
     eventContactReveals: 0,
     eventActivityEvents: 0,
+    eventActivityAggregates: 0,
     eventOwnerSessions: 0,
   };
 

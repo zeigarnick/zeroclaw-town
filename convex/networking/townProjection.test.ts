@@ -10,7 +10,8 @@ type TableName =
   | 'introCandidates'
   | 'eventAgents'
   | 'eventNetworkingCards'
-  | 'eventActivityEvents';
+  | 'eventActivityEvents'
+  | 'eventActivityAggregates';
 
 type Row = Record<string, any> & { _id: string };
 
@@ -26,6 +27,7 @@ function createMockCtx(tableOverrides: Partial<Record<TableName, Row[]>>) {
     eventAgents: [],
     eventNetworkingCards: [],
     eventActivityEvents: [],
+    eventActivityAggregates: [],
     ...tableOverrides,
   };
   const db = {
@@ -47,6 +49,16 @@ function createMockCtx(tableOverrides: Partial<Record<TableName, Row[]>>) {
         return {
           first: async () => rows[0] ?? null,
           collect: async () => rows,
+          order: (direction: 'asc' | 'desc') => ({
+            take: async (limit: number) =>
+              [...rows]
+                .sort((left, right) =>
+                  direction === 'desc'
+                    ? (right.createdAt ?? 0) - (left.createdAt ?? 0)
+                    : (left.createdAt ?? 0) - (right.createdAt ?? 0),
+                )
+                .slice(0, limit),
+          }),
         };
       },
     }),
@@ -231,6 +243,7 @@ describe('networking town projection', () => {
           32,
         ),
       ],
+      eventActivityAggregates: [eventActivityAggregate('demo-event', 12, 33)],
     });
 
     const projection = await getTownProjectionHandler(ctx as any, {
@@ -267,7 +280,7 @@ describe('networking town projection', () => {
       intro_ready: 0,
     });
     expect(projection.eventActivity).toMatchObject({
-      matchCount: 2,
+      matchCount: 12,
       recent: [
         {
           type: 'match_created',
@@ -491,5 +504,15 @@ function eventActivityEvent(
     },
     createdAt,
     updatedAt: createdAt,
+  };
+}
+
+function eventActivityAggregate(eventId: string, matchCount: number, updatedAt: number) {
+  return {
+    _id: `eventActivityAggregates:${eventId}`,
+    eventId,
+    matchCount,
+    createdAt: updatedAt,
+    updatedAt,
   };
 }

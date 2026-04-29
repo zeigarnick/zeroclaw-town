@@ -3,7 +3,7 @@ import {
   decideEventConnectionIntentHandler,
   upsertEventPrivateContactHandler,
 } from './eventContactReveal';
-import { listRecentEventActivityHandler } from './eventActivity';
+import { getEventMatchActivityCount, listRecentEventActivityHandler } from './eventActivity';
 import { upsertEventRecipientRulesHandler } from './eventRecipientRules';
 import { hashSecret } from './auth';
 
@@ -15,6 +15,7 @@ type TableName =
   | 'eventPrivateContacts'
   | 'eventContactReveals'
   | 'eventActivityEvents'
+  | 'eventActivityAggregates'
   | 'eventOwnerSessions';
 type Row = Record<string, any> & { _id: string };
 
@@ -27,6 +28,7 @@ function createMockCtx() {
     eventPrivateContacts: [],
     eventContactReveals: [],
     eventActivityEvents: [],
+    eventActivityAggregates: [],
     eventOwnerSessions: [],
   };
   const counters: Record<TableName, number> = {
@@ -37,6 +39,7 @@ function createMockCtx() {
     eventPrivateContacts: 0,
     eventContactReveals: 0,
     eventActivityEvents: 0,
+    eventActivityAggregates: 0,
     eventOwnerSessions: 0,
   };
 
@@ -71,6 +74,16 @@ function createMockCtx() {
         return {
           first: async () => rows[0] ?? null,
           collect: async () => rows,
+          order: (direction: 'asc' | 'desc') => ({
+            take: async (limit: number) =>
+              [...rows]
+                .sort((left, right) =>
+                  direction === 'desc'
+                    ? (right.createdAt ?? 0) - (left.createdAt ?? 0)
+                    : (left.createdAt ?? 0) - (right.createdAt ?? 0),
+                )
+                .slice(0, limit),
+          }),
         };
       },
     }),
@@ -193,6 +206,13 @@ describe('event activity', () => {
     });
 
     expect(tables.eventActivityEvents).toHaveLength(1);
+    expect(tables.eventActivityAggregates).toEqual([
+      expect.objectContaining({
+        eventId: 'demo-event',
+        matchCount: 1,
+      }),
+    ]);
+    await expect(getEventMatchActivityCount(ctx as any, 'demo-event')).resolves.toBe(1);
     expect(tables.eventActivityEvents[0]).toMatchObject({
       eventId: 'demo-event',
       type: 'match_created',
@@ -268,8 +288,48 @@ describe('event activity', () => {
 
     expect(rejected.status).toBe('auto_rejected');
     expect(tables.eventActivityEvents).toHaveLength(0);
+    expect(tables.eventActivityAggregates).toHaveLength(0);
     await expect(
       listRecentEventActivityHandler(ctx as any, { eventId: 'demo-event' }),
     ).resolves.toEqual([]);
+  });
+
+  test('uses bounded recent activity reads while count comes from aggregate rows', async () => {
+    const { ctx, tables } = createMockCtx();
+    await ctx.db.insert('eventActivityAggregates', {
+      eventId: 'demo-event',
+      matchCount: 42,
+      createdAt: 1710000000000,
+      updatedAt: 1710000000042,
+    });
+    for (let index = 0; index < 8; index += 1) {
+      await ctx.db.insert('eventActivityEvents', {
+        eventId: 'demo-event',
+        type: 'match_created',
+        requesterDisplayName: `Scout ${index}`,
+        targetDisplayName: `Builder ${index}`,
+        sourceIntentId: `eventConnectionIntents:${index}`,
+        payload: {
+          matchKind: 'recipient_approved',
+        },
+        createdAt: 1710000000000 + index,
+        updatedAt: 1710000000000 + index,
+      });
+    }
+
+    await expect(getEventMatchActivityCount(ctx as any, 'demo-event')).resolves.toBe(42);
+    const recent = await listRecentEventActivityHandler(ctx as any, {
+      eventId: 'demo-event',
+      limit: 3,
+    });
+
+    expect(recent).toHaveLength(3);
+    expect(recent.map((activity) => activity.requesterDisplayName)).toEqual([
+      'Scout 7',
+      'Scout 6',
+      'Scout 5',
+    ]);
+    expect(JSON.stringify(recent)).not.toContain('sourceIntentId');
+    expect(JSON.stringify(tables.eventActivityAggregates)).not.toContain('eventConnectionIntents');
   });
 });

@@ -72,6 +72,7 @@ export async function createMatchActivityForApprovedIntent(
   if (!activity) {
     throw networkingError('event_activity_not_found', 'The event activity could not be loaded.');
   }
+  await incrementEventMatchActivityAggregate(ctx, intent.eventId, now);
   return toEventActivityView(activity);
 }
 
@@ -86,23 +87,19 @@ export async function listRecentEventActivityHandler(
     .withIndex('by_event_type_created_at', (q) =>
       q.eq('eventId', eventId).eq('type', 'match_created'),
     )
-    .collect();
+    .order('desc')
+    .take(limit);
 
-  return events
-    .sort((left, right) => right.createdAt - left.createdAt)
-    .slice(0, limit)
-    .map(toEventActivityView);
+  return events.map(toEventActivityView);
 }
 
-export async function countEventMatchActivities(ctx: QueryCtx, eventId: string) {
+export async function getEventMatchActivityCount(ctx: QueryCtx, eventId: string) {
   const normalizedEventId = normalizeEventId(eventId);
-  const events = await ctx.db
-    .query('eventActivityEvents')
-    .withIndex('by_event_type_created_at', (q) =>
-      q.eq('eventId', normalizedEventId).eq('type', 'match_created'),
-    )
-    .collect();
-  return events.length;
+  const aggregate = await ctx.db
+    .query('eventActivityAggregates')
+    .withIndex('by_event_id', (q) => q.eq('eventId', normalizedEventId))
+    .first();
+  return aggregate?.matchCount ?? 0;
 }
 
 function toEventActivityView(activity: Doc<'eventActivityEvents'>): EventActivityView {
@@ -124,4 +121,28 @@ function normalizeLimit(limit: number | undefined) {
     return DEFAULT_EVENT_ACTIVITY_LIMIT;
   }
   return Math.max(1, Math.min(MAX_EVENT_ACTIVITY_LIMIT, Math.floor(limit)));
+}
+
+async function incrementEventMatchActivityAggregate(
+  ctx: MutationCtx,
+  eventId: string,
+  now: number,
+) {
+  const existing = await ctx.db
+    .query('eventActivityAggregates')
+    .withIndex('by_event_id', (q) => q.eq('eventId', eventId))
+    .first();
+  if (existing) {
+    await ctx.db.patch(existing._id, {
+      matchCount: existing.matchCount + 1,
+      updatedAt: now,
+    });
+    return;
+  }
+  await ctx.db.insert('eventActivityAggregates', {
+    eventId,
+    matchCount: 1,
+    createdAt: now,
+    updatedAt: now,
+  });
 }

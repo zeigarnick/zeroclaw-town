@@ -374,6 +374,13 @@ export const networkingTables = {
     updatedAt: v.number(),
   }).index('by_event_type_created_at', ['eventId', 'type', 'createdAt']),
 
+  eventActivityAggregates: defineTable({
+    eventId: v.string(),
+    matchCount: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index('by_event_id', ['eventId']),
+
   eventRecipientRules: defineTable({
     eventId: v.string(),
     eventAgentId: v.id('eventAgents'),

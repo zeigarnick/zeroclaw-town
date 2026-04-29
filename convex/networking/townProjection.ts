@@ -3,8 +3,8 @@ import { Doc, Id } from '../_generated/dataModel';
 import { QueryCtx, query } from '../_generated/server';
 import { GameId } from '../aiTown/ids';
 import {
-  countEventMatchActivities,
   EventActivityView,
+  getEventMatchActivityCount,
   listRecentEventActivityHandler,
 } from './eventActivity';
 import type { EventAvatarConfig, EventPublicCard } from './eventCards';
@@ -324,7 +324,7 @@ export async function getTownProjectionHandler(
 async function collectEventActivitySummary(ctx: QueryCtx, eventId: string) {
   const [recent, matchCount] = await Promise.all([
     listRecentEventActivityHandler(ctx, { eventId, limit: 5 }),
-    countEventMatchActivities(ctx, eventId),
+    getEventMatchActivityCount(ctx, eventId),
   ]);
   return {
     recent,
