@@ -15,7 +15,9 @@
     "test:networking": "NODE_OPTIONS=--experimental-vm-modules jest --verbose convex/networking",
     "demo:networking": "node scripts/networking-demo.mjs",
     "smoke:networking": "node scripts/networking-smoke.mjs",
+    "smoke:event": "node scripts/event-networking-smoke.mjs",
     "e2e:networking": "playwright test e2e/networking/mvp.spec.ts",
+    "e2e:event": "playwright test e2e/event-networking.spec.ts",
     "level-editor": "vite src/editor/",
     "le": "vite src/editor/"
   },
