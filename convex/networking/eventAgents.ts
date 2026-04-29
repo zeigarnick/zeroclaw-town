@@ -112,6 +112,7 @@ export async function registerEventAgentHandler(
   const eventAgentId = await ctx.db.insert('eventAgents', {
     eventId,
     agentIdentifier,
+    publicMarkerSlug: generatePublicMarkerSlug(),
     displayName,
     avatarConfig,
     approvalStatus: 'pending_owner_review',
@@ -475,6 +476,10 @@ function generateRandomDisplayName() {
 
 function generateEventOwnerSessionToken() {
   return `event_owner_${randomBase64Url(24)}`;
+}
+
+function generatePublicMarkerSlug() {
+  return `event-marker-${generateShortToken()}`;
 }
 
 function generateShortToken() {

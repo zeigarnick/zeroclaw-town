@@ -1,5 +1,4 @@
 import { getTownProjectionHandler } from './townProjection';
-import { publicEventMarkerSlug } from './eventMarkerIdentity';
 
 type TableName =
   | 'networkAgents'
@@ -198,6 +197,7 @@ describe('networking town projection', () => {
           'Cedar Scout 123',
           'approved',
           10,
+          'stored-public-cedar',
         ),
         eventAgent(
           'eventAgents:2',
@@ -206,6 +206,7 @@ describe('networking town projection', () => {
           'Private Pending 456',
           'pending_owner_review',
           11,
+          'stored-public-pending',
         ),
       ],
       eventNetworkingCards: [
@@ -224,6 +225,8 @@ describe('networking town projection', () => {
           'demo-event',
           'Cedar Scout 123',
           'Orbit Builder 456',
+          'stored-public-cedar',
+          'stored-public-orbit',
           'eventConnectionIntents:1',
           30,
         ),
@@ -232,6 +235,8 @@ describe('networking town projection', () => {
           'demo-event',
           'Cedar Scout 123',
           'Harbor Builder 789',
+          'stored-public-cedar',
+          'stored-public-harbor',
           'eventConnectionIntents:2',
           31,
         ),
@@ -240,6 +245,8 @@ describe('networking town projection', () => {
           'other-event',
           'Other Scout',
           'Other Builder',
+          'stored-public-other-scout',
+          'stored-public-other-builder',
           'eventConnectionIntents:3',
           32,
         ),
@@ -257,7 +264,7 @@ describe('networking town projection', () => {
         source: 'event',
         eventId: 'demo-event',
         agentId: 'eventAgents:1',
-        slug: expect.stringMatching(/^event-agent-[a-z0-9]+$/),
+        slug: 'stored-public-cedar',
         displayName: 'Cedar Scout 123',
         avatarConfig: {
           hair: 'curly',
@@ -274,6 +281,7 @@ describe('networking town projection', () => {
     expect(JSON.stringify(projection)).not.toContain('founder');
     expect(JSON.stringify(projection)).not.toContain('example');
     expect(JSON.stringify(projection)).not.toContain('Private Pending');
+    expect(JSON.stringify(projection.agents)).not.toContain('event-agent-');
     expect(projection.statusCounts).toEqual({
       matched: 0,
       pending_meeting: 0,
@@ -287,8 +295,8 @@ describe('networking town projection', () => {
           type: 'match_created',
           requesterDisplayName: 'Cedar Scout 123',
           targetDisplayName: 'Harbor Builder 789',
-          requesterMarkerSlug: publicEventMarkerSlug('eventAgents:1' as any),
-          targetMarkerSlug: 'event-agent-harbor',
+          requesterMarkerSlug: 'stored-public-cedar',
+          targetMarkerSlug: 'stored-public-harbor',
           payload: {
             matchKind: 'recipient_approved',
           },
@@ -297,8 +305,8 @@ describe('networking town projection', () => {
           type: 'match_created',
           requesterDisplayName: 'Cedar Scout 123',
           targetDisplayName: 'Orbit Builder 456',
-          requesterMarkerSlug: publicEventMarkerSlug('eventAgents:1' as any),
-          targetMarkerSlug: 'event-agent-orbit',
+          requesterMarkerSlug: 'stored-public-cedar',
+          targetMarkerSlug: 'stored-public-orbit',
           payload: {
             matchKind: 'recipient_approved',
           },
@@ -448,11 +456,13 @@ function eventAgent(
   displayName: string,
   approvalStatus: string,
   updatedAt: number,
+  publicMarkerSlug: string,
 ) {
   return {
     _id,
     eventId,
     agentIdentifier,
+    publicMarkerSlug,
     displayName,
     avatarConfig: {
       hair: 'curly',
@@ -495,6 +505,8 @@ function eventActivityEvent(
   eventId: string,
   requesterDisplayName: string,
   targetDisplayName: string,
+  requesterMarkerSlug: string,
+  targetMarkerSlug: string,
   sourceIntentId: string,
   createdAt: number,
 ) {
@@ -504,9 +516,8 @@ function eventActivityEvent(
     type: 'match_created',
     requesterDisplayName,
     targetDisplayName,
-    requesterMarkerSlug: publicEventMarkerSlug('eventAgents:1' as any),
-    targetMarkerSlug:
-      targetDisplayName === 'Harbor Builder 789' ? 'event-agent-harbor' : 'event-agent-orbit',
+    requesterMarkerSlug,
+    targetMarkerSlug,
     sourceIntentId,
     payload: {
       matchKind: 'recipient_approved',

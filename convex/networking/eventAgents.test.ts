@@ -197,9 +197,12 @@ describe('event agent handlers', () => {
     expect(tables.eventAgents[0]).toMatchObject({
       eventId: 'demo-event',
       agentIdentifier: 'attendee-agent',
+      publicMarkerSlug: expect.stringMatching(/^event-marker-[a-z0-9_-]+$/),
       approvalStatus: 'pending_owner_review',
       ownerSessionId: tables.eventOwnerSessions[0]._id,
     });
+    expect(tables.eventAgents[0].publicMarkerSlug).not.toContain('eventAgents:');
+    expect(tables.eventAgents[0].publicMarkerSlug).not.toContain('attendee-agent');
     expect(tables.eventNetworkingCards[0]).toMatchObject({
       eventId: 'demo-event',
       eventAgentId: tables.eventAgents[0]._id,

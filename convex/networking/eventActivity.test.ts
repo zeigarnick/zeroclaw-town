@@ -4,7 +4,6 @@ import {
   upsertEventPrivateContactHandler,
 } from './eventContactReveal';
 import { getEventMatchActivityCount, listRecentEventActivityHandler } from './eventActivity';
-import { publicEventMarkerSlug } from './eventMarkerIdentity';
 import { upsertEventRecipientRulesHandler } from './eventRecipientRules';
 import { hashSecret } from './auth';
 
@@ -124,6 +123,7 @@ async function insertAgentWithCard(
   const agentId = await ctx.db.insert('eventAgents', {
     eventId: 'demo-event',
     agentIdentifier: label,
+    publicMarkerSlug: `public-marker-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
     displayName: label,
     avatarConfig: {
       hair: 'curly',
@@ -219,8 +219,8 @@ describe('event activity', () => {
       type: 'match_created',
       requesterDisplayName: 'Cedar Scout',
       targetDisplayName: 'Orbit Builder',
-      requesterMarkerSlug: publicEventMarkerSlug(requester.agentId as any),
-      targetMarkerSlug: publicEventMarkerSlug(target.agentId as any),
+      requesterMarkerSlug: 'public-marker-cedar-scout',
+      targetMarkerSlug: 'public-marker-orbit-builder',
       sourceIntentId: intent.id,
       payload: {
         matchKind: 'recipient_approved',
@@ -235,8 +235,8 @@ describe('event activity', () => {
         type: 'match_created',
         requesterDisplayName: 'Cedar Scout',
         targetDisplayName: 'Orbit Builder',
-        requesterMarkerSlug: publicEventMarkerSlug(requester.agentId as any),
-        targetMarkerSlug: publicEventMarkerSlug(target.agentId as any),
+        requesterMarkerSlug: 'public-marker-cedar-scout',
+        targetMarkerSlug: 'public-marker-orbit-builder',
         payload: {
           matchKind: 'recipient_approved',
         },
@@ -250,6 +250,7 @@ describe('event activity', () => {
     expect(serialized).not.toContain('Private Co');
     expect(serialized).not.toContain('event_owner_');
     expect(serialized).not.toContain('eventAgents:');
+    expect(serialized).not.toContain('event-agent-');
     expect(serialized).not.toContain('sourceIntentId');
     expect(serialized).not.toContain('GTM help');
   });

@@ -3,7 +3,7 @@ import { Doc } from '../_generated/dataModel';
 import { MutationCtx, QueryCtx, query } from '../_generated/server';
 import { networkingError } from './auth';
 import { normalizeEventId } from './eventAgents';
-import { publicEventMarkerSlug } from './eventMarkerIdentity';
+import { getStoredPublicEventMarkerSlug } from './eventMarkerIdentity';
 import { EventActivityType } from './validators';
 
 const DEFAULT_EVENT_ACTIVITY_LIMIT = 12;
@@ -64,8 +64,8 @@ export async function createMatchActivityForApprovedIntent(
     type: 'match_created',
     requesterDisplayName: requester.displayName,
     targetDisplayName: target.displayName,
-    requesterMarkerSlug: publicEventMarkerSlug(requester._id),
-    targetMarkerSlug: publicEventMarkerSlug(target._id),
+    requesterMarkerSlug: getStoredPublicEventMarkerSlug(requester),
+    targetMarkerSlug: getStoredPublicEventMarkerSlug(target),
     sourceIntentId: intent._id,
     payload: {
       matchKind: 'recipient_approved',

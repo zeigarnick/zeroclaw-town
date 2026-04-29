@@ -4,8 +4,8 @@ import type { EventTownMarker } from './eventTownMarkers';
 
 function marker(overrides: Partial<EventTownMarker>): EventTownMarker {
   return {
-    key: 'demo-event:event-agent-a',
-    markerSlug: 'event-agent-a',
+    key: 'demo-event:stored-public-a',
+    markerSlug: 'stored-public-a',
     displayName: 'Cedar Scout',
     avatarConfig: {
       hair: 'curly',
@@ -38,8 +38,8 @@ function activity(createdAt: number): NonNullable<NetworkingTownProjection['even
         type: 'match_created',
         requesterDisplayName: 'Cedar Scout',
         targetDisplayName: 'Orbit Builder',
-        requesterMarkerSlug: 'event-agent-a',
-        targetMarkerSlug: 'event-agent-b',
+        requesterMarkerSlug: 'stored-public-a',
+        targetMarkerSlug: 'stored-public-b',
         payload: {
           matchKind: 'recipient_approved',
         },
@@ -53,9 +53,9 @@ function activity(createdAt: number): NonNullable<NetworkingTownProjection['even
 describe('event match choreography', () => {
   test('moves matched markers toward each other and leaves unmatched markers alone', () => {
     const markers = [
-      marker({ key: 'demo-event:event-agent-a', markerSlug: 'event-agent-a', x: 0, y: 0 }),
-      marker({ key: 'demo-event:event-agent-b', markerSlug: 'event-agent-b', x: 120, y: 0 }),
-      marker({ key: 'demo-event:event-agent-c', markerSlug: 'event-agent-c', x: 40, y: 80 }),
+      marker({ key: 'demo-event:stored-public-a', markerSlug: 'stored-public-a', x: 0, y: 0 }),
+      marker({ key: 'demo-event:stored-public-b', markerSlug: 'stored-public-b', x: 120, y: 0 }),
+      marker({ key: 'demo-event:stored-public-c', markerSlug: 'stored-public-c', x: 40, y: 80 }),
     ];
 
     const result = buildEventMatchChoreography({
@@ -72,8 +72,8 @@ describe('event match choreography', () => {
 
   test('creates only a display-safe Match bubble near the pair', () => {
     const markers = [
-      marker({ key: 'demo-event:event-agent-a', markerSlug: 'event-agent-a', x: 0, y: 0 }),
-      marker({ key: 'demo-event:event-agent-b', markerSlug: 'event-agent-b', x: 120, y: 0 }),
+      marker({ key: 'demo-event:stored-public-a', markerSlug: 'stored-public-a', x: 0, y: 0 }),
+      marker({ key: 'demo-event:stored-public-b', markerSlug: 'stored-public-b', x: 120, y: 0 }),
     ];
 
     const result = buildEventMatchChoreography({
@@ -95,8 +95,8 @@ describe('event match choreography', () => {
 
   test('uses deterministic marker positions when no recent match applies', () => {
     const markers = [
-      marker({ key: 'demo-event:event-agent-a', markerSlug: 'event-agent-a', x: 0, y: 0 }),
-      marker({ key: 'demo-event:event-agent-b', markerSlug: 'event-agent-b', x: 120, y: 0 }),
+      marker({ key: 'demo-event:stored-public-a', markerSlug: 'stored-public-a', x: 0, y: 0 }),
+      marker({ key: 'demo-event:stored-public-b', markerSlug: 'stored-public-b', x: 120, y: 0 }),
     ];
 
     const result = buildEventMatchChoreography({

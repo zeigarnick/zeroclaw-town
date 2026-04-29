@@ -283,6 +283,7 @@ export const networkingTables = {
   eventAgents: defineTable({
     eventId: v.string(),
     agentIdentifier: v.string(),
+    publicMarkerSlug: v.optional(v.string()),
     displayName: v.string(),
     avatarConfig: v.object({
       hair: v.string(),
