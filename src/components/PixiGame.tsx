@@ -25,6 +25,11 @@ import { Location, locationFields, playerLocation } from '../../convex/aiTown/lo
 import { Player as ServerPlayer } from '../../convex/aiTown/player.ts';
 import { buildEventTownMarkers } from '../networking/eventTownMarkers.ts';
 import type { EventTownMarker } from '../networking/eventTownMarkers.ts';
+import {
+  beginMapNavigationPointer,
+  MapNavigationPointerStart,
+  shouldCompleteMapNavigationPointer,
+} from './pixiMapNavigation.ts';
 
 const NETWORKING_BADGE_META: Record<
   NetworkingTownStatus,
@@ -64,10 +69,10 @@ export const PixiGame = (props: {
   const moveTo = useSendInput(props.worldId, props.engineId, 'moveTo');
 
   // Interaction for clicking on the world to navigate.
-  const dragStart = useRef<{ screenX: number; screenY: number } | null>(null);
+  const dragStart = useRef<MapNavigationPointerStart | null>(null);
   const onMapPointerDown = (e: any) => {
     // https://pixijs.download/dev/docs/PIXI.FederatedPointerEvent.html
-    dragStart.current = { screenX: e.screenX, screenY: e.screenY };
+    dragStart.current = beginMapNavigationPointer(e);
   };
 
   const [lastDestination, setLastDestination] = useState<{
@@ -76,15 +81,11 @@ export const PixiGame = (props: {
     t: number;
   } | null>(null);
   const onMapPointerUp = async (e: any) => {
-    if (dragStart.current) {
-      const { screenX, screenY } = dragStart.current;
-      dragStart.current = null;
-      const [dx, dy] = [screenX - e.screenX, screenY - e.screenY];
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist > 10) {
-        console.log(`Skipping navigation on drag event (${dist}px)`);
-        return;
-      }
+    const pointerStart = dragStart.current;
+    dragStart.current = null;
+    if (!shouldCompleteMapNavigationPointer(pointerStart, e)) {
+      console.log('Skipping navigation without a matching map pointerdown');
+      return;
     }
     if (!humanPlayerId) {
       return;
@@ -305,6 +306,7 @@ function EventAgentMarker({
       hitArea={hitArea}
       pointerdown={stopMarkerPropagation}
       pointerup={handlePointerUp}
+      pointerupoutside={stopMarkerPropagation}
     >
       <Graphics draw={draw} />
       <Text
