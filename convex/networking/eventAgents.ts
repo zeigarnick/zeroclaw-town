@@ -11,6 +11,7 @@ import {
   normalizeEventPublicCard,
   toEventPublicCardView,
 } from './eventCards';
+import { createEventWorld, ensureEventSpaceWorld } from './eventWorlds';
 import { writeEventOrganizerAuditEvent } from './eventOrganizerControls';
 import { enforceEventRateLimit } from './eventRateLimits';
 import {
@@ -320,11 +321,14 @@ async function getOrCreateEventSpace(ctx: MutationCtx, eventId: string, now: num
     .withIndex('by_event_id', (q) => q.eq('eventId', eventId))
     .first();
   if (existing) {
-    return existing;
+    return await ensureEventSpaceWorld(ctx, existing, { now });
   }
+  const eventWorld = await createEventWorld(ctx, { now });
   const eventSpaceId = await ctx.db.insert('eventSpaces', {
     eventId,
     title: titleizeEventId(eventId),
+    worldTemplateId: eventWorld.worldTemplateId,
+    worldId: eventWorld.worldId,
     registrationStatus: 'open',
     createdAt: now,
     updatedAt: now,

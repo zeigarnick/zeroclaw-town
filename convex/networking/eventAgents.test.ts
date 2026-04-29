@@ -11,7 +11,11 @@ type TableName =
   | 'eventAgents'
   | 'eventNetworkingCards'
   | 'eventOwnerSessions'
-  | 'eventOrganizerAuditEvents';
+  | 'eventOrganizerAuditEvents'
+  | 'worlds'
+  | 'worldStatus'
+  | 'maps'
+  | 'engines';
 type Row = Record<string, any> & { _id: string };
 
 function createMockCtx() {
@@ -21,6 +25,10 @@ function createMockCtx() {
     eventNetworkingCards: [],
     eventOwnerSessions: [],
     eventOrganizerAuditEvents: [],
+    worlds: [],
+    worldStatus: [],
+    maps: [],
+    engines: [],
   };
   const counters: Record<TableName, number> = {
     eventSpaces: 0,
@@ -28,6 +36,10 @@ function createMockCtx() {
     eventNetworkingCards: 0,
     eventOwnerSessions: 0,
     eventOrganizerAuditEvents: 0,
+    worlds: 0,
+    worldStatus: 0,
+    maps: 0,
+    engines: 0,
   };
 
   const db = {
@@ -66,7 +78,11 @@ function createMockCtx() {
     }),
   };
 
-  return { ctx: { db }, tables };
+  const scheduler = {
+    runAfter: async () => undefined,
+  };
+
+  return { ctx: { db, scheduler }, tables };
 }
 
 function findById(tables: Record<TableName, Row[]>, id: string) {
@@ -134,6 +150,24 @@ describe('event agent handlers', () => {
     expect(registration.ownerSessionToken).toMatch(/^event_owner_/);
 
     expect(tables.eventSpaces).toHaveLength(1);
+    expect(tables.eventSpaces[0]).toMatchObject({
+      worldTemplateId: 'clawport-terminal',
+      worldId: tables.worlds[0]._id,
+    });
+    expect(tables.worlds).toHaveLength(1);
+    expect(tables.worldStatus).toEqual([
+      expect.objectContaining({
+        worldId: tables.worlds[0]._id,
+        isDefault: false,
+        status: 'running',
+      }),
+    ]);
+    expect(tables.maps).toEqual([
+      expect.objectContaining({
+        worldId: tables.worlds[0]._id,
+        tileSetUrl: '/ai-town/assets/clawport-terminal/clawport-terminal-tileset.png',
+      }),
+    ]);
     expect(tables.eventAgents).toHaveLength(1);
     expect(tables.eventNetworkingCards).toHaveLength(1);
     expect(tables.eventOwnerSessions).toHaveLength(1);

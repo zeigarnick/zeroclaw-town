@@ -2,6 +2,7 @@ import { v } from 'convex/values';
 import { Doc, Id } from '../_generated/dataModel';
 import { MutationCtx, QueryCtx, mutation, query } from '../_generated/server';
 import { networkingError } from './auth';
+import { createEventWorld, ensureEventSpaceWorld } from './eventWorlds';
 import { enforceEventRateLimit } from './eventRateLimits';
 import { EventOrganizerAuditType, MAX_EVENT_REVIEW_NOTE_LENGTH } from './validators';
 
@@ -399,11 +400,14 @@ async function getOrCreateEventSpace(ctx: MutationCtx, eventId: string, now: num
     .withIndex('by_event_id', (q) => q.eq('eventId', eventId))
     .first();
   if (existing) {
-    return existing;
+    return await ensureEventSpaceWorld(ctx, existing, { now });
   }
+  const eventWorld = await createEventWorld(ctx, { now });
   const eventSpaceId = await ctx.db.insert('eventSpaces', {
     eventId,
     title: titleizeEventId(eventId),
+    worldTemplateId: eventWorld.worldTemplateId,
+    worldId: eventWorld.worldId,
     registrationStatus: 'open',
     createdAt: now,
     updatedAt: now,

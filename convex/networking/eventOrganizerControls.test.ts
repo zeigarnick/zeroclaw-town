@@ -1,5 +1,6 @@
 import { ConvexError } from 'convex/values';
 import { decideOwnerReviewHandler, listApprovedPublicCardsHandler, registerEventAgentHandler } from './eventAgents';
+import { getEventSpaceConfigHandler } from './eventSpaces';
 import {
   listHighVolumeRequestersHandler,
   listSuspiciousRegistrationsHandler,
@@ -15,7 +16,11 @@ type TableName =
   | 'eventAgents'
   | 'eventNetworkingCards'
   | 'eventOwnerSessions'
-  | 'eventOrganizerAuditEvents';
+  | 'eventOrganizerAuditEvents'
+  | 'worlds'
+  | 'worldStatus'
+  | 'maps'
+  | 'engines';
 type Row = Record<string, any> & { _id: string };
 
 const ORGANIZER_TOKEN = 'organizer-secret';
@@ -27,6 +32,10 @@ function createMockCtx() {
     eventNetworkingCards: [],
     eventOwnerSessions: [],
     eventOrganizerAuditEvents: [],
+    worlds: [],
+    worldStatus: [],
+    maps: [],
+    engines: [],
   };
   const counters: Record<TableName, number> = {
     eventSpaces: 0,
@@ -34,6 +43,10 @@ function createMockCtx() {
     eventNetworkingCards: 0,
     eventOwnerSessions: 0,
     eventOrganizerAuditEvents: 0,
+    worlds: 0,
+    worldStatus: 0,
+    maps: 0,
+    engines: 0,
   };
 
   const db = {
@@ -72,7 +85,11 @@ function createMockCtx() {
     }),
   };
 
-  return { ctx: { db }, tables };
+  const scheduler = {
+    runAfter: async () => undefined,
+  };
+
+  return { ctx: { db, scheduler }, tables };
 }
 
 function findById(tables: Record<TableName, Row[]>, id: string) {
@@ -152,9 +169,17 @@ describe('event organizer controls', () => {
     });
     expect(paused).toMatchObject({
       eventId: 'demo-event',
+      worldTemplateId: 'clawport-terminal',
+      worldId: tables.worlds[0]._id,
       registrationStatus: 'paused',
       registrationPausedAt: expect.any(Number),
     });
+    expect(tables.worldStatus).toEqual([
+      expect.objectContaining({
+        worldId: tables.worlds[0]._id,
+        isDefault: false,
+      }),
+    ]);
 
     await expect(
       registerEventAgentHandler(ctx as any, {
@@ -211,6 +236,11 @@ describe('event organizer controls', () => {
       eventId: 'demo-event',
       skillUrl: 'https://event.example/skill.md',
       skillUrlRotatedAt: expect.any(Number),
+    });
+    await expect(getEventSpaceConfigHandler(ctx as any, { eventId: 'demo-event' })).resolves.toMatchObject({
+      eventId: 'demo-event',
+      skillUrl: 'https://event.example/skill.md',
+      skillUrlRotatedAt: updated.skillUrlRotatedAt,
     });
   });
 
