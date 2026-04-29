@@ -2,7 +2,11 @@ import * as PIXI from 'pixi.js';
 import { Container, Graphics, Text, useApp } from '@pixi/react';
 import { Player, SelectElement } from './Player.tsx';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { PixiStaticMap } from './PixiStaticMap.tsx';
+import {
+  hasAboveCharacterFixedSprites,
+  PixiFixedSprites,
+  PixiStaticMap,
+} from './PixiStaticMap.tsx';
 import PixiMapLayer, { getAboveCharacterLayers } from './PixiMapLayer.tsx';
 import PixiViewport from './PixiViewport.tsx';
 import { Viewport } from 'pixi-viewport';
@@ -171,6 +175,9 @@ export const PixiGame = (props: {
           }
         />
       ))}
+      {hasAboveCharacterFixedSprites(props.game.worldMap) && (
+        <PixiFixedSprites map={props.game.worldMap} renderLayer="aboveCharacters" />
+      )}
       {eventTownMarkers.map((marker) => (
         <EventAgentMarker
           key={marker.key}

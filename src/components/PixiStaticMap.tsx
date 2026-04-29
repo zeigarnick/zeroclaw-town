@@ -63,17 +63,33 @@ type StaticMapContainer = PIXI.Container & {
   _animationGeneration: number;
 };
 
+type FixedSpriteRenderLayer = 'belowCharacters' | 'aboveCharacters';
+
 const applyMapHitArea = (container: PIXI.Container, map: WorldMap): void => {
   container.interactive = true;
   container.hitArea = new PIXI.Rectangle(0, 0, map.width * map.tileDim, map.height * map.tileDim);
 };
 
-const renderFixedSprites = (container: StaticMapContainer, map: WorldMap): void => {
-  container._fixedSpriteLayerContainer.removeChildren();
+const isFixedSpriteInRenderLayer = (
+  sprite: FixedSprite,
+  renderLayer: FixedSpriteRenderLayer,
+): boolean => {
+  if (renderLayer === 'belowCharacters') {
+    return sprite.layer <= 0;
+  }
+  return sprite.layer > 0;
+};
 
-  const sprites = [...(map.fixedSprites ?? [])].sort((first, second) =>
-    first.layer - second.layer || first.order - second.order,
-  );
+const renderFixedSprites = (
+  container: PIXI.Container,
+  map: WorldMap,
+  renderLayer: FixedSpriteRenderLayer,
+): void => {
+  container.removeChildren();
+
+  const sprites = [...(map.fixedSprites ?? [])]
+    .filter((sprite) => isFixedSpriteInRenderLayer(sprite, renderLayer))
+    .sort((first, second) => first.layer - second.layer || first.order - second.order);
   for (const sprite of sprites) {
     const baseTexture = PIXI.BaseTexture.from(sprite.url, {
       scaleMode: PIXI.SCALE_MODES.NEAREST,
@@ -84,7 +100,7 @@ const renderFixedSprites = (container: StaticMapContainer, map: WorldMap): void 
     pixiSprite.y = sprite.y;
     pixiSprite.width = sprite.width;
     pixiSprite.height = sprite.height;
-    container._fixedSpriteLayerContainer.addChild(pixiSprite);
+    container.addChild(pixiSprite);
   }
 };
 
@@ -140,10 +156,13 @@ const renderAnimatedSprites = (container: StaticMapContainer, map: WorldMap): vo
 
 const syncStaticMap = (container: StaticMapContainer, map: WorldMap): void => {
   renderTileLayers(container._tileLayerContainer, map, getBelowCharacterLayers(map));
-  renderFixedSprites(container, map);
+  renderFixedSprites(container._fixedSpriteLayerContainer, map, 'belowCharacters');
   renderAnimatedSprites(container, map);
   applyMapHitArea(container, map);
 };
+
+const hasFixedSpritesInLayer = (map: WorldMap, renderLayer: FixedSpriteRenderLayer): boolean =>
+  (map.fixedSprites ?? []).some((sprite) => isFixedSpriteInRenderLayer(sprite, renderLayer));
 
 const areAnimatedSpritesEquivalent = (
   first: AnimatedSprite[],
@@ -241,3 +260,25 @@ export const PixiStaticMap = PixiComponent('StaticMap', {
     applyDefaultProps(instance, oldProps, newProps);
   },
 });
+
+export const PixiFixedSprites = PixiComponent('FixedSprites', {
+  create: (props: { map: WorldMap; renderLayer: FixedSpriteRenderLayer; [k: string]: any }) => {
+    const container = new PIXI.Container();
+    renderFixedSprites(container, props.map, props.renderLayer);
+    return container;
+  },
+
+  applyProps: (instance, oldProps, newProps) => {
+    if (
+      !oldProps.map ||
+      oldProps.renderLayer !== newProps.renderLayer ||
+      !areFixedSpritesEquivalent(oldProps.map.fixedSprites, newProps.map.fixedSprites)
+    ) {
+      renderFixedSprites(instance, newProps.map, newProps.renderLayer);
+    }
+    applyDefaultProps(instance, oldProps, newProps);
+  },
+});
+
+export const hasAboveCharacterFixedSprites = (map: WorldMap): boolean =>
+  hasFixedSpritesInLayer(map, 'aboveCharacters');
