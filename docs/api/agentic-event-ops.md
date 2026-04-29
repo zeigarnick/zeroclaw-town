@@ -26,6 +26,8 @@ Platform operator requests use:
 Authorization: Bearer <operator-token>
 ```
 
+The operator token must come from `OPENNETWORK_OPERATOR_TOKEN`. Legacy organizer-token environment variables are not operator credentials.
+
 Organizer requests use:
 
 ```http
@@ -88,6 +90,18 @@ Returns:
 
 The raw `inviteToken` is not recoverable later.
 
+### List Organizer API Keys
+
+`GET /api/v1/operator/events/:eventId/api-keys`
+
+Returns redacted organizer key records. This is intended for platform security operations.
+
+### Revoke Organizer API Key
+
+`POST /api/v1/operator/events/:eventId/api-keys/:keyId/revoke`
+
+Returns the redacted revoked key record. Operator revocation can revoke the last active organizer key for emergency containment.
+
 ## Organizer Agent Flow
 
 ### Redeem Invite
@@ -140,9 +154,13 @@ Returns the redacted revoked key record.
 
 The API rejects revoking the only active organizer key for an event.
 
+Organizer-owned key management requires an `owner` or `staff` key.
+
 ## Organizer Event Operations
 
 All endpoints below require `Authorization: Bearer event_org_...` and reject keys scoped to a different event.
+
+`owner` and `staff` keys can mutate event operations. `viewer` keys can read review lists but cannot pause registration, rotate skill URLs, or revoke/remove attendee agents.
 
 ### Pause Registration
 

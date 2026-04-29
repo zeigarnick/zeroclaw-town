@@ -9,6 +9,7 @@ import {
 } from './auth';
 import {
   assertRedeemableEventOrganizerInvite,
+  assertPlatformOperatorCapability,
   authenticateEventOrganizerApiKey,
   EventOrganizerActor,
   organizerActorKeyForPrefix,
@@ -70,6 +71,23 @@ export const revokeOrganizerApiKey = mutation({
     keyId: v.id('eventOrganizerApiKeys'),
   },
   handler: (ctx, args) => revokeOrganizerApiKeyHandler(ctx, args),
+});
+
+export const operatorListOrganizerApiKeys = mutation({
+  args: {
+    operatorToken: v.string(),
+    eventId: v.string(),
+  },
+  handler: (ctx, args) => operatorListOrganizerApiKeysHandler(ctx, args),
+});
+
+export const operatorRevokeOrganizerApiKey = mutation({
+  args: {
+    operatorToken: v.string(),
+    eventId: v.string(),
+    keyId: v.id('eventOrganizerApiKeys'),
+  },
+  handler: (ctx, args) => operatorRevokeOrganizerApiKeyHandler(ctx, args),
 });
 
 export async function redeemOrganizerInviteHandler(
@@ -217,6 +235,59 @@ export async function revokeOrganizerApiKeyHandler(
     actorKind: 'organizer',
     actorKey: actor.actorKey,
     metadata: { keyPrefix: target.keyPrefix },
+    now,
+  });
+  return redactedKey({
+    ...target,
+    status: 'revoked',
+    revokedAt: now,
+    updatedAt: now,
+  });
+}
+
+export async function operatorListOrganizerApiKeysHandler(
+  ctx: MutationCtx,
+  args: { operatorToken: string; eventId: string },
+): Promise<RedactedOrganizerApiKey[]> {
+  assertPlatformOperatorCapability(args.operatorToken);
+  const eventId = normalizeEventId(args.eventId);
+  const keys = await ctx.db
+    .query('eventOrganizerApiKeys')
+    .withIndex('by_event_created_at', (q) => q.eq('eventId', eventId))
+    .collect();
+  return keys
+    .sort((left, right) => right.createdAt - left.createdAt)
+    .map((key) => redactedKey(key));
+}
+
+export async function operatorRevokeOrganizerApiKeyHandler(
+  ctx: MutationCtx,
+  args: { operatorToken: string; eventId: string; keyId: Id<'eventOrganizerApiKeys'> },
+): Promise<RedactedOrganizerApiKey> {
+  const actor = assertPlatformOperatorCapability(args.operatorToken);
+  const eventId = normalizeEventId(args.eventId);
+  const target = await mustGetOrganizerApiKey(ctx, args.keyId);
+  if (target.eventId !== eventId) {
+    throw networkingError(
+      'event_scope_mismatch',
+      'The organizer API key is not scoped to this event.',
+    );
+  }
+  if (target.status === 'revoked') {
+    return redactedKey(target);
+  }
+  const now = Date.now();
+  await ctx.db.patch(target._id, {
+    status: 'revoked',
+    revokedAt: now,
+    updatedAt: now,
+  });
+  await writeEventOrganizerAuditEvent(ctx, {
+    eventId,
+    type: 'organizer_api_key_revoked',
+    actorKind: actor.kind,
+    actorKey: actor.actorKey,
+    metadata: { keyPrefix: target.keyPrefix, operatorOverride: true },
     now,
   });
   return redactedKey({

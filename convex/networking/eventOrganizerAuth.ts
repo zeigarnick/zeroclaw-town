@@ -2,12 +2,7 @@ import { Doc, Id } from '../_generated/dataModel';
 import { MutationCtx, QueryCtx } from '../_generated/server';
 import { getKeyPrefix, hashSecret, networkingError } from './auth';
 
-const OPERATOR_TOKEN_ENV_KEYS = [
-  'OPENNETWORK_OPERATOR_TOKEN',
-  'OPENNETWORK_ORGANIZER_TOKEN',
-  'EVENT_ORGANIZER_TOKEN',
-  'NETWORKING_ORGANIZER_TOKEN',
-] as const;
+const OPERATOR_TOKEN_ENV_KEY = 'OPENNETWORK_OPERATOR_TOKEN';
 
 export type EventOrganizerActor = {
   kind: 'organizer';
@@ -132,11 +127,5 @@ export function organizerActorKeyForPrefix(keyPrefix: string) {
 }
 
 function getConfiguredOperatorToken() {
-  for (const key of OPERATOR_TOKEN_ENV_KEYS) {
-    const value = process.env[key]?.trim();
-    if (value) {
-      return value;
-    }
-  }
-  return undefined;
+  return process.env[OPERATOR_TOKEN_ENV_KEY]?.trim() || undefined;
 }

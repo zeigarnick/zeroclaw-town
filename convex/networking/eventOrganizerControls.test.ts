@@ -252,6 +252,37 @@ describe('event organizer controls', () => {
     });
   });
 
+  test('allows viewer keys to read review lists but not mutate event operations', async () => {
+    const { ctx } = createMockCtx();
+    await seedOrganizerKey(ctx, { role: 'viewer' });
+
+    await expect(
+      listSuspiciousRegistrationsHandler(ctx as any, {
+        eventId: 'demo-event',
+        organizerApiKey: ORGANIZER_API_KEY,
+      }),
+    ).resolves.toEqual([]);
+
+    await expect(
+      pauseEventRegistrationHandler(ctx as any, {
+        eventId: 'demo-event',
+        organizerApiKey: ORGANIZER_API_KEY,
+      }),
+    ).rejects.toMatchObject({
+      data: { code: 'event_scope_mismatch' },
+    } satisfies Partial<ConvexError<{ code: string }>>);
+
+    await expect(
+      rotateEventSkillUrlHandler(ctx as any, {
+        eventId: 'demo-event',
+        organizerApiKey: ORGANIZER_API_KEY,
+        skillUrl: 'https://event.example/skill.md',
+      }),
+    ).rejects.toMatchObject({
+      data: { code: 'event_scope_mismatch' },
+    } satisfies Partial<ConvexError<{ code: string }>>);
+  });
+
   test('revokes approved agents from public cards and owner review lookup', async () => {
     const { ctx, tables } = createMockCtx();
     await seedOrganizerKey(ctx);

@@ -152,7 +152,7 @@ export function generateVerificationCode() {
 }
 
 export function getKeyPrefix(apiKey: string) {
-  return apiKey.slice(0, 12);
+  return apiKey.slice(0, 20);
 }
 
 export function formatClaimUrl(claimBaseUrl: string, claimToken: string) {

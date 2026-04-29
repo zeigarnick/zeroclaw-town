@@ -117,6 +117,7 @@ export async function pauseEventRegistrationHandler(
 ) {
   const eventId = normalizeEventId(args.eventId);
   const actor = await authenticateOrganizerForEvent(ctx, eventId, args.organizerApiKey);
+  assertCanManageEventOperations(actor);
   await enforceEventRateLimit(ctx, 'eventOrganizerAction', [eventId, 'pause']);
   const now = Date.now();
   const eventSpace = await getOrCreateEventSpace(ctx, eventId, now);
@@ -142,6 +143,7 @@ export async function resumeEventRegistrationHandler(
 ) {
   const eventId = normalizeEventId(args.eventId);
   const actor = await authenticateOrganizerForEvent(ctx, eventId, args.organizerApiKey);
+  assertCanManageEventOperations(actor);
   await enforceEventRateLimit(ctx, 'eventOrganizerAction', [eventId, 'resume']);
   const now = Date.now();
   const eventSpace = await getOrCreateEventSpace(ctx, eventId, now);
@@ -166,6 +168,7 @@ export async function rotateEventSkillUrlHandler(
 ) {
   const eventId = normalizeEventId(args.eventId);
   const actor = await authenticateOrganizerForEvent(ctx, eventId, args.organizerApiKey);
+  assertCanManageEventOperations(actor);
   await enforceEventRateLimit(ctx, 'eventOrganizerAction', [eventId, 'rotate-skill-url']);
   const skillUrl = normalizeSkillUrl(args.skillUrl);
   const now = Date.now();
@@ -195,9 +198,10 @@ export async function revokeEventAgentHandler(
     reason?: string;
     remove?: boolean;
   },
-) {
+  ) {
   const eventId = normalizeEventId(args.eventId);
   const actor = await authenticateOrganizerForEvent(ctx, eventId, args.organizerApiKey);
+  assertCanManageEventOperations(actor);
   await enforceEventRateLimit(ctx, 'eventOrganizerAction', [
     eventId,
     args.remove ? 'remove-agent' : 'revoke-agent',
@@ -375,6 +379,15 @@ async function authenticateOrganizerForEvent(
     eventId,
     organizerApiKey,
   });
+}
+
+function assertCanManageEventOperations(actor: EventOrganizerActor) {
+  if (actor.role !== 'owner' && actor.role !== 'staff') {
+    throw networkingError(
+      'event_scope_mismatch',
+      'This organizer API key cannot modify event operations.',
+    );
+  }
 }
 
 async function getOrCreateEventSpace(ctx: MutationCtx, eventId: string, now: number) {

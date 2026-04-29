@@ -23,6 +23,7 @@ V1 uses long-lived revocable API keys.
 
 - The platform operator uses a configured global bearer token only for operator-level APIs.
 - Operator APIs can create events and generate event organizer invites.
+- Operator APIs can list and revoke event organizer API keys for emergency containment.
 - Organizer invites are single-use, expiring, and stored only as hashes.
 - Redeeming an invite creates an event-scoped organizer API key.
 - Organizer API keys are long-lived, revocable, stored only as hashes, and scoped to one event.
@@ -39,6 +40,8 @@ Core endpoints:
 - `POST /api/v1/operator/events`: create or upsert an event.
 - `GET /api/v1/operator/events/:eventId`: read event status and configuration.
 - `POST /api/v1/operator/events/:eventId/organizer-invites`: create an organizer invite link.
+- `GET /api/v1/operator/events/:eventId/api-keys`: list redacted organizer API keys.
+- `POST /api/v1/operator/events/:eventId/api-keys/:keyId/revoke`: revoke an organizer API key, including the last active key during containment.
 - `POST /api/v1/operator/events/:eventId/archive`: archive or disable an event when that lifecycle state exists.
 
 Operator requests use `Authorization: Bearer <operator-token>`.
@@ -66,6 +69,8 @@ Core endpoints:
 Organizer requests use `Authorization: Bearer <event-organizer-api-key>`.
 
 Every organizer endpoint must verify that the key is active and scoped to the requested `eventId`.
+
+`owner` and `staff` organizer keys can mutate event operations and manage organizer keys. `viewer` keys can read review lists but cannot mutate registration, skill URLs, attendee agents, or organizer keys.
 
 ## Event Creation And Invite Flow
 
@@ -108,6 +113,7 @@ These codes are important because AI agents should be able to reason about recov
 - An organizer or organizer AI agent can redeem the invite and receive a long-lived event-scoped API key.
 - An organizer AI agent can manage registration, skill URL rotation, suspicious registrations, high-volume requesters, and attendee revocation through authenticated APIs.
 - A stolen or retired organizer key can be revoked without changing the global operator token.
+- A platform operator can revoke the last active organizer key during a security incident.
 - Organizer API keys cannot manage another event.
 
 ## Implementation Note

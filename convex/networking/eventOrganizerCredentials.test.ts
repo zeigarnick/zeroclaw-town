@@ -8,6 +8,8 @@ import {
 import {
   createOrganizerApiKeyHandler,
   listOrganizerApiKeysHandler,
+  operatorListOrganizerApiKeysHandler,
+  operatorRevokeOrganizerApiKeyHandler,
   redeemOrganizerInviteHandler,
   revokeOrganizerApiKeyHandler,
 } from './eventOrganizerCredentials';
@@ -132,6 +134,20 @@ async function insertKey(
 }
 
 describe('event organizer credentials', () => {
+  const originalOperatorToken = process.env.OPENNETWORK_OPERATOR_TOKEN;
+
+  beforeEach(() => {
+    process.env.OPENNETWORK_OPERATOR_TOKEN = 'operator-secret';
+  });
+
+  afterEach(() => {
+    if (originalOperatorToken === undefined) {
+      delete process.env.OPENNETWORK_OPERATOR_TOKEN;
+    } else {
+      process.env.OPENNETWORK_OPERATOR_TOKEN = originalOperatorToken;
+    }
+  });
+
   test('redeems an invite into a long-lived organizer API key once', async () => {
     const { ctx, tables } = createMockCtx();
     const inviteToken = generateEventOrganizerInviteToken();
@@ -232,5 +248,35 @@ describe('event organizer credentials', () => {
     ).rejects.toMatchObject({
       data: { code: 'invalid_public_field' },
     } satisfies Partial<ConvexError<{ code: string }>>);
+  });
+
+  test('lets platform operators list and revoke even the last active organizer key', async () => {
+    const { ctx, tables } = createMockCtx();
+    const primaryKey = generateEventOrganizerApiKey();
+    const primaryKeyId = await insertKey(ctx, primaryKey);
+
+    const listed = await operatorListOrganizerApiKeysHandler(ctx as any, {
+      eventId: 'demo-event',
+      operatorToken: 'operator-secret',
+    });
+    const revoked = await operatorRevokeOrganizerApiKeyHandler(ctx as any, {
+      eventId: 'demo-event',
+      operatorToken: 'operator-secret',
+      keyId: primaryKeyId as any,
+    });
+
+    expect(listed).toHaveLength(1);
+    expect(JSON.stringify(listed)).not.toContain(primaryKey);
+    expect(revoked).toMatchObject({
+      keyId: primaryKeyId,
+      status: 'revoked',
+      revokedAt: expect.any(Number),
+    });
+    expect(tables.eventOrganizerApiKeys[0].status).toBe('revoked');
+    expect(tables.eventOrganizerAuditEvents[0]).toMatchObject({
+      type: 'organizer_api_key_revoked',
+      actorKind: 'platform_operator',
+      actorKey: 'configured-platform-operator',
+    });
   });
 });

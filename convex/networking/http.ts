@@ -129,6 +129,12 @@ const functions = {
     revokeOrganizerApiKey: makeFunctionReference<'mutation'>(
       'networking/eventOrganizerCredentials:revokeOrganizerApiKey',
     ),
+    operatorListOrganizerApiKeys: makeFunctionReference<'mutation'>(
+      'networking/eventOrganizerCredentials:operatorListOrganizerApiKeys',
+    ),
+    operatorRevokeOrganizerApiKey: makeFunctionReference<'mutation'>(
+      'networking/eventOrganizerCredentials:operatorRevokeOrganizerApiKey',
+    ),
   },
   eventOperatorControls: {
     createOrUpdateEvent: makeFunctionReference<'mutation'>(
@@ -215,6 +221,36 @@ export async function handleNetworkingHttpRequest(
       const data = await ctx.runQuery(functions.eventOperatorControls.getOperatorEvent, {
         operatorToken: requireOperatorToken(request.headers.get('Authorization')),
         eventId: requirePathId(route[2], 'eventId'),
+      });
+      return jsonSuccess(data);
+    }
+
+    if (
+      request.method === 'GET' &&
+      route[0] === 'operator' &&
+      route[1] === 'events' &&
+      route[3] === 'api-keys' &&
+      route.length === 4
+    ) {
+      const data = await ctx.runMutation(functions.eventOrganizerCredentials.operatorListOrganizerApiKeys, {
+        operatorToken: requireOperatorToken(request.headers.get('Authorization')),
+        eventId: requirePathId(route[2], 'eventId'),
+      });
+      return jsonSuccess(data);
+    }
+
+    if (
+      request.method === 'POST' &&
+      route[0] === 'operator' &&
+      route[1] === 'events' &&
+      route[3] === 'api-keys' &&
+      route[5] === 'revoke' &&
+      route.length === 6
+    ) {
+      const data = await ctx.runMutation(functions.eventOrganizerCredentials.operatorRevokeOrganizerApiKey, {
+        operatorToken: requireOperatorToken(request.headers.get('Authorization')),
+        eventId: requirePathId(route[2], 'eventId'),
+        keyId: requirePathId(route[4], 'keyId'),
       });
       return jsonSuccess(data);
     }
@@ -1259,6 +1295,7 @@ function jsonError(code: string, message: string, status: number) {
 function jsonHeaders() {
   const headers = new Headers(CORS_HEADERS);
   headers.set('Content-Type', 'application/json');
+  headers.set('Cache-Control', 'no-store');
   return headers;
 }
 

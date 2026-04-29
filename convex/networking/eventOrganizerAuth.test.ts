@@ -120,12 +120,18 @@ async function insertOrganizerInvite(
 
 describe('event organizer auth', () => {
   const originalOperatorToken = process.env.OPENNETWORK_OPERATOR_TOKEN;
+  const originalLegacyOrganizerToken = process.env.OPENNETWORK_ORGANIZER_TOKEN;
 
   afterEach(() => {
     if (originalOperatorToken === undefined) {
       delete process.env.OPENNETWORK_OPERATOR_TOKEN;
     } else {
       process.env.OPENNETWORK_OPERATOR_TOKEN = originalOperatorToken;
+    }
+    if (originalLegacyOrganizerToken === undefined) {
+      delete process.env.OPENNETWORK_ORGANIZER_TOKEN;
+    } else {
+      process.env.OPENNETWORK_ORGANIZER_TOKEN = originalLegacyOrganizerToken;
     }
   });
 
@@ -137,6 +143,15 @@ describe('event organizer auth', () => {
       actorKey: 'configured-platform-operator',
     });
     expect(() => assertPlatformOperatorCapability('wrong-secret')).toThrow(
+      'A configured platform operator bearer token is required.',
+    );
+  });
+
+  test('does not accept legacy organizer env vars as platform operator tokens', () => {
+    delete process.env.OPENNETWORK_OPERATOR_TOKEN;
+    process.env.OPENNETWORK_ORGANIZER_TOKEN = 'legacy-organizer-secret';
+
+    expect(() => assertPlatformOperatorCapability('legacy-organizer-secret')).toThrow(
       'A configured platform operator bearer token is required.',
     );
   });

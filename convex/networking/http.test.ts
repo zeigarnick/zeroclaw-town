@@ -524,6 +524,60 @@ describe('networking HTTP helpers', () => {
     });
   });
 
+  test('routes platform operator organizer key list and revocation', async () => {
+    const calls: Array<{ kind: string; args: any }> = [];
+    const ctx = {
+      runMutation: async (_funcRef: unknown, args: any) => {
+        calls.push({ kind: 'mutation', args });
+        if ('keyId' in args) {
+          return { keyId: args.keyId, status: 'revoked' };
+        }
+        return [];
+      },
+      runQuery: async () => {
+        throw new Error('unexpected query');
+      },
+    };
+
+    const listResponse = await handleNetworkingHttpRequest(
+      ctx,
+      new Request('https://town.example/api/v1/operator/events/demo-event/api-keys', {
+        method: 'GET',
+        headers: { Authorization: 'Bearer operator-secret' },
+      }),
+    );
+    const revokeResponse = await handleNetworkingHttpRequest(
+      ctx,
+      new Request(
+        'https://town.example/api/v1/operator/events/demo-event/api-keys/eventOrganizerApiKeys:1/revoke',
+        {
+          method: 'POST',
+          headers: { Authorization: 'Bearer operator-secret' },
+        },
+      ),
+    );
+
+    expect(listResponse.status).toBe(200);
+    expect(revokeResponse.status).toBe(200);
+    expect(calls).toEqual([
+      {
+        kind: 'mutation',
+        args: {
+          operatorToken: 'operator-secret',
+          eventId: 'demo-event',
+        },
+      },
+      {
+        kind: 'mutation',
+        args: {
+          operatorToken: 'operator-secret',
+          eventId: 'demo-event',
+          keyId: 'eventOrganizerApiKeys:1',
+        },
+      },
+    ]);
+  });
+
   test('routes organizer invite redemption and key management', async () => {
     const calls: Array<{ kind: string; args: any }> = [];
     const ctx = {
