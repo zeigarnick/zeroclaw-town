@@ -15,6 +15,7 @@ export type NetworkingErrorCode =
   | 'duplicate_event_connection_intent'
   | 'duplicate_event_agent'
   | 'empty_card_text'
+  | 'event_activity_not_found'
   | 'event_agent_not_approved'
   | 'contact_field_not_public'
   | 'event_agent_not_found'
@@ -135,9 +136,7 @@ export function getKeyPrefix(apiKey: string) {
 }
 
 export function formatClaimUrl(claimBaseUrl: string, claimToken: string) {
-  const normalizedBaseUrl = claimBaseUrl.endsWith('/')
-    ? claimBaseUrl.slice(0, -1)
-    : claimBaseUrl;
+  const normalizedBaseUrl = claimBaseUrl.endsWith('/') ? claimBaseUrl.slice(0, -1) : claimBaseUrl;
   return `${normalizedBaseUrl}/${claimToken}`;
 }
 

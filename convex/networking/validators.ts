@@ -61,8 +61,7 @@ export const recommendationStatusValidator = v.union(
 );
 
 export const recommendationSuppressionReasons = ['dismissed', 'declined'] as const;
-export type RecommendationSuppressionReason =
-  (typeof recommendationSuppressionReasons)[number];
+export type RecommendationSuppressionReason = (typeof recommendationSuppressionReasons)[number];
 export const recommendationSuppressionReasonValidator = v.union(
   v.literal('dismissed'),
   v.literal('declined'),
@@ -96,10 +95,7 @@ export const inboxEventStatusValidator = v.union(
 
 export const eventRegistrationStatuses = ['open', 'paused'] as const;
 export type EventRegistrationStatus = (typeof eventRegistrationStatuses)[number];
-export const eventRegistrationStatusValidator = v.union(
-  v.literal('open'),
-  v.literal('paused'),
-);
+export const eventRegistrationStatusValidator = v.union(v.literal('open'), v.literal('paused'));
 
 export const eventAgentStatuses = [
   'pending_owner_review',
@@ -157,13 +153,11 @@ export const eventConnectionIntentStatusValidator = v.union(
   v.literal('recipient_declined'),
 );
 
-export const eventAvatarCategories = [
-  'hair',
-  'skinTone',
-  'clothing',
-  'hat',
-  'accessory',
-] as const;
+export const eventActivityTypes = ['match_created'] as const;
+export type EventActivityType = (typeof eventActivityTypes)[number];
+export const eventActivityTypeValidator = v.union(v.literal('match_created'));
+
+export const eventAvatarCategories = ['hair', 'skinTone', 'clothing', 'hat', 'accessory'] as const;
 export type EventAvatarCategory = (typeof eventAvatarCategories)[number];
 export const eventAvatarCategoryValidator = v.union(
   v.literal('hair'),
@@ -175,10 +169,7 @@ export const eventAvatarCategoryValidator = v.union(
 
 export const eventAvatarAssetStatuses = ['active', 'disabled'] as const;
 export type EventAvatarAssetStatus = (typeof eventAvatarAssetStatuses)[number];
-export const eventAvatarAssetStatusValidator = v.union(
-  v.literal('active'),
-  v.literal('disabled'),
-);
+export const eventAvatarAssetStatusValidator = v.union(v.literal('active'), v.literal('disabled'));
 
 export const eventPublicCardFieldNames = [
   'role',

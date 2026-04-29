@@ -2,6 +2,7 @@ import { v } from 'convex/values';
 import { Doc, Id } from '../_generated/dataModel';
 import { MutationCtx, QueryCtx, mutation, query } from '../_generated/server';
 import { networkingError } from './auth';
+import { createMatchActivityForApprovedIntent } from './eventActivity';
 import { toEventConnectionIntentView } from './eventConnectionIntents';
 import { authenticateApprovedEventOwnerSession, normalizeEventId } from './eventAgents';
 import { MAX_EVENT_PUBLIC_TEXT_LENGTH } from './validators';
@@ -188,6 +189,7 @@ export async function decideEventConnectionIntentHandler(
       'The connection intent could not be loaded.',
     );
   }
+  await createMatchActivityForApprovedIntent(ctx, updated, now);
   return {
     intent: toEventConnectionIntentView(updated),
     reveal,
@@ -274,7 +276,10 @@ async function createContactReveal(
   });
   const reveal = await ctx.db.get(revealId);
   if (!reveal) {
-    throw networkingError('event_contact_reveal_not_found', 'The contact reveal could not be loaded.');
+    throw networkingError(
+      'event_contact_reveal_not_found',
+      'The contact reveal could not be loaded.',
+    );
   }
   return toEventContactRevealView(reveal);
 }

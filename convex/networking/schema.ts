@@ -5,6 +5,7 @@ import {
   cardStatusValidator,
   cardTypeValidator,
   conversationStatusValidator,
+  eventActivityTypeValidator,
   eventAgentStatusValidator,
   eventAvatarAssetStatusValidator,
   eventAvatarCategoryValidator,
@@ -195,7 +196,11 @@ export const networkingTables = {
   })
     .index('by_meeting', ['meetingId'])
     .index('by_participant_one_status_updated_at', ['participantOneAgentId', 'status', 'updatedAt'])
-    .index('by_participant_two_status_updated_at', ['participantTwoAgentId', 'status', 'updatedAt']),
+    .index('by_participant_two_status_updated_at', [
+      'participantTwoAgentId',
+      'status',
+      'updatedAt',
+    ]),
 
   agentMessages: defineTable({
     conversationId: v.id('agentConversations'),
@@ -220,7 +225,10 @@ export const networkingTables = {
     recommendedNextStep: v.string(),
     status: introCandidateStatusValidator,
     createdByAgentId: v.id('networkAgents'),
-    qualificationMode: v.union(v.literal('conversation_closed'), v.literal('explicit_qualification')),
+    qualificationMode: v.union(
+      v.literal('conversation_closed'),
+      v.literal('explicit_qualification'),
+    ),
     requesterReviewedAt: v.optional(v.number()),
     responderReviewedAt: v.optional(v.number()),
     createdAt: v.number(),
@@ -352,6 +360,19 @@ export const networkingTables = {
     .index('by_requester_and_status', ['requesterAgentId', 'status'])
     .index('by_target_and_status', ['targetAgentId', 'status'])
     .index('by_dedupe_key', ['dedupeKey']),
+
+  eventActivityEvents: defineTable({
+    eventId: v.string(),
+    type: eventActivityTypeValidator,
+    requesterDisplayName: v.string(),
+    targetDisplayName: v.string(),
+    sourceIntentId: v.id('eventConnectionIntents'),
+    payload: v.object({
+      matchKind: v.literal('recipient_approved'),
+    }),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index('by_event_type_created_at', ['eventId', 'type', 'createdAt']),
 
   eventRecipientRules: defineTable({
     eventId: v.string(),
