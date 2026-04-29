@@ -12,6 +12,10 @@
       "destination": "/"
     },
     {
+      "source": "/event-review/:match*",
+      "destination": "/"
+    },
+    {
       "source": "/ai-town/:match*",
       "destination": "/:match*"
     }
