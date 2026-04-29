@@ -47,9 +47,18 @@ export default function FreezeButton({ eventId }: { eventId?: string }) {
       disabled={!worldStatus}
     >
       <div className="flex h-full w-full items-center justify-center bg-clay-700">
-        <span className="flex size-5 items-center justify-center font-body text-base leading-none tracking-normal [image-rendering:pixelated] sm:size-6 sm:text-lg">
-          {frozen ? '>' : '||'}
-        </span>
+        {frozen ? (
+          <span aria-hidden="true" className="relative block size-5 sm:size-6">
+            <span className="absolute left-[35%] top-[20%] h-[60%] w-[18%] bg-white" />
+            <span className="absolute left-[53%] top-[31%] h-[38%] w-[18%] bg-white" />
+            <span className="absolute left-[71%] top-[42%] h-[16%] w-[18%] bg-white" />
+          </span>
+        ) : (
+          <span aria-hidden="true" className="flex size-5 justify-center gap-1 sm:size-6">
+            <span className="h-full w-1.5 bg-white sm:w-2" />
+            <span className="h-full w-1.5 bg-white sm:w-2" />
+          </span>
+        )}
       </div>
     </button>
   );
