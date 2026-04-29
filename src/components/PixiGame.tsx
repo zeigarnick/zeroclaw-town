@@ -23,6 +23,7 @@ import type {
 import { useHistoricalValue } from '../hooks/useHistoricalValue.ts';
 import { Location, locationFields, playerLocation } from '../../convex/aiTown/location.ts';
 import { Player as ServerPlayer } from '../../convex/aiTown/player.ts';
+import { buildEventTownMarkers, EventTownMarker } from '../networking/eventTownMarkers.ts';
 
 const NETWORKING_BADGE_META: Record<
   NetworkingTownStatus,
@@ -110,6 +111,16 @@ export const PixiGame = (props: {
     [props.game.worldMap.aboveCharacterLayers, props.game.worldMap.visualLayers],
   );
   const players = [...props.game.world.players.values()];
+  const eventTownMarkers = useMemo(
+    () =>
+      buildEventTownMarkers({
+        agents: props.networkingProjection?.agents ?? [],
+        mapWidth: width,
+        mapHeight: height,
+        tileDim,
+      }),
+    [props.networkingProjection?.agents, width, height, tileDim],
+  );
 
   // Zoom on the user’s avatar when it is created
   useEffect(() => {
@@ -156,6 +167,9 @@ export const PixiGame = (props: {
             (props.networkingProjection?.agentsByPlayerId[p.id]?.counts.talking ?? 0) > 0
           }
         />
+      ))}
+      {eventTownMarkers.map((marker) => (
+        <EventAgentMarker key={marker.key} marker={marker} />
       ))}
       {players.map((p) => {
         const networkingAgent = props.networkingProjection?.agentsByPlayerId[p.id];
@@ -231,6 +245,48 @@ function NetworkingBadge({
             fill: meta.text,
             fontFamily: 'VCR OSD Mono, monospace',
             fontSize: 9,
+          })
+        }
+      />
+    </Container>
+  );
+}
+
+function EventAgentMarker({ marker }: { marker: EventTownMarker }) {
+  const draw = useCallback(
+    (g: PIXI.Graphics) => {
+      g.clear();
+      g.beginFill(0x181425, 0.65);
+      g.drawRoundedRect(-36, 18, 72, 16, 4);
+      g.endFill();
+      g.beginFill(marker.accent, 1);
+      g.drawCircle(0, 0, 15);
+      g.endFill();
+      g.beginFill(marker.fill, 1);
+      g.drawCircle(0, -3, 10);
+      g.endFill();
+      g.beginFill(0x181425, 1);
+      g.drawCircle(-4, -5, 1.4);
+      g.drawCircle(4, -5, 1.4);
+      g.endFill();
+    },
+    [marker.accent, marker.fill],
+  );
+
+  return (
+    <Container x={marker.x} y={marker.y}>
+      <Graphics draw={draw} />
+      <Text
+        x={0}
+        y={26}
+        text={marker.displayName}
+        anchor={{ x: 0.5, y: 0.5 }}
+        style={
+          new PIXI.TextStyle({
+            align: 'center',
+            fill: 0xffffff,
+            fontFamily: 'VCR OSD Mono, monospace',
+            fontSize: 8,
           })
         }
       />
