@@ -184,6 +184,10 @@ describe('networking HTTP helpers', () => {
       },
       new Request('https://town.example/api/v1/events/demo-event/register', {
         method: 'POST',
+        headers: {
+          'x-forwarded-for': '203.0.113.10, 198.51.100.1',
+          'user-agent': 'event-test-agent',
+        },
         body: JSON.stringify({
           agentIdentifier: 'attendee-agent',
           avatarConfig: {
@@ -213,6 +217,7 @@ describe('networking HTTP helpers', () => {
       args: {
         eventId: 'demo-event',
         agentIdentifier: 'attendee-agent',
+        requesterKey: 'ip:203.0.113.10|ua:event-test-agent',
         avatarConfig: {
           hair: 'curly',
           skinTone: 'tone-3',
@@ -249,6 +254,10 @@ describe('networking HTTP helpers', () => {
         'https://town.example/api/v1/events/demo-event/directory?q=climate&category=Climate&offers=GTM,operator%20intros&wants=seed%20feedback',
         {
           method: 'GET',
+          headers: {
+            'cf-connecting-ip': '203.0.113.20',
+            'user-agent': 'event-directory-test-agent',
+          },
         },
       ),
     );
@@ -269,6 +278,7 @@ describe('networking HTTP helpers', () => {
       kind: 'mutation',
       args: {
         eventId: 'demo-event',
+        requesterKey: 'ip:203.0.113.20|ua:event-directory-test-agent',
         filters: {
           q: 'climate',
           category: 'Climate',

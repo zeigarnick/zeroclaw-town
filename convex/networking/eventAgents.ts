@@ -28,6 +28,7 @@ const DISPLAY_NOUNS = ['Scout', 'Builder', 'Guide', 'Connector', 'Pilot', 'Mappe
 type RegisterEventAgentArgs = {
   eventId: string;
   agentIdentifier?: string;
+  requesterKey?: string;
   publicCard: unknown;
   avatarConfig?: unknown;
 };
@@ -56,6 +57,7 @@ export const registerEventAgent = mutation({
   args: {
     eventId: v.string(),
     agentIdentifier: v.optional(v.string()),
+    requesterKey: v.optional(v.string()),
     publicCard: v.any(),
     avatarConfig: v.optional(v.any()),
   },
@@ -70,8 +72,16 @@ export async function registerEventAgentHandler(
   const agentIdentifier = normalizeAgentIdentifier(args.agentIdentifier);
   await enforceEventRateLimit(ctx, 'eventRegistrationPerRequester', [
     eventId,
-    agentIdentifier,
+    'requester',
+    normalizeRequesterKey(args.requesterKey) ?? 'unknown-public-requester',
   ]);
+  if (args.agentIdentifier !== undefined) {
+    await enforceEventRateLimit(ctx, 'eventRegistrationPerRequester', [
+      eventId,
+      'agent-identifier',
+      agentIdentifier,
+    ]);
+  }
   await enforceEventRateLimit(ctx, 'eventRegistrationPerEvent', [eventId]);
   const publicCard = normalizeEventPublicCard(args.publicCard);
   const avatarConfig =
@@ -401,6 +411,11 @@ function normalizeAgentIdentifier(agentIdentifier: string | undefined) {
     throw networkingError('invalid_public_field', 'agentIdentifier is invalid.');
   }
   return normalized;
+}
+
+function normalizeRequesterKey(requesterKey: string | undefined) {
+  const normalized = requesterKey?.trim();
+  return normalized ? normalized.slice(0, 180) : undefined;
 }
 
 function normalizeReviewNote(reviewNote: string | undefined) {

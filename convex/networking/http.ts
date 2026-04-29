@@ -178,6 +178,7 @@ export async function handleNetworkingHttpRequest(
       const data = await ctx.runMutation(functions.eventAgents.registerEventAgent, {
         eventId: requirePathId(route[1], 'eventId'),
         agentIdentifier: optionalString(body.agentIdentifier, 'agentIdentifier'),
+        requesterKey: publicRequesterKey(request),
         publicCard: requireValue(body.publicCard, 'publicCard'),
         avatarConfig: body.avatarConfig,
       });
@@ -258,6 +259,7 @@ export async function handleNetworkingHttpRequest(
     ) {
       const data = await ctx.runMutation(functions.eventDirectory.searchEventDirectory, {
         eventId: requirePathId(route[1], 'eventId'),
+        requesterKey: publicRequesterKey(request),
         filters: {
           q: optionalQueryParam(url.searchParams, 'q'),
           role: optionalQueryParam(url.searchParams, 'role'),
@@ -1017,6 +1019,29 @@ function optionalBoolean(value: unknown, fieldName: string) {
     throw new RouteError('invalid_request', `${fieldName} must be a boolean when provided.`, 400);
   }
   return value;
+}
+
+function publicRequesterKey(request: Request) {
+  const ipAddress =
+    firstForwardedIp(request.headers.get('x-forwarded-for')) ??
+    parseForwardedFor(request.headers.get('forwarded')) ??
+    request.headers.get('cf-connecting-ip')?.trim() ??
+    request.headers.get('x-real-ip')?.trim() ??
+    'unknown-ip';
+  const userAgent = request.headers.get('user-agent')?.trim() || 'unknown-agent';
+  return `ip:${ipAddress}|ua:${userAgent}`.slice(0, 180);
+}
+
+function firstForwardedIp(headerValue: string | null) {
+  return headerValue?.split(',')[0]?.trim() || undefined;
+}
+
+function parseForwardedFor(headerValue: string | null) {
+  if (!headerValue) {
+    return undefined;
+  }
+  const match = headerValue.match(/(?:^|;)\s*for="?([^";,]+)"?/i);
+  return match?.[1]?.trim();
 }
 
 function optionalStringArray(value: unknown, fieldName: string) {

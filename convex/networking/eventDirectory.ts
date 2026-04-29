@@ -20,12 +20,14 @@ export type EventDirectoryFilters = {
 
 export type SearchEventDirectoryArgs = {
   eventId: string;
+  requesterKey?: string;
   filters?: EventDirectoryFilters;
 };
 
 export const searchEventDirectory = mutation({
   args: {
     eventId: v.string(),
+    requesterKey: v.optional(v.string()),
     filters: v.optional(
       v.object({
         q: v.optional(v.string()),
@@ -51,7 +53,8 @@ export async function searchEventDirectoryHandler(
   const filters = normalizeFilters(args.filters);
   await enforceEventRateLimit(ctx, 'eventDirectorySearch', [
     eventId,
-    JSON.stringify(filters),
+    'requester',
+    normalizeRequesterKey(args.requesterKey) ?? 'unknown-public-requester',
   ]);
   const cards = await ctx.db
     .query('eventNetworkingCards')
@@ -89,6 +92,11 @@ function normalizeFilters(filters: EventDirectoryFilters | undefined): EventDire
     interests: normalizeOptionalTextList(filters.interests, 'interests'),
     favoriteMedia: normalizeOptionalTextList(filters.favoriteMedia, 'favoriteMedia'),
   };
+}
+
+function normalizeRequesterKey(requesterKey: string | undefined) {
+  const normalized = requesterKey?.trim();
+  return normalized ? normalized.slice(0, 180) : undefined;
 }
 
 function normalizeOptionalText(value: string | undefined, fieldName: string) {
