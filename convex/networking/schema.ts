@@ -267,6 +267,7 @@ export const networkingTables = {
     eventId: v.string(),
     title: v.string(),
     worldTemplateId: v.optional(eventWorldTemplateIdValidator),
+    worldTemplateRevision: v.optional(v.string()),
     worldId: v.optional(v.id('worlds')),
     registrationStatus: eventRegistrationStatusValidator,
     skillUrl: v.optional(v.string()),
@@ -276,6 +277,7 @@ export const networkingTables = {
     updatedAt: v.number(),
   })
     .index('by_event_id', ['eventId'])
+    .index('by_world_id', ['worldId'])
     .index('by_registration_status', ['registrationStatus']),
 
   eventAgents: defineTable({

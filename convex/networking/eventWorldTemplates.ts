@@ -10,6 +10,7 @@ export const DEFAULT_EVENT_WORLD_TEMPLATE_ID = 'clawport-terminal' satisfies Eve
 
 export type EventWorldTemplate = {
   id: EventWorldTemplateId;
+  revision: string;
   displayName: string;
   description: string;
   mapModule: {
@@ -24,6 +25,7 @@ export type EventWorldTemplate = {
 const templates = {
   'clawport-terminal': {
     id: 'clawport-terminal',
+    revision: '2026-04-29-template-sync-v1',
     displayName: 'Clawport Terminal',
     description: 'A compact terminal-harbor event floor for QR onboarding and attendee markers.',
     mapModule: clawportTerminalMap as { serializedWorldMap: SerializedWorldMap },

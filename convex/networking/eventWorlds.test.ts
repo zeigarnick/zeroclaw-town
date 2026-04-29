@@ -40,6 +40,14 @@ function createMockCtx() {
       }
       Object.assign(row, patch);
     },
+    replace: async (id: string, replacement: Record<string, any>) => {
+      const tableName = id.split(':')[0] as TableName;
+      const index = tables[tableName].findIndex((row) => row._id === id);
+      if (index === -1) {
+        throw new Error(`Missing row ${id}`);
+      }
+      tables[tableName][index] = { _id: id, ...replacement };
+    },
     get: async (id: string) => findById(tables, id) ?? null,
     query: (tableName: TableName) => ({
       withIndex: (_indexName: string, buildQuery: (q: any) => any) => {
@@ -123,6 +131,7 @@ describe('event worlds', () => {
     });
 
     expect(eventWorld.worldTemplateId).toBe('clawport-terminal');
+    expect(eventWorld.worldTemplateRevision).toBeDefined();
   });
 
   test('idempotently reuses an event space world', async () => {
@@ -132,6 +141,7 @@ describe('event worlds', () => {
       eventId: 'demo-event',
       title: 'Demo Event',
       worldTemplateId: eventWorld.worldTemplateId,
+      worldTemplateRevision: eventWorld.worldTemplateRevision,
       worldId: eventWorld.worldId,
       registrationStatus: 'open',
       createdAt: 123,
@@ -144,6 +154,36 @@ describe('event worlds', () => {
     expect(ensured.worldId).toBe(eventWorld.worldId);
     expect(tables.worlds).toHaveLength(1);
     expect(tables.maps).toHaveLength(1);
+  });
+
+  test('refreshes an existing event world when the template revision changes', async () => {
+    const { ctx, tables } = createMockCtx();
+    const eventWorld = await createEventWorld(ctx as any, { now: 123 });
+    const mapId = tables.maps[0]._id;
+    tables.maps[0].tileSetUrl = '/ai-town/assets/old-map.png';
+    const eventSpaceId = await ctx.db.insert('eventSpaces', {
+      eventId: 'demo-event',
+      title: 'Demo Event',
+      worldTemplateId: eventWorld.worldTemplateId,
+      worldId: eventWorld.worldId,
+      registrationStatus: 'open',
+      createdAt: 123,
+      updatedAt: 123,
+    });
+
+    const ensured = await ensureEventSpaceWorld(
+      ctx as any,
+      (await ctx.db.get(eventSpaceId)) as any,
+      { now: 456 },
+    );
+
+    expect(ensured.worldTemplateRevision).toBe(eventWorld.worldTemplateRevision);
+    expect(tables.maps).toHaveLength(1);
+    expect(tables.maps[0]).toMatchObject({
+      _id: mapId,
+      worldId: eventWorld.worldId,
+      tileSetUrl: '/ai-town/assets/clawport-terminal/clawport-terminal-tileset.png',
+    });
   });
 
   test('provisions isolated worlds for separate events', async () => {

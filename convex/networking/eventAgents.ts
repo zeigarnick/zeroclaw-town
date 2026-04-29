@@ -341,6 +341,7 @@ async function getOrCreateEventSpace(ctx: MutationCtx, eventId: string, now: num
     eventId,
     title: titleizeEventId(eventId),
     worldTemplateId: eventWorld.worldTemplateId,
+    worldTemplateRevision: eventWorld.worldTemplateRevision,
     worldId: eventWorld.worldId,
     registrationStatus: 'open',
     createdAt: now,

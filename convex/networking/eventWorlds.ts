@@ -16,6 +16,7 @@ type EventWorldSelection = {
 
 type CreatedEventWorld = {
   worldTemplateId: EventWorldTemplateId;
+  worldTemplateRevision: string;
   worldId: Id<'worlds'>;
   worldStatusId: Id<'worldStatus'>;
   engineId: Id<'engines'>;
@@ -57,6 +58,7 @@ export async function createEventWorld(
   });
   return {
     worldTemplateId: template.id,
+    worldTemplateRevision: template.revision,
     worldId,
     worldStatusId,
     engineId,
@@ -71,14 +73,24 @@ export async function ensureEventSpaceWorld(
 ) {
   const selectedTemplateId =
     selection.worldTemplateId ?? eventSpace.worldTemplateId ?? DEFAULT_EVENT_WORLD_TEMPLATE_ID;
+  const template = resolveEventWorldTemplate(selectedTemplateId);
   if (eventSpace.worldId && eventSpace.worldTemplateId) {
-    return eventSpace;
+    const synced = await syncEventWorldMapFromTemplate(ctx, eventSpace, { now: selection.now });
+    if (!synced && eventSpace.worldTemplateRevision === template.revision) {
+      return eventSpace;
+    }
+    const updated = await ctx.db.get(eventSpace._id);
+    if (!updated) {
+      throw new Error(`Event space ${eventSpace._id} disappeared during world provisioning.`);
+    }
+    return updated;
   }
 
   const eventWorld = eventSpace.worldId
     ? {
         worldId: eventSpace.worldId,
         worldTemplateId: selectedTemplateId,
+        worldTemplateRevision: template.revision,
       }
     : await createEventWorld(ctx, {
         worldTemplateId: selectedTemplateId,
@@ -88,6 +100,7 @@ export async function ensureEventSpaceWorld(
   await ctx.db.patch(eventSpace._id, {
     worldId: eventWorld.worldId,
     worldTemplateId: eventWorld.worldTemplateId,
+    worldTemplateRevision: eventWorld.worldTemplateRevision,
     updatedAt: selection.now ?? Date.now(),
   });
   const updated = await ctx.db.get(eventSpace._id);
@@ -95,4 +108,58 @@ export async function ensureEventSpaceWorld(
     throw new Error(`Event space ${eventSpace._id} disappeared during world provisioning.`);
   }
   return updated;
+}
+
+export async function syncEventWorldMapByWorldId(
+  ctx: MutationCtx,
+  worldId: Id<'worlds'>,
+  selection: { now?: number } = {},
+) {
+  const eventSpace = await ctx.db
+    .query('eventSpaces')
+    .withIndex('by_world_id', (q) => q.eq('worldId', worldId))
+    .first();
+  if (!eventSpace) {
+    return false;
+  }
+  return await syncEventWorldMapFromTemplate(ctx, eventSpace, selection);
+}
+
+export async function syncEventWorldMapFromTemplate(
+  ctx: MutationCtx,
+  eventSpace: Doc<'eventSpaces'>,
+  selection: { now?: number } = {},
+) {
+  if (!eventSpace.worldId) {
+    return false;
+  }
+  const selectedTemplateId = eventSpace.worldTemplateId ?? DEFAULT_EVENT_WORLD_TEMPLATE_ID;
+  const template = resolveEventWorldTemplate(selectedTemplateId);
+  if (
+    eventSpace.worldTemplateId === template.id &&
+    eventSpace.worldTemplateRevision === template.revision
+  ) {
+    return false;
+  }
+  const existingMap = await ctx.db
+    .query('maps')
+    .withIndex('worldId', (q) => q.eq('worldId', eventSpace.worldId!))
+    .unique();
+  if (existingMap) {
+    await ctx.db.replace(existingMap._id, {
+      worldId: eventSpace.worldId,
+      ...template.mapModule.serializedWorldMap,
+    });
+  } else {
+    await ctx.db.insert('maps', {
+      worldId: eventSpace.worldId,
+      ...template.mapModule.serializedWorldMap,
+    });
+  }
+  await ctx.db.patch(eventSpace._id, {
+    worldTemplateId: template.id,
+    worldTemplateRevision: template.revision,
+    updatedAt: selection.now ?? Date.now(),
+  });
+  return true;
 }
