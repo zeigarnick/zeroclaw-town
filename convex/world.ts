@@ -6,7 +6,7 @@ import { ENGINE_ACTION_DURATION, IDLE_WORLD_TIMEOUT, WORLD_HEARTBEAT_INTERVAL } 
 import { playerId } from './aiTown/ids';
 import { kickEngine, startEngine, stopEngine } from './aiTown/main';
 import { engineInsertInput } from './engine/abstractGame';
-import { hashSecret } from './networking/auth';
+import { hashSecret, networkingError } from './networking/auth';
 import { Doc, Id } from './_generated/dataModel';
 import { pruneDefaultWorldNpcsHandler, pruneWorldNpcs, townNpcsEnabled } from './townNpcs';
 
@@ -28,6 +28,28 @@ export const defaultWorldStatus = query({
     return worldStatus;
   },
 });
+
+export const eventWorldStatus = query({
+  args: {
+    eventId: v.string(),
+  },
+  handler: (ctx, args) => eventWorldStatusHandler(ctx, args),
+});
+
+export async function eventWorldStatusHandler(ctx: QueryCtx, args: { eventId: string }) {
+  const eventId = normalizeEventId(args.eventId);
+  const eventSpace = await ctx.db
+    .query('eventSpaces')
+    .withIndex('by_event_id', (q) => q.eq('eventId', eventId))
+    .first();
+  if (!eventSpace?.worldId) {
+    return null;
+  }
+  return await ctx.db
+    .query('worldStatus')
+    .withIndex('worldId', (q) => q.eq('worldId', eventSpace.worldId!))
+    .first();
+}
 
 export const heartbeatWorld = mutation({
   args: {
@@ -378,6 +400,14 @@ function randomBase64Url(byteLength: number) {
   }
 
   return out;
+}
+
+function normalizeEventId(eventId: string) {
+  const normalized = eventId.trim().toLowerCase().replace(/[^a-z0-9-]+/g, '-');
+  if (!normalized) {
+    throw networkingError('invalid_public_field', 'eventId is required.');
+  }
+  return normalized;
 }
 
 export const worldState = query({

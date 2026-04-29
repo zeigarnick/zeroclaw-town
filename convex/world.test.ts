@@ -1,8 +1,12 @@
 import { ConvexError } from 'convex/values';
 import { hashSecret } from './networking/auth';
-import { assertCurrentConversationParticipant, assertPlayerSession } from './world';
+import {
+  assertCurrentConversationParticipant,
+  assertPlayerSession,
+  eventWorldStatusHandler,
+} from './world';
 
-type TableName = 'worlds' | 'playerSessions';
+type TableName = 'worlds' | 'playerSessions' | 'eventSpaces' | 'worldStatus';
 type Row = Record<string, any> & { _id: string };
 
 function createMockCtx() {
@@ -23,6 +27,8 @@ function createMockCtx() {
       },
     ],
     playerSessions: [],
+    eventSpaces: [],
+    worldStatus: [],
   };
 
   const db = {
@@ -46,6 +52,10 @@ function createMockCtx() {
         buildQuery(q);
         return {
           first: async () =>
+            tables[tableName].find((row) =>
+              filters.every(({ field, value }) => valuesEqual(row[field], value)),
+            ) ?? null,
+          unique: async () =>
             tables[tableName].find((row) =>
               filters.every(({ field, value }) => valuesEqual(row[field], value)),
             ) ?? null,
@@ -126,5 +136,45 @@ describe('world player session guards', () => {
         conversationId: 'c:1',
       }),
     ).rejects.toBeInstanceOf(ConvexError);
+  });
+});
+
+describe('event world status', () => {
+  test('resolves world status from the normalized event id', async () => {
+    const { ctx, tables } = createMockCtx();
+    tables.eventSpaces.push({
+      _id: 'eventSpaces:1',
+      eventId: 'demo-event',
+      title: 'Demo Event',
+      worldTemplateId: 'clawport-terminal',
+      worldId: 'worlds:1',
+      registrationStatus: 'open',
+      createdAt: 1,
+      updatedAt: 1,
+    });
+    tables.worldStatus.push({
+      _id: 'worldStatus:1',
+      worldId: 'worlds:1',
+      engineId: 'engines:1',
+      isDefault: false,
+      lastViewed: 2,
+      status: 'running',
+    });
+
+    await expect(
+      eventWorldStatusHandler(ctx as any, { eventId: ' Demo Event ' }),
+    ).resolves.toMatchObject({
+      worldId: 'worlds:1',
+      engineId: 'engines:1',
+      isDefault: false,
+    });
+  });
+
+  test('does not fall back to the default world when event world is missing', async () => {
+    const { ctx } = createMockCtx();
+
+    await expect(
+      eventWorldStatusHandler(ctx as any, { eventId: 'missing-event' }),
+    ).resolves.toBeNull();
   });
 });

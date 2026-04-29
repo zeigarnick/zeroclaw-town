@@ -34,7 +34,7 @@ export default function Game() {
     setSelectedEventMarker(marker);
   }, []);
 
-  const worldStatus = useQuery(api.world.defaultWorldStatus);
+  const worldStatus = useQuery(api.world.eventWorldStatus, { eventId: EVENT_ID });
   const worldId = worldStatus?.worldId;
   const engineId = worldStatus?.engineId;
 
@@ -45,7 +45,7 @@ export default function Game() {
   ) as NetworkingTownProjection | undefined;
 
   // Send a periodic heartbeat to our world to keep it alive.
-  useWorldHeartbeat();
+  useWorldHeartbeat(worldStatus);
 
   const worldState = useQuery(api.world.worldState, worldId ? { worldId } : 'skip');
   const { historicalTime, timeManager } = useHistoricalTime(worldState?.engine);

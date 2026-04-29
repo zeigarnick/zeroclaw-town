@@ -1,12 +1,16 @@
-import { useMutation, useQuery } from 'convex/react';
+import { useMutation } from 'convex/react';
 import { useEffect } from 'react';
 import { api } from '../../convex/_generated/api';
 import { WORLD_HEARTBEAT_INTERVAL } from '../../convex/constants';
+import { Id } from '../../convex/_generated/dataModel';
 
-export function useWorldHeartbeat() {
-  const worldStatus = useQuery(api.world.defaultWorldStatus);
+type HeartbeatWorldStatus = {
+  worldId: Id<'worlds'>;
+  lastViewed: number;
+} | null | undefined;
+
+export function useWorldHeartbeat(worldStatus: HeartbeatWorldStatus) {
   const worldId = worldStatus?.worldId;
-
   // Send a periodic heartbeat to our world to keep it alive.
   const heartbeat = useMutation(api.world.heartbeatWorld);
   useEffect(() => {
