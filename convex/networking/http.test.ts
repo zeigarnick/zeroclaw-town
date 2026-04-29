@@ -663,20 +663,20 @@ describe('networking HTTP helpers', () => {
     const suspiciousResponse = await handleNetworkingHttpRequest(
       ctx,
       new Request(
-        'https://town.example/api/v1/admin/events/demo-event/suspicious-registrations?limit=10',
+        'https://town.example/api/v1/organizer/events/demo-event/suspicious-registrations?limit=10',
         {
           method: 'GET',
-          headers: { Authorization: 'Bearer organizer-secret' },
+          headers: { Authorization: 'Bearer event_org_active' },
         },
       ),
     );
     const highVolumeResponse = await handleNetworkingHttpRequest(
       ctx,
       new Request(
-        'https://town.example/api/v1/admin/events/demo-event/high-volume-requesters?threshold=2&limit=5',
+        'https://town.example/api/v1/organizer/events/demo-event/high-volume-requesters?threshold=2&limit=5',
         {
           method: 'GET',
-          headers: { Authorization: 'Bearer organizer-secret' },
+          headers: { Authorization: 'Bearer event_org_active' },
         },
       ),
     );
@@ -688,7 +688,7 @@ describe('networking HTTP helpers', () => {
         kind: 'mutation',
         args: {
           eventId: 'demo-event',
-          organizerToken: 'organizer-secret',
+          organizerApiKey: 'event_org_active',
           limit: 10,
         },
       },
@@ -696,12 +696,38 @@ describe('networking HTTP helpers', () => {
         kind: 'mutation',
         args: {
           eventId: 'demo-event',
-          organizerToken: 'organizer-secret',
+          organizerApiKey: 'event_org_active',
           threshold: 2,
           limit: 5,
         },
       },
     ]);
+  });
+
+  test('rejects legacy shared-token admin organizer routes', async () => {
+    const response = await handleNetworkingHttpRequest(
+      {
+        runMutation: async () => {
+          throw new Error('unexpected mutation');
+        },
+        runQuery: async () => {
+          throw new Error('unexpected query');
+        },
+      },
+      new Request('https://town.example/api/v1/admin/events/demo-event/suspicious-registrations', {
+        method: 'GET',
+        headers: { Authorization: 'Bearer organizer-secret' },
+      }),
+    );
+
+    expect(response.status).toBe(410);
+    expect(await readJson(response)).toEqual({
+      success: false,
+      error: {
+        code: 'legacy_admin_route_unsupported',
+        message: 'Legacy shared-token admin routes are not supported. Use /api/v1/organizer.',
+      },
+    });
   });
 
   test('routes minimal event connection intents and rejects extra fields', async () => {

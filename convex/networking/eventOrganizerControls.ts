@@ -2,6 +2,7 @@ import { v } from 'convex/values';
 import { Doc, Id } from '../_generated/dataModel';
 import { MutationCtx, QueryCtx, mutation } from '../_generated/server';
 import { networkingError } from './auth';
+import { authenticateEventOrganizerApiKey, EventOrganizerActor } from './eventOrganizerAuth';
 import { createEventWorld, ensureEventSpaceWorld } from './eventWorlds';
 import { enforceEventRateLimit } from './eventRateLimits';
 import { EventOrganizerAuditType, MAX_EVENT_REVIEW_NOTE_LENGTH } from './validators';
@@ -9,12 +10,6 @@ import { EventOrganizerAuditType, MAX_EVENT_REVIEW_NOTE_LENGTH } from './validat
 const MAX_SKILL_URL_LENGTH = 2048;
 const DEFAULT_REVIEW_LIMIT = 50;
 const MAX_REVIEW_LIMIT = 100;
-const ORGANIZER_TOKEN_ENV_KEYS = [
-  'OPENNETWORK_ORGANIZER_TOKEN',
-  'EVENT_ORGANIZER_TOKEN',
-  'NETWORKING_ORGANIZER_TOKEN',
-] as const;
-
 export type EventOrganizerAuditActorKind =
   | 'platform_operator'
   | 'organizer'
@@ -53,7 +48,7 @@ export type HighVolumeRequester = {
 export const pauseEventRegistration = mutation({
   args: {
     eventId: v.string(),
-    organizerToken: v.string(),
+    organizerApiKey: v.string(),
     reason: v.optional(v.string()),
   },
   handler: (ctx, args) => pauseEventRegistrationHandler(ctx, args),
@@ -62,7 +57,7 @@ export const pauseEventRegistration = mutation({
 export const resumeEventRegistration = mutation({
   args: {
     eventId: v.string(),
-    organizerToken: v.string(),
+    organizerApiKey: v.string(),
     reason: v.optional(v.string()),
   },
   handler: (ctx, args) => resumeEventRegistrationHandler(ctx, args),
@@ -71,7 +66,7 @@ export const resumeEventRegistration = mutation({
 export const rotateEventSkillUrl = mutation({
   args: {
     eventId: v.string(),
-    organizerToken: v.string(),
+    organizerApiKey: v.string(),
     skillUrl: v.string(),
   },
   handler: (ctx, args) => rotateEventSkillUrlHandler(ctx, args),
@@ -81,7 +76,7 @@ export const revokeEventAgent = mutation({
   args: {
     eventId: v.string(),
     eventAgentId: v.id('eventAgents'),
-    organizerToken: v.string(),
+    organizerApiKey: v.string(),
     reason: v.optional(v.string()),
   },
   handler: (ctx, args) => revokeEventAgentHandler(ctx, { ...args, remove: false }),
@@ -91,7 +86,7 @@ export const removeEventAgent = mutation({
   args: {
     eventId: v.string(),
     eventAgentId: v.id('eventAgents'),
-    organizerToken: v.string(),
+    organizerApiKey: v.string(),
     reason: v.optional(v.string()),
   },
   handler: (ctx, args) => revokeEventAgentHandler(ctx, { ...args, remove: true }),
@@ -100,7 +95,7 @@ export const removeEventAgent = mutation({
 export const listSuspiciousRegistrations = mutation({
   args: {
     eventId: v.string(),
-    organizerToken: v.string(),
+    organizerApiKey: v.string(),
     limit: v.optional(v.number()),
   },
   handler: (ctx, args) => listSuspiciousRegistrationsHandler(ctx, args),
@@ -109,7 +104,7 @@ export const listSuspiciousRegistrations = mutation({
 export const listHighVolumeRequesters = mutation({
   args: {
     eventId: v.string(),
-    organizerToken: v.string(),
+    organizerApiKey: v.string(),
     threshold: v.optional(v.number()),
     limit: v.optional(v.number()),
   },
@@ -118,10 +113,10 @@ export const listHighVolumeRequesters = mutation({
 
 export async function pauseEventRegistrationHandler(
   ctx: MutationCtx,
-  args: { eventId: string; organizerToken: string; reason?: string },
+  args: { eventId: string; organizerApiKey: string; reason?: string },
 ) {
-  assertOrganizerCapability(args.organizerToken);
   const eventId = normalizeEventId(args.eventId);
+  const actor = await authenticateOrganizerForEvent(ctx, eventId, args.organizerApiKey);
   await enforceEventRateLimit(ctx, 'eventOrganizerAction', [eventId, 'pause']);
   const now = Date.now();
   const eventSpace = await getOrCreateEventSpace(ctx, eventId, now);
@@ -134,7 +129,7 @@ export async function pauseEventRegistrationHandler(
     eventId,
     type: 'registration_paused',
     actorKind: 'organizer',
-    actorKey: organizerActorKey(),
+    actorKey: actor.actorKey,
     metadata: { reason: normalizeOptionalReason(args.reason) },
     now,
   });
@@ -143,10 +138,10 @@ export async function pauseEventRegistrationHandler(
 
 export async function resumeEventRegistrationHandler(
   ctx: MutationCtx,
-  args: { eventId: string; organizerToken: string; reason?: string },
+  args: { eventId: string; organizerApiKey: string; reason?: string },
 ) {
-  assertOrganizerCapability(args.organizerToken);
   const eventId = normalizeEventId(args.eventId);
+  const actor = await authenticateOrganizerForEvent(ctx, eventId, args.organizerApiKey);
   await enforceEventRateLimit(ctx, 'eventOrganizerAction', [eventId, 'resume']);
   const now = Date.now();
   const eventSpace = await getOrCreateEventSpace(ctx, eventId, now);
@@ -158,7 +153,7 @@ export async function resumeEventRegistrationHandler(
     eventId,
     type: 'registration_resumed',
     actorKind: 'organizer',
-    actorKey: organizerActorKey(),
+    actorKey: actor.actorKey,
     metadata: { reason: normalizeOptionalReason(args.reason) },
     now,
   });
@@ -167,10 +162,10 @@ export async function resumeEventRegistrationHandler(
 
 export async function rotateEventSkillUrlHandler(
   ctx: MutationCtx,
-  args: { eventId: string; organizerToken: string; skillUrl: string },
+  args: { eventId: string; organizerApiKey: string; skillUrl: string },
 ) {
-  assertOrganizerCapability(args.organizerToken);
   const eventId = normalizeEventId(args.eventId);
+  const actor = await authenticateOrganizerForEvent(ctx, eventId, args.organizerApiKey);
   await enforceEventRateLimit(ctx, 'eventOrganizerAction', [eventId, 'rotate-skill-url']);
   const skillUrl = normalizeSkillUrl(args.skillUrl);
   const now = Date.now();
@@ -184,7 +179,7 @@ export async function rotateEventSkillUrlHandler(
     eventId,
     type: 'skill_url_rotated',
     actorKind: 'organizer',
-    actorKey: organizerActorKey(),
+    actorKey: actor.actorKey,
     metadata: { skillUrl },
     now,
   });
@@ -196,13 +191,13 @@ export async function revokeEventAgentHandler(
   args: {
     eventId: string;
     eventAgentId: Id<'eventAgents'>;
-    organizerToken: string;
+    organizerApiKey: string;
     reason?: string;
     remove?: boolean;
   },
 ) {
-  assertOrganizerCapability(args.organizerToken);
   const eventId = normalizeEventId(args.eventId);
+  const actor = await authenticateOrganizerForEvent(ctx, eventId, args.organizerApiKey);
   await enforceEventRateLimit(ctx, 'eventOrganizerAction', [
     eventId,
     args.remove ? 'remove-agent' : 'revoke-agent',
@@ -261,7 +256,7 @@ export async function revokeEventAgentHandler(
     eventId,
     type: args.remove ? 'event_agent_removed' : 'event_agent_revoked',
     actorKind: 'organizer',
-    actorKey: organizerActorKey(),
+    actorKey: actor.actorKey,
     eventAgentId: agent._id,
     metadata: { reason },
     now,
@@ -276,10 +271,10 @@ export async function revokeEventAgentHandler(
 
 export async function listSuspiciousRegistrationsHandler(
   ctx: MutationCtx,
-  args: { eventId: string; organizerToken: string; limit?: number },
+  args: { eventId: string; organizerApiKey: string; limit?: number },
 ): Promise<SuspiciousEventRegistration[]> {
-  assertOrganizerCapability(args.organizerToken);
   const eventId = normalizeEventId(args.eventId);
+  await authenticateOrganizerForEvent(ctx, eventId, args.organizerApiKey);
   await enforceEventRateLimit(ctx, 'eventOrganizerAction', [
     eventId,
     'list-suspicious-registrations',
@@ -309,10 +304,10 @@ export async function listSuspiciousRegistrationsHandler(
 
 export async function listHighVolumeRequestersHandler(
   ctx: MutationCtx,
-  args: { eventId: string; organizerToken: string; threshold?: number; limit?: number },
+  args: { eventId: string; organizerApiKey: string; threshold?: number; limit?: number },
 ): Promise<HighVolumeRequester[]> {
-  assertOrganizerCapability(args.organizerToken);
   const eventId = normalizeEventId(args.eventId);
+  await authenticateOrganizerForEvent(ctx, eventId, args.organizerApiKey);
   await enforceEventRateLimit(ctx, 'eventOrganizerAction', [
     eventId,
     'list-high-volume-requesters',
@@ -371,28 +366,15 @@ export async function writeEventOrganizerAuditEvent(
   });
 }
 
-export function assertOrganizerCapability(organizerToken: string) {
-  const configuredToken = getConfiguredOrganizerToken();
-  if (!configuredToken || organizerToken !== configuredToken) {
-    throw networkingError(
-      'invalid_event_organizer_token',
-      'A configured organizer bearer token is required.',
-    );
-  }
-}
-
-function getConfiguredOrganizerToken() {
-  for (const key of ORGANIZER_TOKEN_ENV_KEYS) {
-    const value = process.env[key]?.trim();
-    if (value) {
-      return value;
-    }
-  }
-  return undefined;
-}
-
-function organizerActorKey() {
-  return 'configured-organizer';
+async function authenticateOrganizerForEvent(
+  ctx: MutationCtx,
+  eventId: string,
+  organizerApiKey: string,
+): Promise<EventOrganizerActor> {
+  return await authenticateEventOrganizerApiKey(ctx, {
+    eventId,
+    organizerApiKey,
+  });
 }
 
 async function getOrCreateEventSpace(ctx: MutationCtx, eventId: string, now: number) {

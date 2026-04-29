@@ -1,4 +1,5 @@
 import { ConvexError } from 'convex/values';
+import { getKeyPrefix, hashSecret } from './auth';
 import { decideOwnerReviewHandler, listApprovedPublicCardsHandler, registerEventAgentHandler } from './eventAgents';
 import { getEventSpaceConfigHandler } from './eventSpaces';
 import {
@@ -15,6 +16,7 @@ type TableName =
   | 'eventAgents'
   | 'eventNetworkingCards'
   | 'eventOwnerSessions'
+  | 'eventOrganizerApiKeys'
   | 'eventOrganizerAuditEvents'
   | 'worlds'
   | 'worldStatus'
@@ -22,7 +24,7 @@ type TableName =
   | 'engines';
 type Row = Record<string, any> & { _id: string };
 
-const ORGANIZER_TOKEN = 'organizer-secret';
+const ORGANIZER_API_KEY = 'event_org_test_secret';
 
 function createMockCtx() {
   const tables: Record<TableName, Row[]> = {
@@ -30,6 +32,7 @@ function createMockCtx() {
     eventAgents: [],
     eventNetworkingCards: [],
     eventOwnerSessions: [],
+    eventOrganizerApiKeys: [],
     eventOrganizerAuditEvents: [],
     worlds: [],
     worldStatus: [],
@@ -41,6 +44,7 @@ function createMockCtx() {
     eventAgents: 0,
     eventNetworkingCards: 0,
     eventOwnerSessions: 0,
+    eventOrganizerApiKeys: 0,
     eventOrganizerAuditEvents: 0,
     worlds: 0,
     worldStatus: 0,
@@ -143,27 +147,31 @@ async function registerApprovedAgent(
   return registration;
 }
 
+async function seedOrganizerKey(
+  ctx: ReturnType<typeof createMockCtx>['ctx'],
+  overrides: Record<string, any> = {},
+) {
+  const now = Date.now();
+  return await ctx.db.insert('eventOrganizerApiKeys', {
+    eventId: 'demo-event',
+    keyHash: await hashSecret(ORGANIZER_API_KEY),
+    keyPrefix: getKeyPrefix(ORGANIZER_API_KEY),
+    status: 'active',
+    role: 'owner',
+    createdAt: now,
+    updatedAt: now,
+    ...overrides,
+  });
+}
+
 describe('event organizer controls', () => {
-  const originalToken = process.env.OPENNETWORK_ORGANIZER_TOKEN;
-
-  beforeEach(() => {
-    process.env.OPENNETWORK_ORGANIZER_TOKEN = ORGANIZER_TOKEN;
-  });
-
-  afterEach(() => {
-    if (originalToken === undefined) {
-      delete process.env.OPENNETWORK_ORGANIZER_TOKEN;
-    } else {
-      process.env.OPENNETWORK_ORGANIZER_TOKEN = originalToken;
-    }
-  });
-
   test('pauses and resumes event registration with audit rows', async () => {
     const { ctx, tables } = createMockCtx();
+    await seedOrganizerKey(ctx);
 
     const paused = await pauseEventRegistrationHandler(ctx as any, {
       eventId: ' Demo Event ',
-      organizerToken: ORGANIZER_TOKEN,
+      organizerApiKey: ORGANIZER_API_KEY,
       reason: 'leaked QR',
     });
     expect(paused).toMatchObject({
@@ -192,7 +200,7 @@ describe('event organizer controls', () => {
 
     const resumed = await resumeEventRegistrationHandler(ctx as any, {
       eventId: 'demo-event',
-      organizerToken: ORGANIZER_TOKEN,
+      organizerApiKey: ORGANIZER_API_KEY,
       reason: 'rotated link',
     });
     expect(resumed.registrationStatus).toBe('open');
@@ -214,11 +222,12 @@ describe('event organizer controls', () => {
 
   test('rotates the event skill URL behind organizer capability auth', async () => {
     const { ctx } = createMockCtx();
+    await seedOrganizerKey(ctx);
 
     await expect(
       rotateEventSkillUrlHandler(ctx as any, {
         eventId: 'demo-event',
-        organizerToken: 'wrong-token',
+        organizerApiKey: 'event_org_wrong',
         skillUrl: 'https://event.example/skill.md',
       }),
     ).rejects.toMatchObject({
@@ -227,7 +236,7 @@ describe('event organizer controls', () => {
 
     const updated = await rotateEventSkillUrlHandler(ctx as any, {
       eventId: 'demo-event',
-      organizerToken: ORGANIZER_TOKEN,
+      organizerApiKey: ORGANIZER_API_KEY,
       skillUrl: 'https://event.example/skill.md',
     });
 
@@ -245,6 +254,7 @@ describe('event organizer controls', () => {
 
   test('revokes approved agents from public cards and owner review lookup', async () => {
     const { ctx, tables } = createMockCtx();
+    await seedOrganizerKey(ctx);
     const registration = await registerApprovedAgent(ctx, 'abusive-agent');
 
     await expect(
@@ -254,7 +264,7 @@ describe('event organizer controls', () => {
     const revoked = await revokeEventAgentHandler(ctx as any, {
       eventId: 'demo-event',
       eventAgentId: registration.eventAgentId as any,
-      organizerToken: ORGANIZER_TOKEN,
+      organizerApiKey: ORGANIZER_API_KEY,
       reason: 'spam reports',
     });
 
@@ -281,6 +291,7 @@ describe('event organizer controls', () => {
 
   test('lists suspicious registrations and high-volume audit requesters', async () => {
     const { ctx, tables } = createMockCtx();
+    await seedOrganizerKey(ctx);
     await registerEventAgentHandler(ctx as any, {
       eventId: 'demo-event',
       agentIdentifier: 'pending-one',
@@ -297,11 +308,11 @@ describe('event organizer controls', () => {
     await revokeEventAgentHandler(ctx as any, {
       eventId: 'demo-event',
       eventAgentId: approved.eventAgentId as any,
-      organizerToken: ORGANIZER_TOKEN,
+      organizerApiKey: ORGANIZER_API_KEY,
     });
     const suspicious = await listSuspiciousRegistrationsHandler(ctx as any, {
       eventId: 'demo-event',
-      organizerToken: ORGANIZER_TOKEN,
+      organizerApiKey: ORGANIZER_API_KEY,
     });
     expect(suspicious.map((row) => row.reason).sort()).toEqual([
       'pending_owner_review',
@@ -323,7 +334,7 @@ describe('event organizer controls', () => {
 
     const highVolume = await listHighVolumeRequestersHandler(ctx as any, {
       eventId: 'demo-event',
-      organizerToken: ORGANIZER_TOKEN,
+      organizerApiKey: ORGANIZER_API_KEY,
       threshold: 2,
     });
     expect(highVolume).toEqual([
