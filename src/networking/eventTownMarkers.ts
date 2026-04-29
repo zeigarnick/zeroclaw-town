@@ -1,8 +1,12 @@
 import type { NetworkingTownAgent } from '../../convex/networking/townProjection';
+import type { EventAvatarConfig, EventPublicCard } from '../../convex/networking/eventCards';
 
 export type EventTownMarker = {
   key: string;
   displayName: string;
+  avatarConfig: EventAvatarConfig;
+  avatarSummary: string;
+  publicCard: EventPublicCard;
   x: number;
   y: number;
   fill: number;
@@ -37,20 +41,42 @@ export function buildEventTownMarkers({
   tileDim: number;
 }): EventTownMarker[] {
   const eventAgents = agents.filter(
-    (agent) => agent.source === 'event' && agent.playerId === undefined,
+    (agent) =>
+      agent.source === 'event' &&
+      agent.playerId === undefined &&
+      agent.avatarConfig !== undefined &&
+      agent.publicCard !== undefined,
   );
   return eventAgents.map((agent, index) => {
     const position = deterministicTilePosition(agent.slug, index, mapWidth, mapHeight);
+    const avatarConfig = agent.avatarConfig!;
     return {
-      key: `${agent.eventId ?? 'event'}:${agent.agentId}`,
+      key: `${agent.eventId ?? 'event'}:${agent.slug}`,
       displayName: agent.displayName,
+      avatarConfig,
+      avatarSummary: describeAvatar(avatarConfig),
+      publicCard: agent.publicCard!,
       x: position.x * tileDim + tileDim / 2,
       y: position.y * tileDim + tileDim / 2,
-      fill: SKIN_TONE_COLORS[agent.avatarConfig?.skinTone ?? ''] ?? SKIN_TONE_COLORS['tone-3'],
-      accent:
-        CLOTHING_COLORS[agent.avatarConfig?.clothing ?? ''] ?? CLOTHING_COLORS.jacket,
+      fill: SKIN_TONE_COLORS[avatarConfig.skinTone] ?? SKIN_TONE_COLORS['tone-3'],
+      accent: CLOTHING_COLORS[avatarConfig.clothing] ?? CLOTHING_COLORS.jacket,
     };
   });
+}
+
+function describeAvatar(avatarConfig: EventAvatarConfig) {
+  const details = [
+    `Hair: ${avatarConfig.hair}`,
+    `Skin tone: ${avatarConfig.skinTone}`,
+    `Clothing: ${avatarConfig.clothing}`,
+  ];
+  if (avatarConfig.hat) {
+    details.push(`Hat: ${avatarConfig.hat}`);
+  }
+  if (avatarConfig.accessory) {
+    details.push(`Accessory: ${avatarConfig.accessory}`);
+  }
+  return details.join(' | ');
 }
 
 function deterministicTilePosition(

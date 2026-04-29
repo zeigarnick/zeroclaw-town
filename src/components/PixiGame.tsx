@@ -23,7 +23,8 @@ import type {
 import { useHistoricalValue } from '../hooks/useHistoricalValue.ts';
 import { Location, locationFields, playerLocation } from '../../convex/aiTown/location.ts';
 import { Player as ServerPlayer } from '../../convex/aiTown/player.ts';
-import { buildEventTownMarkers, EventTownMarker } from '../networking/eventTownMarkers.ts';
+import { buildEventTownMarkers } from '../networking/eventTownMarkers.ts';
+import type { EventTownMarker } from '../networking/eventTownMarkers.ts';
 
 const NETWORKING_BADGE_META: Record<
   NetworkingTownStatus,
@@ -43,6 +44,7 @@ export const PixiGame = (props: {
   width: number;
   height: number;
   setSelectedElement: SelectElement;
+  onSelectEventTownMarker?: (marker: EventTownMarker) => void;
   networkingProjection?: NetworkingTownProjection;
 }) => {
   // PIXI setup.
@@ -169,7 +171,11 @@ export const PixiGame = (props: {
         />
       ))}
       {eventTownMarkers.map((marker) => (
-        <EventAgentMarker key={marker.key} marker={marker} />
+        <EventAgentMarker
+          key={marker.key}
+          marker={marker}
+          onSelect={props.onSelectEventTownMarker}
+        />
       ))}
       {players.map((p) => {
         const networkingAgent = props.networkingProjection?.agentsByPlayerId[p.id];
@@ -252,7 +258,13 @@ function NetworkingBadge({
   );
 }
 
-function EventAgentMarker({ marker }: { marker: EventTownMarker }) {
+function EventAgentMarker({
+  marker,
+  onSelect,
+}: {
+  marker: EventTownMarker;
+  onSelect?: (marker: EventTownMarker) => void;
+}) {
   const draw = useCallback(
     (g: PIXI.Graphics) => {
       g.clear();
@@ -272,9 +284,28 @@ function EventAgentMarker({ marker }: { marker: EventTownMarker }) {
     },
     [marker.accent, marker.fill],
   );
+  const hitArea = useMemo(() => new PIXI.Rectangle(-40, -22, 80, 60), []);
+  const stopMarkerPropagation = useCallback((event: PIXI.FederatedPointerEvent) => {
+    event.stopPropagation();
+  }, []);
+  const handlePointerUp = useCallback(
+    (event: PIXI.FederatedPointerEvent) => {
+      event.stopPropagation();
+      onSelect?.(marker);
+    },
+    [marker, onSelect],
+  );
 
   return (
-    <Container x={marker.x} y={marker.y}>
+    <Container
+      x={marker.x}
+      y={marker.y}
+      interactive={true}
+      cursor="pointer"
+      hitArea={hitArea}
+      pointerdown={stopMarkerPropagation}
+      pointerup={handlePointerUp}
+    >
       <Graphics draw={draw} />
       <Text
         x={0}

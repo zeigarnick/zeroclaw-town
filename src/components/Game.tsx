@@ -12,6 +12,8 @@ import { useServerGame } from '../hooks/serverGame.ts';
 import type { NetworkingTownProjection } from '../../convex/networking/townProjection.ts';
 import PlayerDetails from './PlayerDetails.tsx';
 import type { SelectElement } from './Player.tsx';
+import { EventPublicCardPanel } from '../networking/EventPublicCardPanel.tsx';
+import type { EventTownMarker } from '../networking/eventTownMarkers.ts';
 
 export const SHOW_DEBUG_UI = !!import.meta.env.VITE_SHOW_DEBUG_UI;
 const EVENT_ID = import.meta.env.VITE_OPENNETWORK_EVENT_ID ?? 'main-event';
@@ -20,9 +22,15 @@ export default function Game() {
   const convex = useConvex();
   const [gameWrapperRef, { width, height }] = useElementSize();
   const [selectedElement, setSelectedElementState] = useState<Parameters<SelectElement>[0]>();
+  const [selectedEventMarker, setSelectedEventMarker] = useState<EventTownMarker | null>(null);
   const scrollViewRef = useRef<HTMLDivElement>(null);
   const setSelectedElement = useCallback<SelectElement>((element) => {
+    setSelectedEventMarker(null);
     setSelectedElementState(element);
+  }, []);
+  const setSelectedEventTownMarker = useCallback((marker: EventTownMarker) => {
+    setSelectedElementState(undefined);
+    setSelectedEventMarker(marker);
   }, []);
 
   const worldStatus = useQuery(api.world.defaultWorldStatus);
@@ -66,10 +74,17 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
                 historicalTime={historicalTime}
                 networkingProjection={networkingProjection}
                 setSelectedElement={setSelectedElement}
+                onSelectEventTownMarker={setSelectedEventTownMarker}
               />
             </ConvexProvider>
           </Stage>
         </div>
+        {selectedEventMarker && (
+          <EventPublicCardPanel
+            marker={selectedEventMarker}
+            onClose={() => setSelectedEventMarker(null)}
+          />
+        )}
         {selectedElement?.kind === 'player' && (
           <aside className="pointer-events-auto absolute inset-y-0 right-0 z-20 flex w-full max-w-md border-l-4 border-brown-900 bg-brown-900/95 text-white shadow-2xl sm:max-w-lg">
             <div ref={scrollViewRef} className="h-full w-full overflow-y-auto p-4 sm:p-5">
