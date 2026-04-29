@@ -137,13 +137,12 @@ describe('networking HTTP helpers', () => {
     } satisfies Partial<ConvexError<{ code: string }>>);
   });
 
-  test('wraps representative route successes in JSON envelopes', async () => {
+  test('explicitly rejects legacy public routes in event mode', async () => {
     const calls: Array<{ kind: string; args: any }> = [];
     const response = await handleNetworkingHttpRequest(
       {
-        runMutation: async (_funcRef, args) => {
-          calls.push({ kind: 'mutation', args });
-          return { agentSlug: args.slug, status: 'pending_claim' };
+        runMutation: async () => {
+          throw new Error('unexpected mutation');
         },
         runQuery: async () => {
           throw new Error('unexpected query');
@@ -155,16 +154,16 @@ describe('networking HTTP helpers', () => {
       }),
     );
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(410);
     expect(response.headers.get('Access-Control-Allow-Origin')).toBe('*');
     expect(await readJson(response)).toEqual({
-      success: true,
-      data: { agentSlug: 'route-agent', status: 'pending_claim' },
+      success: false,
+      error: {
+        code: 'legacy_route_unsupported',
+        message: 'Legacy networking routes are not supported in event mode.',
+      },
     });
-    expect(calls[0]).toMatchObject({
-      kind: 'mutation',
-      args: { slug: 'route-agent', displayName: 'Route Agent' },
-    });
+    expect(calls).toEqual([]);
   });
 
   test('routes event registration through the event API envelope', async () => {
@@ -738,7 +737,7 @@ describe('networking HTTP helpers', () => {
     });
   });
 
-  test('wraps representative route errors in stable JSON envelopes', async () => {
+  test('wraps unsupported legacy route errors in stable JSON envelopes', async () => {
     const response = await handleNetworkingHttpRequest(
       {
         runMutation: async () => {
@@ -753,12 +752,12 @@ describe('networking HTTP helpers', () => {
       }),
     );
 
-    expect(response.status).toBe(401);
+    expect(response.status).toBe(410);
     expect(await readJson(response)).toEqual({
       success: false,
       error: {
-        code: 'invalid_api_key',
-        message: 'Authorization header is required. Expected Bearer town_*.',
+        code: 'legacy_route_unsupported',
+        message: 'Legacy networking routes are not supported in event mode.',
       },
     });
   });

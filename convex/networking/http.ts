@@ -160,6 +160,14 @@ export async function handleNetworkingHttpRequest(
     const url = new URL(request.url);
     const route = parseApiRoute(url.pathname);
 
+    if (isLegacyPublicRoute(route)) {
+      return jsonError(
+        'legacy_route_unsupported',
+        'Legacy networking routes are not supported in event mode.',
+        410,
+      );
+    }
+
     if (request.method === 'POST' && route[0] === 'events' && route[2] === 'register') {
       const body = await parseJsonObject(request);
       const data = await ctx.runMutation(functions.eventAgents.registerEventAgent, {
@@ -783,6 +791,16 @@ function parseApiRoute(pathname: string) {
   }
 
   return route;
+}
+
+function isLegacyPublicRoute(route: string[]) {
+  if (route[0] === 'agents') {
+    return true;
+  }
+  if (['cards', 'inbox', 'meetings', 'conversations', 'intros', 'recommendations'].includes(route[0])) {
+    return true;
+  }
+  return false;
 }
 
 async function parseJsonObject(request: Request): Promise<Record<string, unknown>> {

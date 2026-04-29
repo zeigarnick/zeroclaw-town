@@ -8,12 +8,11 @@ import { useState } from 'react';
 import MusicButton from './components/buttons/MusicButton.tsx';
 import InteractButton from './components/buttons/InteractButton.tsx';
 import FreezeButton from './components/FreezeButton.tsx';
-import { OwnerDashboard } from './networking/OwnerDashboard.tsx';
 import { EventOwnerReview } from './networking/EventOwnerReview.tsx';
 import { EventQrOverlay } from './networking/EventQrOverlay.tsx';
 import { apiAdapter } from './networking/api.ts';
 
-type AppView = 'town' | 'dashboard' | 'eventReview';
+type AppView = 'town' | 'eventReview';
 
 type InitialRoute = {
   claimToken: string;
@@ -56,7 +55,7 @@ export default function Home() {
   const initialRoute = getInitialRoute();
   const eventQrConfig = getEventQrConfig();
   const [currentView, setCurrentView] = useState<AppView>(
-    initialRoute.eventReview ? 'eventReview' : initialRoute.claimToken ? 'dashboard' : 'town',
+    initialRoute.eventReview ? 'eventReview' : 'town',
   );
   return (
     <main className="relative overflow-hidden bg-black font-body" style={{ height: '100dvh' }}>
@@ -75,12 +74,6 @@ export default function Home() {
           <>
             <Game />
 
-            <button
-              onClick={() => setCurrentView('dashboard')}
-              className="absolute right-4 top-4 z-10 rounded bg-clay-700 px-4 py-2 text-sm font-bold text-white shadow-lg hover:bg-clay-500 pointer-events-auto"
-            >
-              Dashboard
-            </button>
             <div className="absolute bottom-4 left-4 z-10 flex flex-wrap gap-3 pointer-events-none">
               <FreezeButton />
               <MusicButton />
@@ -92,21 +85,6 @@ export default function Home() {
             />
             <ToastContainer position="bottom-right" autoClose={2000} closeOnClick theme="dark" />
           </>
-        ) : currentView === 'dashboard' ? (
-          <div className="relative flex h-full min-h-0 flex-col">
-            <button
-              onClick={() => setCurrentView('town')}
-              className="absolute top-4 right-4 lg:top-8 lg:right-8 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded font-bold text-sm z-10"
-            >
-              Back to Town
-            </button>
-            <div className="min-h-0 flex-1 overflow-hidden pt-12">
-              <OwnerDashboard
-                apiAdapter={apiAdapter}
-                initialClaimToken={initialRoute.claimToken}
-              />
-            </div>
-          </div>
         ) : (
           <div className="relative flex h-full min-h-0 flex-col">
             <button
