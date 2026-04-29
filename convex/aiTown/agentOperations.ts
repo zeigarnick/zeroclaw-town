@@ -14,6 +14,7 @@ import { ACTIVITIES, ACTIVITY_COOLDOWN, CONVERSATION_COOLDOWN } from '../constan
 import { internal } from '../_generated/api';
 import { sleep } from '../util/sleep';
 import { serializedPlayer } from './player';
+import { Point } from '../util/types';
 
 export const agentRememberConversation = internalAction({
   args: {
@@ -118,7 +119,7 @@ export const agentDoSomething = internalAction({
         args: {
           operationId: args.operationId,
           agentId: agent.id,
-          destination: wanderDestination(map),
+          destination: eventWanderDestination(map, player.position),
         },
       });
       return;
@@ -188,4 +189,70 @@ function wanderDestination(worldMap: WorldMap) {
     x: 1 + Math.floor(Math.random() * (worldMap.width - 2)),
     y: 1 + Math.floor(Math.random() * (worldMap.height - 2)),
   };
+}
+
+const EVENT_WANDER_RADIUS = 14;
+
+function eventWanderDestination(worldMap: WorldMap, position: Point) {
+  const start = {
+    x: Math.floor(position.x),
+    y: Math.floor(position.y),
+  };
+  const queue = [start];
+  const visited = new Set([tileKey(start)]);
+  const candidates: Point[] = [];
+
+  for (let index = 0; index < queue.length; index++) {
+    const current = queue[index];
+    if (tileDistance(start, current) > EVENT_WANDER_RADIUS) {
+      continue;
+    }
+    if (!sameTile(start, current) && openMapTile(worldMap, current)) {
+      candidates.push(current);
+    }
+    for (const next of [
+      { x: current.x + 1, y: current.y },
+      { x: current.x - 1, y: current.y },
+      { x: current.x, y: current.y + 1 },
+      { x: current.x, y: current.y - 1 },
+    ]) {
+      const key = tileKey(next);
+      if (visited.has(key) || !openMapTile(worldMap, next)) {
+        continue;
+      }
+      visited.add(key);
+      queue.push(next);
+    }
+  }
+
+  if (candidates.length === 0) {
+    return wanderDestination(worldMap);
+  }
+  return candidates[Math.floor(Math.random() * candidates.length)];
+}
+
+function openMapTile(worldMap: WorldMap, position: Point) {
+  if (
+    position.x < 1 ||
+    position.y < 1 ||
+    position.x >= worldMap.width - 1 ||
+    position.y >= worldMap.height - 1
+  ) {
+    return false;
+  }
+  const blockingLayers =
+    worldMap.collisionTiles !== undefined ? [worldMap.collisionTiles] : worldMap.objectTiles;
+  return blockingLayers.every((layer) => layer[position.x]?.[position.y] === -1);
+}
+
+function tileDistance(left: Point, right: Point) {
+  return Math.abs(left.x - right.x) + Math.abs(left.y - right.y);
+}
+
+function tileKey(position: Point) {
+  return `${position.x}:${position.y}`;
+}
+
+function sameTile(left: Point, right: Point) {
+  return left.x === right.x && left.y === right.y;
 }

@@ -4,12 +4,14 @@ import { Player, activity } from './player';
 import { Conversation, conversationInputs } from './conversation';
 import { blocked, movePlayer } from './movement';
 import { inputHandler } from './inputHandler';
-import { point } from '../util/types';
+import { Point, point } from '../util/types';
 import { Descriptions } from '../../data/characters';
 import { AgentDescription } from './agentDescription';
 import { Agent } from './agent';
 import { Id } from '../_generated/dataModel';
 import type { Game } from './game';
+import { PATHFINDING_TIMEOUT } from '../constants';
+import { findRoute } from './movement';
 
 export const agentInputs = {
   finishRememberConversation: inputHandler({
@@ -68,7 +70,9 @@ export const agentInputs = {
         agent.lastInviteAttempt = now;
       }
       if (args.destination) {
-        movePlayer(game, now, player, args.destination);
+        if (!agent.eventAgentId || canReachExactDestination(game, now, player, args.destination)) {
+          movePlayer(game, now, player, args.destination);
+        }
       }
       if (args.activity) {
         player.activity = args.activity;
@@ -302,9 +306,22 @@ function nearestOpenNeighbor(
     (left, right) =>
       tileDistance(left, mover.position) - tileDistance(right, mover.position),
   );
-  return candidates.find((candidate) => blocked(game, now, candidate, mover.id) === null);
+  return candidates.find(
+    (candidate) =>
+      blocked(game, now, candidate, mover.id) === null &&
+      canReachExactDestination(game, now, mover, candidate),
+  );
 }
 
 function tileDistance(left: { x: number; y: number }, right: { x: number; y: number }) {
   return Math.hypot(left.x - right.x, left.y - right.y);
+}
+
+function canReachExactDestination(game: Game, now: number, player: Player, destination: Point) {
+  const route = findRoute(game, now, player, destination);
+  if (!route || route.newDestination) {
+    return false;
+  }
+  const finalPoint = route.path[route.path.length - 1];
+  return finalPoint !== undefined && finalPoint[4] - now < PATHFINDING_TIMEOUT - 1000;
 }
