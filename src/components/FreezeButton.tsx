@@ -40,15 +40,17 @@ export default function FreezeButton({ eventId }: { eventId?: string }) {
     <button
       type="button"
       onClick={() => void flipSwitch()}
-      className="pointer-events-auto inline-flex size-10 items-center justify-center border-2 border-brown-900 bg-clay-700 text-clay-100 shadow-solid transition hover:bg-clay-500 focus:outline-none focus:ring-2 focus:ring-clay-100 disabled:cursor-not-allowed disabled:opacity-50 active:translate-x-px active:translate-y-px"
+      className="button pointer-events-auto size-10 bg-transparent p-0 text-xl text-white shadow-solid focus:outline-none focus:ring-2 focus:ring-clay-100 disabled:opacity-50 sm:size-12"
       title={label}
       aria-label={label}
       aria-pressed={frozen}
       disabled={!worldStatus}
     >
-      <span className="font-mono text-base font-black leading-none [image-rendering:pixelated]">
-        {frozen ? '>' : '||'}
-      </span>
+      <div className="flex h-full w-full items-center justify-center bg-clay-700">
+        <span className="font-body text-xl leading-none tracking-normal [image-rendering:pixelated] sm:text-2xl">
+          {frozen ? '>' : '||'}
+        </span>
+      </div>
     </button>
   );
 }

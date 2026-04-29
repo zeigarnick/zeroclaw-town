@@ -57,22 +57,26 @@ export default function MusicButton() {
     <button
       type="button"
       onClick={() => void flipSwitch()}
-      className="pointer-events-auto inline-flex size-10 items-center justify-center border-2 border-brown-900 bg-clay-700 text-clay-100 shadow-solid transition hover:bg-clay-500 focus:outline-none focus:ring-2 focus:ring-clay-100 disabled:cursor-not-allowed disabled:opacity-50 active:translate-x-px active:translate-y-px"
+      className="button pointer-events-auto size-10 bg-transparent p-0 text-xl text-white shadow-solid focus:outline-none focus:ring-2 focus:ring-clay-100 disabled:opacity-50 sm:size-12"
       title={isPlaying ? 'Mute music (M)' : 'Play music (M)'}
       aria-label={isPlaying ? 'Mute music' : 'Play music'}
       aria-pressed={isPlaying}
       disabled={!musicUrl}
     >
-      <img
-        className={
-          isPlaying
-            ? 'size-5 opacity-100 [image-rendering:pixelated]'
-            : 'size-5 opacity-75 [image-rendering:pixelated]'
-        }
-        src={volumeImg}
-        alt=""
-        aria-hidden="true"
-      />
+      <div className="flex h-full w-full items-center justify-center bg-clay-700">
+        <span className="flex h-full w-full items-center justify-center">
+          <img
+            className={
+              isPlaying
+                ? 'size-5 opacity-100 [image-rendering:pixelated] sm:size-6'
+                : 'size-5 opacity-75 [image-rendering:pixelated] sm:size-6'
+            }
+            src={volumeImg}
+            alt=""
+            aria-hidden="true"
+          />
+        </span>
+      </div>
     </button>
   );
 }

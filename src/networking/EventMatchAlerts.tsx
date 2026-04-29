@@ -10,15 +10,17 @@ export function EventMatchAlerts({ activity }: { activity?: EventActivitySummary
   return (
     <aside
       aria-label="Event match activity"
-      className="pointer-events-none absolute left-4 top-4 z-20 text-clay-100 sm:left-5 sm:top-5"
+      className="pointer-events-none absolute left-4 top-4 z-20 text-white sm:left-5 sm:top-5"
     >
-      <div className="inline-flex h-10 items-center border-2 border-brown-900 bg-clay-700 text-sm shadow-solid">
-        <span className="border-r-2 border-brown-900 px-3 font-mono text-[11px] font-black uppercase leading-none tracking-normal [image-rendering:pixelated]">
-          Matches
-        </span>
-        <span className="min-w-10 px-3 text-center font-mono text-base font-black leading-none tabular-nums tracking-tight [image-rendering:pixelated]">
-          {activity.matchCount}
-        </span>
+      <div className="button inline-flex h-10 cursor-default bg-transparent p-0 text-sm shadow-solid sm:h-12 sm:text-base">
+        <div className="inline-flex h-full items-center bg-clay-700 px-2.5 sm:px-3">
+          <span className="font-body uppercase leading-none tracking-normal [image-rendering:pixelated]">
+            Matches{' '}
+            <span className="inline-block min-w-5 text-right tabular-nums tracking-tight">
+              {activity.matchCount}
+            </span>
+          </span>
+        </div>
       </div>
     </aside>
   );
