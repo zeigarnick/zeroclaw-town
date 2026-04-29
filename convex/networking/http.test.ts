@@ -415,6 +415,115 @@ describe('networking HTTP helpers', () => {
     ]);
   });
 
+  test('routes platform operator event creation and invite creation', async () => {
+    const calls: Array<{ kind: string; args: any }> = [];
+    const ctx = {
+      runMutation: async (_funcRef: unknown, args: any) => {
+        calls.push({ kind: 'mutation', args });
+        if ('organizerEmail' in args) {
+          return {
+            eventId: args.eventId,
+            inviteToken: 'event_org_invite_route',
+            inviteUrl: `${args.inviteBaseUrl}/event_org_invite_route`,
+            role: args.role,
+          };
+        }
+        return {
+          eventId: args.eventId,
+          title: args.title,
+          registrationStatus: args.registrationStatus,
+        };
+      },
+      runQuery: async () => {
+        throw new Error('unexpected query');
+      },
+    };
+
+    const createResponse = await handleNetworkingHttpRequest(
+      ctx,
+      new Request('https://town.example/api/v1/operator/events', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer operator-secret' },
+        body: JSON.stringify({
+          eventId: 'demo-event',
+          title: 'Demo Event',
+          registrationStatus: 'open',
+          skillUrl: 'https://event.example/skill.md',
+          worldTemplateId: 'clawport-terminal',
+        }),
+      }),
+    );
+    const inviteResponse = await handleNetworkingHttpRequest(
+      ctx,
+      new Request('https://town.example/api/v1/operator/events/demo-event/organizer-invites', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer operator-secret' },
+        body: JSON.stringify({
+          role: 'owner',
+          label: 'Primary organizer',
+          organizerEmail: 'organizer@example.com',
+          expiresInMs: 60000,
+        }),
+      }),
+    );
+
+    expect(createResponse.status).toBe(200);
+    expect(inviteResponse.status).toBe(200);
+    expect(calls).toEqual([
+      {
+        kind: 'mutation',
+        args: {
+          operatorToken: 'operator-secret',
+          eventId: 'demo-event',
+          title: 'Demo Event',
+          registrationStatus: 'open',
+          skillUrl: 'https://event.example/skill.md',
+          worldTemplateId: 'clawport-terminal',
+        },
+      },
+      {
+        kind: 'mutation',
+        args: {
+          operatorToken: 'operator-secret',
+          eventId: 'demo-event',
+          role: 'owner',
+          label: 'Primary organizer',
+          organizerEmail: 'organizer@example.com',
+          organizerName: undefined,
+          inviteBaseUrl: 'https://town.example/event-admin/invite',
+          expiresAt: undefined,
+          expiresInMs: 60000,
+        },
+      },
+    ]);
+  });
+
+  test('rejects unauthenticated platform operator routes before handlers run', async () => {
+    const response = await handleNetworkingHttpRequest(
+      {
+        runMutation: async () => {
+          throw new Error('unexpected mutation');
+        },
+        runQuery: async () => {
+          throw new Error('unexpected query');
+        },
+      },
+      new Request('https://town.example/api/v1/operator/events', {
+        method: 'POST',
+        body: JSON.stringify({ eventId: 'demo-event' }),
+      }),
+    );
+
+    expect(response.status).toBe(401);
+    expect(await readJson(response)).toEqual({
+      success: false,
+      error: {
+        code: 'invalid_operator_token',
+        message: 'Authorization header is required. Expected Bearer operator token.',
+      },
+    });
+  });
+
   test('routes organizer review lists through mutations for component rate limiting', async () => {
     const calls: Array<{ kind: string; args: any }> = [];
     const ctx = {

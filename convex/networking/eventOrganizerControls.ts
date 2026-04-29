@@ -16,6 +16,7 @@ const ORGANIZER_TOKEN_ENV_KEYS = [
 ] as const;
 
 export type EventOrganizerAuditActorKind =
+  | 'platform_operator'
   | 'organizer'
   | 'event_agent'
   | 'public_requester'

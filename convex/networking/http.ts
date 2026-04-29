@@ -116,6 +116,17 @@ const functions = {
       'networking/eventOrganizerControls:listHighVolumeRequesters',
     ),
   },
+  eventOperatorControls: {
+    createOrUpdateEvent: makeFunctionReference<'mutation'>(
+      'networking/eventOperatorControls:createOrUpdateEvent',
+    ),
+    getOperatorEvent: makeFunctionReference<'query'>(
+      'networking/eventOperatorControls:getOperatorEvent',
+    ),
+    createOrganizerInvite: makeFunctionReference<'mutation'>(
+      'networking/eventOperatorControls:createOrganizerInvite',
+    ),
+  },
   cards: {
     createCard: makeFunctionReference<'mutation'>('networking/cards:createCard'),
     listCards: makeFunctionReference<'query'>('networking/cards:listCards'),
@@ -171,6 +182,49 @@ export async function handleNetworkingHttpRequest(
         'Legacy networking routes are not supported in event mode.',
         410,
       );
+    }
+
+    if (request.method === 'POST' && route[0] === 'operator' && route[1] === 'events' && route.length === 2) {
+      const body = await parseJsonObject(request);
+      const data = await ctx.runMutation(functions.eventOperatorControls.createOrUpdateEvent, {
+        operatorToken: requireOperatorToken(request.headers.get('Authorization')),
+        eventId: requireString(body.eventId, 'eventId'),
+        title: optionalString(body.title, 'title'),
+        registrationStatus: optionalRegistrationStatus(body.registrationStatus),
+        skillUrl: optionalString(body.skillUrl, 'skillUrl'),
+        worldTemplateId: optionalString(body.worldTemplateId, 'worldTemplateId'),
+      });
+      return jsonSuccess(data);
+    }
+
+    if (request.method === 'GET' && route[0] === 'operator' && route[1] === 'events' && route.length === 3) {
+      const data = await ctx.runQuery(functions.eventOperatorControls.getOperatorEvent, {
+        operatorToken: requireOperatorToken(request.headers.get('Authorization')),
+        eventId: requirePathId(route[2], 'eventId'),
+      });
+      return jsonSuccess(data);
+    }
+
+    if (
+      request.method === 'POST' &&
+      route[0] === 'operator' &&
+      route[1] === 'events' &&
+      route[3] === 'organizer-invites' &&
+      route.length === 4
+    ) {
+      const body = await parseJsonObject(request);
+      const data = await ctx.runMutation(functions.eventOperatorControls.createOrganizerInvite, {
+        operatorToken: requireOperatorToken(request.headers.get('Authorization')),
+        eventId: requirePathId(route[2], 'eventId'),
+        role: optionalOrganizerRole(body.role),
+        label: optionalString(body.label, 'label'),
+        organizerEmail: optionalString(body.organizerEmail, 'organizerEmail'),
+        organizerName: optionalString(body.organizerName, 'organizerName'),
+        inviteBaseUrl: optionalString(body.inviteBaseUrl, 'inviteBaseUrl') ?? `${url.origin}/event-admin/invite`,
+        expiresAt: optionalNumber(body.expiresAt, 'expiresAt'),
+        expiresInMs: optionalNumber(body.expiresInMs, 'expiresInMs'),
+      });
+      return jsonSuccess(data);
     }
 
     if (request.method === 'POST' && route[0] === 'events' && route[2] === 'register') {
@@ -795,6 +849,27 @@ function requireOrganizerToken(authorizationHeader: string | null) {
   return token;
 }
 
+function requireOperatorToken(authorizationHeader: string | null) {
+  if (!authorizationHeader) {
+    throw new RouteError(
+      'invalid_operator_token',
+      'Authorization header is required. Expected Bearer operator token.',
+      401,
+    );
+  }
+
+  const [scheme, token, extra] = authorizationHeader.trim().split(/\s+/);
+  if (scheme !== 'Bearer' || !token || extra) {
+    throw new RouteError(
+      'invalid_operator_token',
+      'Authorization header must be in the form: Bearer <operator-token>.',
+      401,
+    );
+  }
+
+  return token;
+}
+
 function parseApiRoute(pathname: string) {
   const prefix = '/api/v1/';
   if (!pathname.startsWith(prefix)) {
@@ -929,6 +1004,34 @@ function optionalVerificationMethod(value: unknown): 'tweet' | 'oauth' | undefin
     throw new RouteError(
       'invalid_request',
       'owner.verificationMethod must be either tweet or oauth when provided.',
+      400,
+    );
+  }
+  return value;
+}
+
+function optionalRegistrationStatus(value: unknown): 'open' | 'paused' | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (value !== 'open' && value !== 'paused') {
+    throw new RouteError(
+      'invalid_request',
+      'registrationStatus must be either open or paused when provided.',
+      400,
+    );
+  }
+  return value;
+}
+
+function optionalOrganizerRole(value: unknown): 'owner' | 'staff' | 'viewer' | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (value !== 'owner' && value !== 'staff' && value !== 'viewer') {
+    throw new RouteError(
+      'invalid_request',
+      'role must be owner, staff, or viewer when provided.',
       400,
     );
   }
@@ -1081,12 +1184,21 @@ function statusForNetworkingError(code: NetworkingErrorCode) {
     return 401;
   }
 
-  if (code === 'invalid_event_owner_token' || code === 'invalid_event_organizer_token') {
+  if (
+    code === 'invalid_event_owner_token' ||
+    code === 'invalid_event_organizer_token' ||
+    code === 'invalid_operator_token' ||
+    code === 'event_organizer_key_revoked'
+  ) {
     return 401;
   }
 
   if (code === 'event_rate_limited') {
     return 429;
+  }
+
+  if (code === 'event_scope_mismatch') {
+    return 403;
   }
 
   if (
@@ -1108,9 +1220,14 @@ function statusForNetworkingError(code: NetworkingErrorCode) {
     code === 'duplicate_event_agent' ||
     code === 'duplicate_event_connection_intent' ||
     code === 'meeting_already_exists' ||
+    code === 'organizer_invite_already_redeemed' ||
     code === 'duplicate_client_message_id'
   ) {
     return 409;
+  }
+
+  if (code === 'organizer_invite_expired') {
+    return 410;
   }
 
   return 400;

@@ -50,6 +50,7 @@ import type * as networking_eventConnectionIntents from "../networking/eventConn
 import type * as networking_eventContactReveal from "../networking/eventContactReveal.js";
 import type * as networking_eventDirectory from "../networking/eventDirectory.js";
 import type * as networking_eventMarkerIdentity from "../networking/eventMarkerIdentity.js";
+import type * as networking_eventOperatorControls from "../networking/eventOperatorControls.js";
 import type * as networking_eventOrganizerAuth from "../networking/eventOrganizerAuth.js";
 import type * as networking_eventOrganizerControls from "../networking/eventOrganizerControls.js";
 import type * as networking_eventRateLimits from "../networking/eventRateLimits.js";
@@ -129,6 +130,7 @@ declare const fullApi: ApiFromModules<{
   "networking/eventContactReveal": typeof networking_eventContactReveal;
   "networking/eventDirectory": typeof networking_eventDirectory;
   "networking/eventMarkerIdentity": typeof networking_eventMarkerIdentity;
+  "networking/eventOperatorControls": typeof networking_eventOperatorControls;
   "networking/eventOrganizerAuth": typeof networking_eventOrganizerAuth;
   "networking/eventOrganizerControls": typeof networking_eventOrganizerControls;
   "networking/eventRateLimits": typeof networking_eventRateLimits;
