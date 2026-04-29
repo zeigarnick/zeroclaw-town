@@ -179,6 +179,16 @@ export async function decideOwnerReviewHandler(
   decision: Exclude<EventCardStatus, 'pending_owner_review'>,
 ): Promise<EventOwnerReview> {
   const { session, agent, card } = await getOwnerReviewRows(ctx, args.reviewToken);
+  if (
+    session.status !== 'pending' ||
+    agent.approvalStatus !== 'pending_owner_review' ||
+    card.status !== 'pending_owner_review'
+  ) {
+    throw networkingError(
+      'invalid_event_owner_session_status',
+      'This event owner review has already been decided.',
+    );
+  }
   const now = Date.now();
   const reviewNote = normalizeReviewNote(args.reviewNote);
   const timestampField = timestampFieldForDecision(decision);

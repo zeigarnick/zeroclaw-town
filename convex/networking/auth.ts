@@ -19,6 +19,7 @@ export type NetworkingErrorCode =
   | 'event_card_not_found'
   | 'event_owner_session_not_found'
   | 'event_registration_paused'
+  | 'invalid_event_owner_session_status'
   | 'invalid_card_status'
   | 'invalid_card_type'
   | 'invalid_agent_slug'

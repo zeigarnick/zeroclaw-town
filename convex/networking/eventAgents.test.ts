@@ -240,4 +240,34 @@ describe('event agent handlers', () => {
       }),
     ]);
   });
+
+  test('rejects repeated owner review decisions after final state', async () => {
+    const { ctx } = createMockCtx();
+    const registration = await registerEventAgentHandler(ctx as any, {
+      eventId: 'event-a',
+      agentIdentifier: 'one-way-agent',
+      publicCard: publicCard(),
+    });
+
+    await decideOwnerReviewHandler(
+      ctx as any,
+      {
+        reviewToken: registration.ownerSessionToken,
+      },
+      'approved',
+    );
+
+    await expect(
+      decideOwnerReviewHandler(
+        ctx as any,
+        {
+          reviewToken: registration.ownerSessionToken,
+          reviewNote: 'Changed my mind',
+        },
+        'rejected',
+      ),
+    ).rejects.toMatchObject({
+      data: { code: 'invalid_event_owner_session_status' },
+    } satisfies Partial<ConvexError<{ code: string }>>);
+  });
 });
