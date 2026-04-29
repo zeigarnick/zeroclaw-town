@@ -24,14 +24,21 @@ export type NetworkingErrorCode =
   | 'event_connection_intent_not_actionable'
   | 'event_connection_intent_not_found'
   | 'event_contact_reveal_not_found'
+  | 'event_not_found'
   | 'invalid_event_owner_token'
   | 'event_owner_session_not_found'
+  | 'event_organizer_key_revoked'
   | 'event_registration_paused'
   | 'event_rate_limited'
+  | 'event_scope_mismatch'
   | 'invalid_event_connection_intent'
   | 'invalid_event_owner_session_status'
   | 'invalid_event_organizer_token'
   | 'invalid_event_world_template'
+  | 'invalid_operator_token'
+  | 'organizer_invite_already_redeemed'
+  | 'organizer_invite_expired'
+  | 'organizer_invite_not_found'
   | 'invalid_card_status'
   | 'invalid_card_type'
   | 'invalid_agent_slug'
@@ -67,6 +74,8 @@ export type NetworkingErrorCode =
 
 const API_KEY_PREFIX = 'town';
 const CLAIM_TOKEN_PREFIX = 'town_claim';
+const EVENT_ORGANIZER_INVITE_TOKEN_PREFIX = 'event_org_invite';
+const EVENT_ORGANIZER_API_KEY_PREFIX = 'event_org';
 
 export function networkingError(code: NetworkingErrorCode, message: string) {
   return new ConvexError({ code, message });
@@ -123,6 +132,14 @@ export async function hashSecret(secret: string): Promise<ArrayBuffer> {
 
 export function generateApiKey() {
   return `${API_KEY_PREFIX}_${randomBase64Url(32)}`;
+}
+
+export function generateEventOrganizerInviteToken() {
+  return `${EVENT_ORGANIZER_INVITE_TOKEN_PREFIX}_${randomBase64Url(24)}`;
+}
+
+export function generateEventOrganizerApiKey() {
+  return `${EVENT_ORGANIZER_API_KEY_PREFIX}_${randomBase64Url(32)}`;
 }
 
 export function generateClaimToken() {

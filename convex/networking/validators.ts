@@ -149,7 +149,36 @@ export const eventOwnerSessionStatusValidator = v.union(
   v.literal('revoked'),
 );
 
+export const eventOrganizerInviteStatuses = ['pending', 'redeemed', 'revoked'] as const;
+export type EventOrganizerInviteStatus = (typeof eventOrganizerInviteStatuses)[number];
+export const eventOrganizerInviteStatusValidator = v.union(
+  v.literal('pending'),
+  v.literal('redeemed'),
+  v.literal('revoked'),
+);
+
+export const eventOrganizerApiKeyStatuses = ['active', 'revoked'] as const;
+export type EventOrganizerApiKeyStatus = (typeof eventOrganizerApiKeyStatuses)[number];
+export const eventOrganizerApiKeyStatusValidator = v.union(
+  v.literal('active'),
+  v.literal('revoked'),
+);
+
+export const eventOrganizerRoles = ['owner', 'staff', 'viewer'] as const;
+export type EventOrganizerRole = (typeof eventOrganizerRoles)[number];
+export const eventOrganizerRoleValidator = v.union(
+  v.literal('owner'),
+  v.literal('staff'),
+  v.literal('viewer'),
+);
+
 export const eventOrganizerAuditTypes = [
+  'event_created',
+  'event_updated',
+  'organizer_invite_created',
+  'organizer_invite_redeemed',
+  'organizer_api_key_created',
+  'organizer_api_key_revoked',
   'event_agent_registered',
   'registration_paused',
   'registration_resumed',
@@ -159,6 +188,12 @@ export const eventOrganizerAuditTypes = [
 ] as const;
 export type EventOrganizerAuditType = (typeof eventOrganizerAuditTypes)[number];
 export const eventOrganizerAuditTypeValidator = v.union(
+  v.literal('event_created'),
+  v.literal('event_updated'),
+  v.literal('organizer_invite_created'),
+  v.literal('organizer_invite_redeemed'),
+  v.literal('organizer_api_key_created'),
+  v.literal('organizer_api_key_revoked'),
   v.literal('event_agent_registered'),
   v.literal('registration_paused'),
   v.literal('registration_resumed'),

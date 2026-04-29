@@ -12,6 +12,9 @@ import {
   eventCardStatusValidator,
   eventConnectionIntentStatusValidator,
   eventOrganizerAuditTypeValidator,
+  eventOrganizerApiKeyStatusValidator,
+  eventOrganizerInviteStatusValidator,
+  eventOrganizerRoleValidator,
   eventOwnerSessionStatusValidator,
   eventRegistrationStatusValidator,
   eventWorldTemplateIdValidator,
@@ -349,6 +352,47 @@ export const networkingTables = {
     .index('by_event_and_status', ['eventId', 'status'])
     .index('by_agent', ['eventAgentId']),
 
+  eventOrganizerInvites: defineTable({
+    eventId: v.string(),
+    inviteTokenHash: v.bytes(),
+    inviteTokenPrefix: v.string(),
+    status: eventOrganizerInviteStatusValidator,
+    role: eventOrganizerRoleValidator,
+    label: v.optional(v.string()),
+    organizerEmail: v.optional(v.string()),
+    organizerName: v.optional(v.string()),
+    createdByActorKey: v.string(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    expiresAt: v.number(),
+    redeemedAt: v.optional(v.number()),
+    redeemedByKeyId: v.optional(v.id('eventOrganizerApiKeys')),
+    revokedAt: v.optional(v.number()),
+  })
+    .index('by_invite_token_hash', ['inviteTokenHash'])
+    .index('by_event_and_status', ['eventId', 'status'])
+    .index('by_event_created_at', ['eventId', 'createdAt']),
+
+  eventOrganizerApiKeys: defineTable({
+    eventId: v.string(),
+    keyHash: v.bytes(),
+    keyPrefix: v.string(),
+    status: eventOrganizerApiKeyStatusValidator,
+    role: eventOrganizerRoleValidator,
+    label: v.optional(v.string()),
+    createdFromInviteId: v.optional(v.id('eventOrganizerInvites')),
+    createdByKeyId: v.optional(v.id('eventOrganizerApiKeys')),
+    createdByActorKey: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    lastUsedAt: v.optional(v.number()),
+    revokedAt: v.optional(v.number()),
+  })
+    .index('by_key_hash', ['keyHash'])
+    .index('by_event_and_status', ['eventId', 'status'])
+    .index('by_event_created_at', ['eventId', 'createdAt'])
+    .index('by_event_and_key_prefix', ['eventId', 'keyPrefix']),
+
   eventConnectionIntents: defineTable({
     eventId: v.string(),
     requesterAgentId: v.id('eventAgents'),
@@ -401,6 +445,7 @@ export const networkingTables = {
     eventId: v.string(),
     type: eventOrganizerAuditTypeValidator,
     actorKind: v.union(
+      v.literal('platform_operator'),
       v.literal('organizer'),
       v.literal('event_agent'),
       v.literal('public_requester'),
