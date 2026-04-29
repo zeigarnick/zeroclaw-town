@@ -18,7 +18,7 @@ describe('networking auth helpers', () => {
     expect(apiKey).toMatch(/^town_[A-Za-z0-9_-]+$/);
     expect(claimToken).toMatch(/^town_claim_[A-Za-z0-9_-]+$/);
     expect(verificationCode).toMatch(/^town-[A-Z2-9]{6}$/);
-    expect(getKeyPrefix(apiKey)).toBe(apiKey.slice(0, 12));
+    expect(getKeyPrefix(apiKey)).toBe(apiKey.slice(0, 20));
   });
 
   test('hashes secrets without preserving plaintext', async () => {
