@@ -10,6 +10,7 @@ import { EventActivityType } from './validators';
 
 const DEFAULT_EVENT_ACTIVITY_LIMIT = 12;
 const MAX_EVENT_ACTIVITY_LIMIT = 50;
+const EVENT_MATCH_MOVEMENT_SCAN_LIMIT = 200;
 
 type EventActivityPayload = {
   matchKind: 'recipient_approved';
@@ -108,7 +109,7 @@ export async function queuePendingEventMatchMovements(
       q.eq('eventId', eventSpace.eventId).eq('type', 'match_created'),
     )
     .order('desc')
-    .take(20);
+    .take(EVENT_MATCH_MOVEMENT_SCAN_LIMIT);
   let enqueued = 0;
   let skipped = 0;
   for (const event of events) {

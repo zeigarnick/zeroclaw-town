@@ -6,6 +6,7 @@ import { authenticateEventOrganizerApiKey, EventOrganizerActor } from './eventOr
 import { createEventWorld, ensureEventSpaceWorld } from './eventWorlds';
 import { enforceEventRateLimit } from './eventRateLimits';
 import { EventOrganizerAuditType, MAX_EVENT_REVIEW_NOTE_LENGTH } from './validators';
+import { insertInput } from '../aiTown/insertInput';
 
 const MAX_SKILL_URL_LENGTH = 2048;
 const DEFAULT_REVIEW_LIMIT = 50;
@@ -217,9 +218,24 @@ export async function revokeEventAgentHandler(
   }
 
   const now = Date.now();
+  const townPlayerId = agent.townPlayerId;
+  if (townPlayerId) {
+    const eventSpace = await ctx.db
+      .query('eventSpaces')
+      .withIndex('by_event_id', (q) => q.eq('eventId', eventId))
+      .first();
+    if (eventSpace?.worldId) {
+      await insertInput(ctx, eventSpace.worldId, 'removeEventAgentAvatar', {
+        eventAgentId: agent._id,
+        playerId: townPlayerId,
+      });
+    }
+  }
+
   await ctx.db.patch(agent._id, {
     approvalStatus: 'revoked',
     activeCardId: undefined,
+    townPlayerId: undefined,
     updatedAt: now,
     revokedAt: now,
     revokedReason: reason,

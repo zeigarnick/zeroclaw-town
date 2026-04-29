@@ -262,8 +262,12 @@ export const agentInputs = {
       if (!requester || !target) {
         return null;
       }
-      const requesterDestination = nearestOpenNeighbor(game, now, target, requester);
-      const targetDestination = nearestOpenNeighbor(game, now, requester, target);
+      const { requesterDestination, targetDestination } = matchMeetingDestinations(
+        game,
+        now,
+        requester,
+        target,
+      );
       if (requesterDestination) {
         movePlayer(game, now, requester, requesterDestination, true);
       }
@@ -284,9 +288,72 @@ export const agentInputs = {
       return null;
     },
   }),
+  removeEventAgentAvatar: inputHandler({
+    args: {
+      eventAgentId: v.id('eventAgents'),
+      playerId: playerId,
+    },
+    handler: (game, now, args) => {
+      const agent = [...game.world.agents.values()].find(
+        (candidate) => candidate.eventAgentId === args.eventAgentId,
+      );
+      if (!agent || agent.playerId !== args.playerId) {
+        return null;
+      }
+      const player = game.world.players.get(agent.playerId);
+      if (player) {
+        player.leave(game, now);
+      }
+      game.world.agents.delete(agent.id);
+      game.agentDescriptions.delete(agent.id);
+      game.playerDescriptions.delete(agent.playerId);
+      game.descriptionsModified = true;
+      return null;
+    },
+  }),
 };
 
-function nearestOpenNeighbor(
+function matchMeetingDestinations(
+  game: Game,
+  now: number,
+  requester: Player,
+  target: Player,
+) {
+  const requesterCandidates = openNeighborCandidates(game, now, target, requester);
+  const targetCandidates = openNeighborCandidates(game, now, requester, target);
+  let bestPair:
+    | {
+        requesterDestination: Point;
+        targetDestination: Point;
+        score: number;
+      }
+    | undefined;
+  for (const requesterDestination of requesterCandidates) {
+    for (const targetDestination of targetCandidates) {
+      if (sameTile(requesterDestination, targetDestination)) {
+        continue;
+      }
+      const score =
+        tileDistance(requesterDestination, requester.position) +
+        tileDistance(targetDestination, target.position);
+      if (!bestPair || score < bestPair.score) {
+        bestPair = { requesterDestination, targetDestination, score };
+      }
+    }
+  }
+  if (bestPair) {
+    return {
+      requesterDestination: bestPair.requesterDestination,
+      targetDestination: bestPair.targetDestination,
+    };
+  }
+  return {
+    requesterDestination: requesterCandidates[0],
+    targetDestination: undefined,
+  };
+}
+
+function openNeighborCandidates(
   game: Game,
   now: number,
   anchor: Player,
@@ -306,8 +373,9 @@ function nearestOpenNeighbor(
     (left, right) =>
       tileDistance(left, mover.position) - tileDistance(right, mover.position),
   );
-  return candidates.find(
+  return candidates.filter(
     (candidate) =>
+      !sameTile(candidate, mover.position) &&
       blocked(game, now, candidate, mover.id) === null &&
       canReachExactDestination(game, now, mover, candidate),
   );
@@ -324,4 +392,8 @@ function canReachExactDestination(game: Game, now: number, player: Player, desti
   }
   const finalPoint = route.path[route.path.length - 1];
   return finalPoint !== undefined && finalPoint[4] - now < PATHFINDING_TIMEOUT - 1000;
+}
+
+function sameTile(left: Point, right: Point) {
+  return Math.floor(left.x) === Math.floor(right.x) && Math.floor(left.y) === Math.floor(right.y);
 }

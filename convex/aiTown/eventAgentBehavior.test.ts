@@ -85,4 +85,62 @@ describe('event agent behavior', () => {
     expect(requester.activity).toMatchObject({ description: 'Matched', until: 12000 });
     expect(target.activity).toMatchObject({ description: 'Matched', until: 12000 });
   });
+
+  test('matched event players do not pathfind to the same meeting tile', () => {
+    const requester = player('p:1', 2, 2);
+    const target = player('p:2', 4, 2);
+    const game = {
+      world: {
+        players: new Map([
+          [requester.id, requester],
+          [target.id, target],
+        ]),
+        conversations: new Map(),
+      },
+      worldMap: {
+        width: 8,
+        height: 8,
+        objectTiles: [emptyCollisionMap(8, 8)],
+      },
+    };
+
+    agentInputs.moveEventMatchPair.handler(game as any, 2000, {
+      requesterPlayerId: 'p:1',
+      targetPlayerId: 'p:2',
+    });
+
+    expect(requester.pathfinding?.destination).toBeDefined();
+    expect(target.pathfinding?.destination).toBeDefined();
+    expect(requester.pathfinding?.destination).not.toEqual(target.pathfinding?.destination);
+  });
+
+  test('revoked event avatars are removed from the town world', () => {
+    const attendee = player('p:1', 2, 2);
+    const agent = new Agent({
+      id: 'a:1',
+      playerId: 'p:1',
+      eventAgentId: 'eventAgents:1' as any,
+    });
+    const game = {
+      world: {
+        players: new Map([[attendee.id, attendee]]),
+        agents: new Map([[agent.id, agent]]),
+        conversations: new Map(),
+      },
+      agentDescriptions: new Map([[agent.id, {}]]),
+      playerDescriptions: new Map([[attendee.id, {}]]),
+      descriptionsModified: false,
+    };
+
+    agentInputs.removeEventAgentAvatar.handler(game as any, 2000, {
+      eventAgentId: 'eventAgents:1' as any,
+      playerId: 'p:1',
+    });
+
+    expect(game.world.players.has(attendee.id)).toBe(false);
+    expect(game.world.agents.has(agent.id)).toBe(false);
+    expect(game.agentDescriptions.has(agent.id)).toBe(false);
+    expect(game.playerDescriptions.has(attendee.id)).toBe(false);
+    expect(game.descriptionsModified).toBe(true);
+  });
 });

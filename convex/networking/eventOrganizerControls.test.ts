@@ -297,6 +297,24 @@ describe('event organizer controls', () => {
     const { ctx, tables } = createMockCtx();
     await seedOrganizerKey(ctx);
     const registration = await registerApprovedAgent(ctx, 'abusive-agent');
+    await ctx.db.insert('eventSpaces', {
+      eventId: 'demo-event',
+      title: 'Demo Event',
+      worldId: 'worlds:event',
+      registrationStatus: 'open',
+      createdAt: 1710000000000,
+      updatedAt: 1710000000000,
+    });
+    await ctx.db.insert('worldStatus', {
+      worldId: 'worlds:event',
+      engineId: 'engines:event',
+      isDefault: false,
+      lastViewed: 1710000000000,
+      status: 'running',
+    });
+    await ctx.db.patch(registration.eventAgentId, {
+      townPlayerId: 'p:7',
+    });
 
     await expect(
       listApprovedPublicCardsHandler(ctx as any, { eventId: 'demo-event' }),
@@ -312,8 +330,18 @@ describe('event organizer controls', () => {
     expect(revoked).toMatchObject({
       approvalStatus: 'revoked',
       activeCardId: undefined,
+      townPlayerId: undefined,
       revokedReason: 'spam reports',
     });
+    expect(tables.inputs).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        name: 'removeEventAgentAvatar',
+        args: {
+          eventAgentId: registration.eventAgentId,
+          playerId: 'p:7',
+        },
+      }),
+    ]));
     expect(tables.eventNetworkingCards[0]).toMatchObject({
       status: 'revoked',
       revokedReason: 'spam reports',

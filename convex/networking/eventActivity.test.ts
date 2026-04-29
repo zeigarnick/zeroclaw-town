@@ -6,6 +6,7 @@ import {
 import {
   getEventMatchActivityCount,
   listRecentEventActivityHandler,
+  queuePendingEventMatchMovements,
   repairEventActivityMarkerSlugsHandler,
 } from './eventActivity';
 import { upsertEventRecipientRulesHandler } from './eventRecipientRules';
@@ -365,6 +366,73 @@ describe('event activity', () => {
     });
     expect(JSON.stringify(tables.inputs)).not.toContain('eventAgents:');
     expect(JSON.stringify(tables.inputs)).not.toContain('event_owner_');
+  });
+
+  test('queues older unprocessed match movement beyond the latest activity window', async () => {
+    const { ctx, tables } = createMockCtx();
+    const now = 1710000010000;
+    await ctx.db.insert('eventSpaces', {
+      eventId: 'demo-event',
+      title: 'Demo Event',
+      worldId: 'worlds:event',
+      registrationStatus: 'open',
+      createdAt: now,
+      updatedAt: now,
+    });
+    await ctx.db.insert('worldStatus', {
+      worldId: 'worlds:event',
+      engineId: 'engines:event',
+      isDefault: false,
+      lastViewed: now,
+      status: 'running',
+    });
+    const requester = await insertAgentWithCard(ctx, 'Cedar Scout', {}, { townPlayerId: 'p:1' });
+    const target = await insertAgentWithCard(ctx, 'Orbit Builder', {}, { townPlayerId: 'p:2' });
+    const intent = await createEventConnectionIntentHandler(ctx as any, {
+      eventId: 'demo-event',
+      requesterAgentId: requester.agentId as any,
+      targetAgentId: target.agentId as any,
+      requesterOwnerSessionToken: requester.ownerSessionToken,
+    });
+
+    for (let index = 0; index < 21; index++) {
+      await ctx.db.insert('eventActivityEvents', {
+        eventId: 'demo-event',
+        type: 'match_created',
+        requesterDisplayName: 'Cedar Scout',
+        targetDisplayName: 'Orbit Builder',
+        sourceIntentId: intent.id,
+        ...(index > 0
+          ? {
+              movementInputId: `inputs:queued-${index}`,
+              movementQueuedAt: now + index,
+            }
+          : {}),
+        payload: {
+          matchKind: 'recipient_approved',
+        },
+        createdAt: now + index,
+        updatedAt: now + index,
+      });
+    }
+
+    await expect(
+      queuePendingEventMatchMovements(ctx as any, tables.eventSpaces[0] as any, { now }),
+    ).resolves.toMatchObject({ enqueued: 1 });
+
+    expect(tables.inputs).toEqual([
+      expect.objectContaining({
+        name: 'moveEventMatchPair',
+        args: {
+          requesterPlayerId: 'p:1',
+          targetPlayerId: 'p:2',
+        },
+      }),
+    ]);
+    expect(tables.eventActivityEvents.find((event) => event.createdAt === now)).toMatchObject({
+      movementInputId: tables.inputs[0]._id,
+      movementQueuedAt: now,
+    });
   });
 
   test('omits legacy hash-derived marker slugs from activity views until repaired', async () => {
