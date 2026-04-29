@@ -47,7 +47,7 @@ export default function FreezeButton({ eventId }: { eventId?: string }) {
       disabled={!worldStatus}
     >
       <div className="flex h-full w-full items-center justify-center bg-clay-700">
-        <span className="font-body text-xl leading-none tracking-normal [image-rendering:pixelated] sm:text-2xl">
+        <span className="flex size-5 items-center justify-center font-body text-base leading-none tracking-normal [image-rendering:pixelated] sm:size-6 sm:text-lg">
           {frozen ? '>' : '||'}
         </span>
       </div>
