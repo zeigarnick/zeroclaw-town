@@ -1,0 +1,175 @@
+{
+  "feature": "event-agent-networking",
+  "deliveryPath": "rolling-wave",
+  "sourcePrd": "docs/prd/event-agent-networking-prd.md",
+  "planningPolicy": {
+    "createImplementationPlanPerWave": true,
+    "doNotPlanAllWavesAtOnce": true,
+    "maxConcurrentWavePlans": 1,
+    "allowInWaveBatching": true,
+    "allowCrossWaveBatching": false,
+    "replanAfterWaveCompletion": true
+  },
+  "currentWave": "wave-01",
+  "nextRecommended": "wave-01",
+  "storyMap": {
+    "US-001": "Host Public Event Skill",
+    "US-002": "Display QR Code In Town",
+    "US-003": "Register Pseudonymous Agent",
+    "US-004": "Submit Public Networking Card",
+    "US-005": "Approve Card Before Search",
+    "US-006": "Configure Avatar From Asset Catalog",
+    "US-007": "Search Public Event Directory",
+    "US-008": "Review Agent-Suggested Matches",
+    "US-009": "Create Minimal Connection Intent",
+    "US-010": "Apply Recipient Filter Before Owner Review",
+    "US-011": "Approve Contact Reveal",
+    "US-012": "Show Public Card On Map Click",
+    "US-013": "Show Pseudonymous Match Alerts",
+    "US-014": "Add Organizer Abuse Controls",
+    "US-015": "Rate Limit Event API Surfaces",
+    "US-016": "Remove Legacy Messaging, NPC, And Matching Paths"
+  },
+  "waves": [
+    {
+      "id": "wave-01",
+      "title": "Event Onboarding Foundation",
+      "objective": "Create the QR-to-skill registration spine and approved public-card model.",
+      "stories": ["US-001", "US-002", "US-003", "US-004", "US-005", "US-006"],
+      "status": "pending",
+      "dependsOn": [],
+      "batches": [
+        {
+          "id": "w01-b01",
+          "title": "Skill And Registration Schema",
+          "stories": ["US-001", "US-003", "US-004"],
+          "dependsOn": []
+        },
+        {
+          "id": "w01-b02",
+          "title": "Owner Approval And Avatar Presence",
+          "stories": ["US-005", "US-006"],
+          "dependsOn": ["w01-b01"]
+        },
+        {
+          "id": "w01-b03",
+          "title": "Town QR Entry Point",
+          "stories": ["US-002"],
+          "dependsOn": ["w01-b01"]
+        }
+      ],
+      "entryCriteria": [
+        "Existing app builds locally before wave work begins or known failures are documented.",
+        "Event design doc and PRD are committed."
+      ],
+      "exitCriteria": [
+        "Attendee agent can register a pseudonymous card and avatar through the event skill/API.",
+        "Owner can approve the card before it becomes public.",
+        "Town screen exposes a usable QR entry point."
+      ],
+      "suggestedPlan": "docs/exec-plans/active/2026-04-29-event-agent-networking-wave-01.md"
+    },
+    {
+      "id": "wave-02",
+      "title": "Directory And Consent-Gated Requests",
+      "objective": "Enable agent-led discovery and minimal connection intents with requester and recipient consent gates.",
+      "stories": ["US-007", "US-008", "US-009", "US-010", "US-011"],
+      "status": "pending",
+      "dependsOn": ["wave-01"],
+      "batches": [
+        {
+          "id": "w02-b01",
+          "title": "Searchable Public Directory",
+          "stories": ["US-007"],
+          "dependsOn": []
+        },
+        {
+          "id": "w02-b02",
+          "title": "Outbound Owner Approval And Minimal Intent",
+          "stories": ["US-008", "US-009"],
+          "dependsOn": ["w02-b01"]
+        },
+        {
+          "id": "w02-b03",
+          "title": "Recipient Filter And Contact Reveal",
+          "stories": ["US-010", "US-011"],
+          "dependsOn": ["w02-b02"]
+        }
+      ],
+      "entryCriteria": [
+        "Approved public cards exist and are event-scoped.",
+        "Owner approval state is available for public-card publication."
+      ],
+      "exitCriteria": [
+        "Agents can search approved public cards.",
+        "Outbound connection intents require owner approval.",
+        "Recipient filters run before recipient owner review.",
+        "Contact fields remain hidden until approved reveal."
+      ],
+      "suggestedPlan": "docs/exec-plans/active/2026-04-29-event-agent-networking-wave-02.md"
+    },
+    {
+      "id": "wave-03",
+      "title": "Town Experience And Event Activity",
+      "objective": "Make the town a view-only event surface with safe card inspection and pseudonymous match alerts.",
+      "stories": ["US-012", "US-013"],
+      "status": "pending",
+      "dependsOn": ["wave-02"],
+      "batches": [
+        {
+          "id": "w03-b01",
+          "title": "View-Only Public Card Interaction",
+          "stories": ["US-012"],
+          "dependsOn": []
+        },
+        {
+          "id": "w03-b02",
+          "title": "Display-Safe Match Alerts",
+          "stories": ["US-013"],
+          "dependsOn": ["w03-b01"]
+        }
+      ],
+      "entryCriteria": [
+        "Directory and connection-intent statuses exist.",
+        "Approved pseudonymous cards can be rendered in the town."
+      ],
+      "exitCriteria": [
+        "Map clicks open only public cards and have no hidden side effects.",
+        "Big screen shows pseudonymous match alerts and aggregate activity without private data."
+      ],
+      "suggestedPlan": "docs/exec-plans/active/2026-04-29-event-agent-networking-wave-03.md"
+    },
+    {
+      "id": "wave-04",
+      "title": "Abuse Controls And Legacy Removal",
+      "objective": "Add organizer controls, API rate limits, and remove conflicting legacy surfaces.",
+      "stories": ["US-014", "US-015", "US-016"],
+      "status": "pending",
+      "dependsOn": ["wave-03"],
+      "batches": [
+        {
+          "id": "w04-b01",
+          "title": "Organizer Controls And Rate Limits",
+          "stories": ["US-014", "US-015"],
+          "dependsOn": []
+        },
+        {
+          "id": "w04-b02",
+          "title": "Legacy Surface Removal",
+          "stories": ["US-016"],
+          "dependsOn": ["w04-b01"]
+        }
+      ],
+      "entryCriteria": [
+        "Core event registration, directory, connection-intent, and town surfaces exist.",
+        "Legacy routes/actions are inventoried before removal."
+      ],
+      "exitCriteria": [
+        "Organizer can recover from leaked-link or abusive registration scenarios.",
+        "Registration, search, updates, and intents are rate-limited.",
+        "Legacy messaging, NPC, vector matching, and dashboard-heavy paths are removed or disabled."
+      ],
+      "suggestedPlan": "docs/exec-plans/active/2026-04-29-event-agent-networking-wave-04.md"
+    }
+  ]
+}
