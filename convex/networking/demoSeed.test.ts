@@ -146,12 +146,36 @@ function tableCounts(tables: Record<TableName, Row[]>) {
 }
 
 describe('networking demo seed', () => {
+  test('skips legacy demo data unless explicitly enabled', async () => {
+    const { ctx, tables } = createMockCtx();
+
+    await expect(seedDemoHandler(ctx as any, {})).resolves.toEqual({
+      skipped: true,
+      reason: 'legacy_demo_seed_disabled',
+    });
+    expect(tableCounts(tables)).toEqual({
+      networkAgents: 0,
+      networkAgentApiKeys: 0,
+      ownerClaims: 0,
+      worldStatus: 0,
+      matchCards: 0,
+      cardEmbeddings: 0,
+      recommendations: 0,
+      recommendationSuppressions: 0,
+      meetings: 0,
+      agentConversations: 0,
+      agentMessages: 0,
+      introCandidates: 0,
+      inboxEvents: 0,
+    });
+  });
+
   test('creates the demo loop and is rerunnable without duplicate records', async () => {
     const { ctx, tables } = createMockCtx();
 
-    const first = await seedDemoHandler(ctx as any, {});
+    const first = await seedDemoHandler(ctx as any, { legacyDemoMode: true });
     const firstCounts = tableCounts(tables);
-    const second = await seedDemoHandler(ctx as any, {});
+    const second = await seedDemoHandler(ctx as any, { legacyDemoMode: true });
     const secondCounts = tableCounts(tables);
 
     expect(secondCounts).toEqual(firstCounts);
@@ -176,6 +200,6 @@ describe('networking demo seed', () => {
     expect(tables.meetings[0].status).toBe('accepted');
     expect(tables.agentConversations[0].status).toBe('closed');
     expect(tables.introCandidates[0].status).toBe('pending_review');
-    expect(first.agents[0].apiKey).toBe(second.agents[0].apiKey);
+    expect((first as any).agents[0].apiKey).toBe((second as any).agents[0].apiKey);
   });
 });

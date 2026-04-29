@@ -282,6 +282,10 @@ export async function runVectorMatchingForCardHandler(
   ctx: Pick<ActionCtx, 'runQuery' | 'runMutation' | 'vectorSearch'>,
   args: { cardId: Id<'matchCards'> },
 ) {
+  if (!platformVectorMatchingAvailableForEventMode()) {
+    return emptyMatchRunResult();
+  }
+
   const seed = await ctx.runQuery(loadVectorMatchingSeedRef, args);
   if (!seed) {
     return emptyMatchRunResult();
@@ -311,6 +315,15 @@ export async function runVectorMatchingForCardHandler(
     triggerCardId: args.cardId,
     candidateEmbeddingIds: candidates.map((candidate) => candidate._id),
   });
+}
+
+export function platformVectorMatchingAvailableForEventMode(
+  eventMode = process.env.OPENNETWORK_EVENT_MODE,
+) {
+  if (!eventMode) {
+    return true;
+  }
+  return !['1', 'true', 'yes', 'on'].includes(eventMode.trim().toLowerCase());
 }
 
 export const loadVectorMatchingSeed = internalQuery({

@@ -1,7 +1,17 @@
 import { Doc, Id } from './_generated/dataModel';
 import { MutationCtx } from './_generated/server';
 
-export function townNpcsEnabled(value = process.env.AGORA_ENABLE_TOWN_NPCS) {
+export function townNpcsEnabled(
+  value = process.env.AGORA_ENABLE_TOWN_NPCS,
+  eventMode = process.env.OPENNETWORK_EVENT_MODE,
+) {
+  if (flagEnabled(eventMode)) {
+    return false;
+  }
+  return flagEnabled(value);
+}
+
+function flagEnabled(value: string | undefined) {
   if (!value) {
     return false;
   }

@@ -10,6 +10,7 @@ describe('town NPC flag', () => {
     expect(townNpcsEnabled('1')).toBe(true);
     expect(townNpcsEnabled('YES')).toBe(true);
     expect(townNpcsEnabled(' on ')).toBe(true);
+    expect(townNpcsEnabled('true', 'true')).toBe(false);
   });
 
   test('removes unlinked NPC agents while preserving networking avatars and humans', () => {

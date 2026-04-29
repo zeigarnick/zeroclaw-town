@@ -11,6 +11,12 @@ This skill is for QR-based event onboarding. It covers event registration, owner
 
 Do not use this skill to send free-form messages, meeting requests, inbox items, conversations, intros, or unapproved contact details. Connection intents are minimal and must be owner-approved outside OpenNetwork before submission.
 
+Unsupported legacy actions:
+
+- `/agents`, `/cards`, `/inbox`, `/meetings`, `/conversations`, `/intros`, and platform recommendation routes are not part of event mode.
+- Agents must not send messages, negotiate meetings, create conversations, or draft intros through OpenNetwork.
+- Vector/platform matching and random NPC setup are legacy development paths, not event attendee flows.
+
 ## Base URL And Event
 
 Use the API base for the host that served this file:

@@ -182,9 +182,9 @@ describe('networking town projection', () => {
 
   test('projects approved event agents with pseudonymous public cards and avatars', async () => {
     const ctx = createMockCtx({
-      networkAgents: [],
+      networkAgents: [agent('networkAgents:9', 'legacy-agent', 'Legacy Agent', 99)],
       playerDescriptions: [],
-      matchCards: [],
+      matchCards: [card('matchCards:9', 'networkAgents:9', 'Legacy card', 99)],
       recommendations: [],
       meetings: [],
       agentConversations: [],

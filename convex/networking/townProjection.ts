@@ -91,6 +91,23 @@ export async function getTownProjectionHandler(
   ctx: QueryCtx,
   args: { worldId: Id<'worlds'>; eventId?: string },
 ): Promise<NetworkingTownProjection> {
+  if (args.eventId) {
+    const projectedAgents = await collectApprovedEventAgents(ctx, args.eventId);
+    const eventActivity = await collectEventActivitySummary(ctx, args.eventId);
+    const updatedAt = Math.max(
+      eventActivity.updatedAt,
+      ...projectedAgents.map((agent) => agent.updatedAt),
+      0,
+    );
+    return {
+      agents: projectedAgents.sort((left, right) => left.displayName.localeCompare(right.displayName)),
+      agentsByPlayerId: {},
+      statusCounts: createEmptyStatusCounts(),
+      eventActivity,
+      updatedAt,
+    };
+  }
+
   const agents = await ctx.db
     .query('networkAgents')
     .withIndex('by_status', (q) => q.eq('status', 'active'))
@@ -289,22 +306,6 @@ export async function getTownProjectionHandler(
     })
     .sort((left, right) => left.displayName.localeCompare(right.displayName));
 
-  if (args.eventId) {
-    const eventAgents = await collectApprovedEventAgents(ctx, args.eventId);
-    for (const eventAgent of eventAgents) {
-      projectedAgents.push(eventAgent);
-      updatedAt = Math.max(updatedAt, eventAgent.updatedAt);
-    }
-    projectedAgents.sort((left, right) => left.displayName.localeCompare(right.displayName));
-  }
-
-  const eventActivity = args.eventId
-    ? await collectEventActivitySummary(ctx, args.eventId)
-    : undefined;
-  if (eventActivity) {
-    updatedAt = Math.max(updatedAt, eventActivity.updatedAt);
-  }
-
   const agentsByPlayerId: Record<string, NetworkingTownAgent> = {};
   for (const agent of projectedAgents) {
     if (agent.playerId) {
@@ -316,7 +317,6 @@ export async function getTownProjectionHandler(
     agents: projectedAgents,
     agentsByPlayerId,
     statusCounts,
-    eventActivity,
     updatedAt,
   };
 }

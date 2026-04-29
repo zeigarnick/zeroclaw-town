@@ -73,14 +73,22 @@ const DEMO_SCORE_BREAKDOWN = {
 export const seed = mutation({
   args: {
     includeIntroCandidate: v.optional(v.boolean()),
+    legacyDemoMode: v.optional(v.boolean()),
   },
   handler: seedDemoHandler,
 });
 
 export async function seedDemoHandler(
   ctx: MutationCtx,
-  args: { includeIntroCandidate?: boolean },
+  args: { includeIntroCandidate?: boolean; legacyDemoMode?: boolean },
 ) {
+  if (!args.legacyDemoMode && !legacyDemoSeedEnabled()) {
+    return {
+      skipped: true as const,
+      reason: 'legacy_demo_seed_disabled' as const,
+    };
+  }
+
   const now = Date.now();
   const includeIntroCandidate = args.includeIntroCandidate ?? true;
 
@@ -166,6 +174,13 @@ export async function seedDemoHandler(
         }
       : null,
   };
+}
+
+function legacyDemoSeedEnabled(value = process.env.OPENNETWORK_ENABLE_LEGACY_DEMO_SEED) {
+  if (!value) {
+    return false;
+  }
+  return ['1', 'true', 'yes', 'on'].includes(value.trim().toLowerCase());
 }
 
 async function upsertClaimedAgent(
