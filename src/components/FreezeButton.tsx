@@ -48,16 +48,16 @@ export default function FreezeButton({ eventId }: { eventId?: string }) {
     >
       <div className="flex h-full w-full items-center justify-center bg-clay-700">
         {frozen ? (
-          <span aria-hidden="true" className="relative block size-5 sm:size-6">
-            <span className="absolute left-[35%] top-[20%] h-[60%] w-[18%] bg-white" />
-            <span className="absolute left-[53%] top-[31%] h-[38%] w-[18%] bg-white" />
-            <span className="absolute left-[71%] top-[42%] h-[16%] w-[18%] bg-white" />
-          </span>
+          <div aria-hidden="true" className="relative size-5 sm:size-6">
+            <span className="absolute left-[35%] top-[20%] block h-[60%] w-[18%] bg-white" />
+            <span className="absolute left-[53%] top-[31%] block h-[38%] w-[18%] bg-white" />
+            <span className="absolute left-[71%] top-[42%] block h-[16%] w-[18%] bg-white" />
+          </div>
         ) : (
-          <span aria-hidden="true" className="flex size-5 justify-center gap-1 sm:size-6">
-            <span className="h-full w-1.5 bg-white sm:w-2" />
-            <span className="h-full w-1.5 bg-white sm:w-2" />
-          </span>
+          <div aria-hidden="true" className="flex size-5 justify-center gap-1 sm:size-6">
+            <span className="block h-full w-1.5 bg-white sm:w-2" />
+            <span className="block h-full w-1.5 bg-white sm:w-2" />
+          </div>
         )}
       </div>
     </button>
