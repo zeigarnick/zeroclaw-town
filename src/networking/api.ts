@@ -278,6 +278,52 @@ export interface UpsertEventRecipientRulesRequest {
   rules: EventRecipientRules;
 }
 
+export interface EventPrivateContact {
+  realName?: string;
+  company?: string;
+  email?: string;
+  phone?: string;
+  linkedin?: string;
+  x?: string;
+  website?: string;
+}
+
+export interface EventContactReveal {
+  id: string;
+  eventId: string;
+  intentId: string;
+  requesterAgentId: string;
+  targetAgentId: string;
+  requesterContact: EventPrivateContact;
+  targetContact: EventPrivateContact;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface EventConnectionIntentDecisionResult {
+  intent: EventConnectionIntent;
+  reveal?: EventContactReveal;
+}
+
+export interface UpsertEventPrivateContactRequest {
+  eventId: string;
+  eventAgentId: string;
+  contact: EventPrivateContact;
+}
+
+export interface DecideEventConnectionIntentRequest {
+  eventId: string;
+  intentId: string;
+  recipientAgentId: string;
+  decision: 'approve' | 'decline';
+}
+
+export interface GetEventContactRevealRequest {
+  eventId: string;
+  intentId: string;
+  viewerAgentId: string;
+}
+
 export type EventOwnerReviewStatus =
   | 'pending'
   | 'approved'
@@ -367,6 +413,13 @@ export interface IApiAdapter {
     req: GetEventInboundIntentsRequest,
   ): Promise<ApiResponse<EventInboundIntentReview[]>>;
   upsertEventRecipientRules(req: UpsertEventRecipientRulesRequest): Promise<ApiResponse<unknown>>;
+  upsertEventPrivateContact(req: UpsertEventPrivateContactRequest): Promise<ApiResponse<unknown>>;
+  decideEventConnectionIntent(
+    req: DecideEventConnectionIntentRequest,
+  ): Promise<ApiResponse<EventConnectionIntentDecisionResult>>;
+  getEventContactReveal(
+    req: GetEventContactRevealRequest,
+  ): Promise<ApiResponse<EventContactReveal>>;
 }
 
 type FetchLike = typeof fetch;
@@ -662,6 +715,45 @@ function normalizeEventInboundIntentReview(value: unknown): EventInboundIntentRe
   return {
     intent: normalizeEventConnectionIntent(row.intent),
     requester: normalizeEventDirectoryResult(row.requester),
+  };
+}
+
+function normalizeEventPrivateContact(value: unknown): EventPrivateContact {
+  const row = asRecord(value);
+  return {
+    realName: typeof row.realName === 'string' ? row.realName : undefined,
+    company: typeof row.company === 'string' ? row.company : undefined,
+    email: typeof row.email === 'string' ? row.email : undefined,
+    phone: typeof row.phone === 'string' ? row.phone : undefined,
+    linkedin: typeof row.linkedin === 'string' ? row.linkedin : undefined,
+    x: typeof row.x === 'string' ? row.x : undefined,
+    website: typeof row.website === 'string' ? row.website : undefined,
+  };
+}
+
+function normalizeEventContactReveal(value: unknown): EventContactReveal {
+  const row = asRecord(value);
+  return {
+    id: normalizeId(row),
+    eventId: typeof row.eventId === 'string' ? row.eventId : '',
+    intentId: typeof row.intentId === 'string' ? row.intentId : '',
+    requesterAgentId: typeof row.requesterAgentId === 'string' ? row.requesterAgentId : '',
+    targetAgentId: typeof row.targetAgentId === 'string' ? row.targetAgentId : '',
+    requesterContact: normalizeEventPrivateContact(row.requesterContact),
+    targetContact: normalizeEventPrivateContact(row.targetContact),
+    createdAt: typeof row.createdAt === 'number' ? row.createdAt : 0,
+    updatedAt: typeof row.updatedAt === 'number' ? row.updatedAt : 0,
+  };
+}
+
+function normalizeEventConnectionIntentDecisionResult(
+  value: unknown,
+): EventConnectionIntentDecisionResult {
+  const row = asRecord(value);
+  const reveal = row.reveal ? normalizeEventContactReveal(row.reveal) : undefined;
+  return {
+    intent: normalizeEventConnectionIntent(row.intent),
+    reveal,
   };
 }
 
@@ -1042,6 +1134,60 @@ export class HttpApiAdapter implements IApiAdapter {
         },
       },
     );
+  }
+
+  async upsertEventPrivateContact(
+    req: UpsertEventPrivateContactRequest,
+  ): Promise<ApiResponse<unknown>> {
+    return await this.request<unknown>(
+      `/events/${req.eventId}/agents/${req.eventAgentId}/private-contact`,
+      {
+        method: 'POST',
+        body: {
+          contact: req.contact,
+        },
+      },
+    );
+  }
+
+  async decideEventConnectionIntent(
+    req: DecideEventConnectionIntentRequest,
+  ): Promise<ApiResponse<EventConnectionIntentDecisionResult>> {
+    const response = await this.request<unknown>(
+      `/events/${req.eventId}/connection-intents/${req.intentId}/decision`,
+      {
+        method: 'POST',
+        body: {
+          recipientAgentId: req.recipientAgentId,
+          decision: req.decision,
+        },
+      },
+    );
+    if (!response.success) {
+      return response;
+    }
+    return {
+      success: true,
+      data: normalizeEventConnectionIntentDecisionResult(response.data),
+    };
+  }
+
+  async getEventContactReveal(
+    req: GetEventContactRevealRequest,
+  ): Promise<ApiResponse<EventContactReveal>> {
+    const response = await this.request<unknown>(
+      `/events/${req.eventId}/contact-reveals/${req.intentId}`,
+      {
+        method: 'GET',
+        query: {
+          viewerAgentId: req.viewerAgentId,
+        },
+      },
+    );
+    if (!response.success) {
+      return response;
+    }
+    return { success: true, data: normalizeEventContactReveal(response.data) };
   }
 
   private async request<T>(

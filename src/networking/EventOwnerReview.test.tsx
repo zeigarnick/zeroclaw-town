@@ -56,6 +56,9 @@ function createApiAdapter(overrides: Partial<IApiAdapter> = {}): IApiAdapter {
     createEventConnectionIntent: jest.fn<any>(),
     getEventInboundIntents: jest.fn<any>(),
     upsertEventRecipientRules: jest.fn<any>(),
+    upsertEventPrivateContact: jest.fn<any>(),
+    decideEventConnectionIntent: jest.fn<any>(),
+    getEventContactReveal: jest.fn<any>(),
     ...overrides,
   };
 }

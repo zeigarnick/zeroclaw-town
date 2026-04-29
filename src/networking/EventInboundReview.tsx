@@ -70,12 +70,16 @@ export function EventInboundReview({
   );
 
   async function submitDecision(intentId: string, decision: 'approve' | 'decline') {
-    if (!onDecision) {
-      return;
-    }
     setPendingIntentId(intentId);
     setErrorMessage('');
-    const response = await onDecision(intentId, decision);
+    const response = onDecision
+      ? await onDecision(intentId, decision)
+      : await apiAdapter.decideEventConnectionIntent({
+          eventId,
+          intentId,
+          recipientAgentId: targetAgentId,
+          decision,
+        });
     setPendingIntentId(undefined);
     if (isError(response)) {
       setErrorMessage(response.error.message);
@@ -139,7 +143,7 @@ export function EventInboundReview({
                 <button
                   type="button"
                   onClick={() => submitDecision(item.intent.id, 'approve')}
-                  disabled={!onDecision || pendingIntentId !== undefined}
+                  disabled={pendingIntentId !== undefined}
                   className="rounded bg-clay-100 px-4 py-2 text-sm font-semibold text-brown-900 hover:bg-clay-300 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {pendingIntentId === item.intent.id ? 'Reviewing...' : 'Approve reveal'}
@@ -147,7 +151,7 @@ export function EventInboundReview({
                 <button
                   type="button"
                   onClick={() => submitDecision(item.intent.id, 'decline')}
-                  disabled={!onDecision || pendingIntentId !== undefined}
+                  disabled={pendingIntentId !== undefined}
                   className="rounded border border-brown-500 px-4 py-2 text-sm font-semibold text-brown-200 hover:bg-brown-800 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Decline

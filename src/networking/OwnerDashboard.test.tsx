@@ -357,6 +357,115 @@ describe('OwnerDashboard HttpApiAdapter', () => {
     });
   });
 
+  test('stores private contact and maps event contact reveal decisions', async () => {
+    const fetchMock = createFetchMock(
+      {
+        body: {
+          success: true,
+          data: { eventAgentId: 'eventAgents:1' },
+        },
+      },
+      {
+        body: {
+          success: true,
+          data: {
+            intent: {
+              _id: 'eventConnectionIntents:1',
+              eventId: 'demo-event',
+              requesterAgentId: 'eventAgents:1',
+              targetAgentId: 'eventAgents:2',
+              status: 'recipient_approved',
+              filterResult: {
+                allowed: true,
+                reasons: ['recipient_rules_allowed'],
+                evaluatedAt: 1710000000000,
+              },
+              createdAt: 1710000000000,
+              updatedAt: 1710000000001,
+            },
+            reveal: {
+              _id: 'eventContactReveals:1',
+              eventId: 'demo-event',
+              intentId: 'eventConnectionIntents:1',
+              requesterAgentId: 'eventAgents:1',
+              targetAgentId: 'eventAgents:2',
+              requesterContact: {
+                email: 'requester@example.com',
+              },
+              targetContact: {
+                email: 'target@example.com',
+                website: 'https://target.example',
+              },
+              createdAt: 1710000000001,
+              updatedAt: 1710000000001,
+            },
+          },
+        },
+      },
+      {
+        body: {
+          success: true,
+          data: {
+            _id: 'eventContactReveals:1',
+            eventId: 'demo-event',
+            intentId: 'eventConnectionIntents:1',
+            requesterAgentId: 'eventAgents:1',
+            targetAgentId: 'eventAgents:2',
+            requesterContact: {
+              email: 'requester@example.com',
+            },
+            targetContact: {
+              email: 'target@example.com',
+            },
+            createdAt: 1710000000001,
+            updatedAt: 1710000000001,
+          },
+        },
+      },
+    );
+    const adapter = new HttpApiAdapter('/api/v1', fetchMock as typeof fetch);
+
+    await adapter.upsertEventPrivateContact({
+      eventId: 'demo-event',
+      eventAgentId: 'eventAgents:1',
+      contact: {
+        email: 'requester@example.com',
+      },
+    });
+    const decision = await adapter.decideEventConnectionIntent({
+      eventId: 'demo-event',
+      intentId: 'eventConnectionIntents:1',
+      recipientAgentId: 'eventAgents:2',
+      decision: 'approve',
+    });
+    const reveal = await adapter.getEventContactReveal({
+      eventId: 'demo-event',
+      intentId: 'eventConnectionIntents:1',
+      viewerAgentId: 'eventAgents:1',
+    });
+
+    expect(getRequestBody(fetchMock, 0)).toEqual({
+      contact: {
+        email: 'requester@example.com',
+      },
+    });
+    expect(getRequestBody(fetchMock, 1)).toEqual({
+      recipientAgentId: 'eventAgents:2',
+      decision: 'approve',
+    });
+    expect(fetchMock.mock.calls[2][0]).toBe(
+      '/api/v1/events/demo-event/contact-reveals/eventConnectionIntents:1?viewerAgentId=eventAgents%3A1',
+    );
+    expect(isError(decision)).toBe(false);
+    if (!isError(decision)) {
+      expect(decision.data.reveal?.targetContact.email).toBe('target@example.com');
+    }
+    expect(isError(reveal)).toBe(false);
+    if (!isError(reveal)) {
+      expect(reveal.data.requesterContact.email).toBe('requester@example.com');
+    }
+  });
+
   test('maps meeting request/action routes to recommendationId and meetingId endpoints', async () => {
     const fetchMock = createFetchMock(
       {

@@ -442,6 +442,156 @@ describe('networking HTTP helpers', () => {
     });
   });
 
+  test('routes private contact storage, recipient decisions, and contact reveal reads', async () => {
+    const calls: Array<{ kind: string; args: any }> = [];
+    const privateContactResponse = await handleNetworkingHttpRequest(
+      {
+        runMutation: async (_funcRef, args) => {
+          calls.push({ kind: 'mutation', args });
+          return { eventAgentId: args.eventAgentId, contact: args.contact };
+        },
+        runQuery: async () => {
+          throw new Error('unexpected query');
+        },
+      },
+      new Request(
+        'https://town.example/api/v1/events/demo-event/agents/eventAgents:1/private-contact',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            contact: {
+              email: 'attendee@example.com',
+              linkedin: 'https://linkedin.com/in/attendee',
+            },
+          }),
+        },
+      ),
+    );
+
+    expect(privateContactResponse.status).toBe(200);
+    expect(calls[0]).toMatchObject({
+      kind: 'mutation',
+      args: {
+        eventId: 'demo-event',
+        eventAgentId: 'eventAgents:1',
+        contact: {
+          email: 'attendee@example.com',
+          linkedin: 'https://linkedin.com/in/attendee',
+        },
+      },
+    });
+
+    const decisionResponse = await handleNetworkingHttpRequest(
+      {
+        runMutation: async (_funcRef, args) => {
+          calls.push({ kind: 'mutation', args });
+          return {
+            intent: {
+              id: args.intentId,
+              status: 'recipient_approved',
+            },
+            reveal: {
+              id: 'eventContactReveals:1',
+              requesterContact: { email: 'requester@example.com' },
+              targetContact: { email: 'target@example.com' },
+            },
+          };
+        },
+        runQuery: async () => {
+          throw new Error('unexpected query');
+        },
+      },
+      new Request(
+        'https://town.example/api/v1/events/demo-event/connection-intents/eventConnectionIntents:1/decision',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            recipientAgentId: 'eventAgents:2',
+            decision: 'approve',
+          }),
+        },
+      ),
+    );
+
+    expect(decisionResponse.status).toBe(200);
+    expect(calls[1]).toMatchObject({
+      kind: 'mutation',
+      args: {
+        eventId: 'demo-event',
+        intentId: 'eventConnectionIntents:1',
+        recipientAgentId: 'eventAgents:2',
+        decision: 'approve',
+      },
+    });
+
+    const revealResponse = await handleNetworkingHttpRequest(
+      {
+        runMutation: async () => {
+          throw new Error('unexpected mutation');
+        },
+        runQuery: async (_funcRef, args) => {
+          calls.push({ kind: 'query', args });
+          return {
+            id: 'eventContactReveals:1',
+            eventId: args.eventId,
+            intentId: args.intentId,
+            requesterAgentId: args.viewerAgentId,
+            targetAgentId: 'eventAgents:2',
+            requesterContact: { email: 'requester@example.com' },
+            targetContact: { email: 'target@example.com' },
+          };
+        },
+      },
+      new Request(
+        'https://town.example/api/v1/events/demo-event/contact-reveals/eventConnectionIntents:1?viewerAgentId=eventAgents:1',
+        {
+          method: 'GET',
+        },
+      ),
+    );
+
+    expect(revealResponse.status).toBe(200);
+    expect(calls[2]).toMatchObject({
+      kind: 'query',
+      args: {
+        eventId: 'demo-event',
+        intentId: 'eventConnectionIntents:1',
+        viewerAgentId: 'eventAgents:1',
+      },
+    });
+
+    const invalidDecisionResponse = await handleNetworkingHttpRequest(
+      {
+        runMutation: async () => {
+          throw new Error('unexpected mutation');
+        },
+        runQuery: async () => {
+          throw new Error('unexpected query');
+        },
+      },
+      new Request(
+        'https://town.example/api/v1/events/demo-event/connection-intents/eventConnectionIntents:1/decision',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            recipientAgentId: 'eventAgents:2',
+            decision: 'approve',
+            contact: { email: 'leak@example.com' },
+          }),
+        },
+      ),
+    );
+
+    expect(invalidDecisionResponse.status).toBe(400);
+    expect(await readJson(invalidDecisionResponse)).toMatchObject({
+      success: false,
+      error: {
+        code: 'invalid_request',
+        message: 'Unexpected request field: contact.',
+      },
+    });
+  });
+
   test('wraps representative route errors in stable JSON envelopes', async () => {
     const response = await handleNetworkingHttpRequest(
       {

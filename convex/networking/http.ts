@@ -77,6 +77,17 @@ const functions = {
       'networking/eventRecipientRules:upsertEventRecipientRules',
     ),
   },
+  eventContactReveal: {
+    upsertEventPrivateContact: makeFunctionReference<'mutation'>(
+      'networking/eventContactReveal:upsertEventPrivateContact',
+    ),
+    decideEventConnectionIntent: makeFunctionReference<'mutation'>(
+      'networking/eventContactReveal:decideEventConnectionIntent',
+    ),
+    getEventContactReveal: makeFunctionReference<'query'>(
+      'networking/eventContactReveal:getEventContactReveal',
+    ),
+  },
   cards: {
     createCard: makeFunctionReference<'mutation'>('networking/cards:createCard'),
     listCards: makeFunctionReference<'query'>('networking/cards:listCards'),
@@ -261,6 +272,55 @@ export async function handleNetworkingHttpRequest(
         eventId: requirePathId(route[1], 'eventId'),
         eventAgentId: requirePathId(route[3], 'eventAgentId'),
         rules,
+      });
+      return jsonSuccess(data);
+    }
+
+    if (
+      request.method === 'POST' &&
+      route[0] === 'events' &&
+      route[2] === 'agents' &&
+      route[4] === 'private-contact' &&
+      route.length === 5
+    ) {
+      const body = await parseJsonObject(request);
+      requireExactBodyKeys(body, ['contact']);
+      const data = await ctx.runMutation(functions.eventContactReveal.upsertEventPrivateContact, {
+        eventId: requirePathId(route[1], 'eventId'),
+        eventAgentId: requirePathId(route[3], 'eventAgentId'),
+        contact: parsePrivateContact(body.contact),
+      });
+      return jsonSuccess(data);
+    }
+
+    if (
+      request.method === 'POST' &&
+      route[0] === 'events' &&
+      route[2] === 'connection-intents' &&
+      route[4] === 'decision' &&
+      route.length === 5
+    ) {
+      const body = await parseJsonObject(request);
+      requireExactBodyKeys(body, ['recipientAgentId', 'decision']);
+      const data = await ctx.runMutation(functions.eventContactReveal.decideEventConnectionIntent, {
+        eventId: requirePathId(route[1], 'eventId'),
+        intentId: requirePathId(route[3], 'intentId'),
+        recipientAgentId: requireString(body.recipientAgentId, 'recipientAgentId'),
+        decision: requireDecision(body.decision),
+      });
+      return jsonSuccess(data);
+    }
+
+    if (
+      request.method === 'GET' &&
+      route[0] === 'events' &&
+      route[2] === 'contact-reveals' &&
+      route.length === 4
+    ) {
+      const data = await ctx.runQuery(functions.eventContactReveal.getEventContactReveal, {
+        eventId: requirePathId(route[1], 'eventId'),
+        intentId: requirePathId(route[3], 'intentId'),
+        viewerAgentId: requireQueryParam(url.searchParams, 'viewerAgentId'),
       });
       return jsonSuccess(data);
     }
@@ -594,6 +654,42 @@ function parseRecipientRules(value: unknown) {
     requiredKeywords: optionalStringArray(rules.requiredKeywords, 'rules.requiredKeywords'),
     blockedKeywords: optionalStringArray(rules.blockedKeywords, 'rules.blockedKeywords'),
   };
+}
+
+function parsePrivateContact(value: unknown) {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new RouteError('invalid_request', 'contact must be an object.', 400);
+  }
+  const contact = value as Record<string, unknown>;
+  requireExactBodyKeys(contact, [
+    'realName',
+    'company',
+    'email',
+    'phone',
+    'linkedin',
+    'x',
+    'website',
+  ]);
+  return {
+    realName: optionalString(contact.realName, 'contact.realName'),
+    company: optionalString(contact.company, 'contact.company'),
+    email: optionalString(contact.email, 'contact.email'),
+    phone: optionalString(contact.phone, 'contact.phone'),
+    linkedin: optionalString(contact.linkedin, 'contact.linkedin'),
+    x: optionalString(contact.x, 'contact.x'),
+    website: optionalString(contact.website, 'contact.website'),
+  };
+}
+
+function requireDecision(value: unknown) {
+  if (value !== 'approve' && value !== 'decline') {
+    throw new RouteError(
+      'invalid_request',
+      'decision must be either approve or decline.',
+      400,
+    );
+  }
+  return value;
 }
 
 function requireExactBodyKeys(body: Record<string, unknown>, allowedKeys: string[]) {

@@ -370,6 +370,55 @@ export const networkingTables = {
     .index('by_event_agent', ['eventAgentId'])
     .index('by_event', ['eventId']),
 
+  eventPrivateContacts: defineTable({
+    eventId: v.string(),
+    eventAgentId: v.id('eventAgents'),
+    contact: v.object({
+      realName: v.optional(v.string()),
+      company: v.optional(v.string()),
+      email: v.optional(v.string()),
+      phone: v.optional(v.string()),
+      linkedin: v.optional(v.string()),
+      x: v.optional(v.string()),
+      website: v.optional(v.string()),
+    }),
+    approvedAt: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index('by_event_agent', ['eventAgentId'])
+    .index('by_event', ['eventId']),
+
+  eventContactReveals: defineTable({
+    eventId: v.string(),
+    intentId: v.id('eventConnectionIntents'),
+    requesterAgentId: v.id('eventAgents'),
+    targetAgentId: v.id('eventAgents'),
+    requesterContact: v.object({
+      realName: v.optional(v.string()),
+      company: v.optional(v.string()),
+      email: v.optional(v.string()),
+      phone: v.optional(v.string()),
+      linkedin: v.optional(v.string()),
+      x: v.optional(v.string()),
+      website: v.optional(v.string()),
+    }),
+    targetContact: v.object({
+      realName: v.optional(v.string()),
+      company: v.optional(v.string()),
+      email: v.optional(v.string()),
+      phone: v.optional(v.string()),
+      linkedin: v.optional(v.string()),
+      x: v.optional(v.string()),
+      website: v.optional(v.string()),
+    }),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index('by_intent', ['intentId'])
+    .index('by_requester', ['requesterAgentId', 'createdAt'])
+    .index('by_target', ['targetAgentId', 'createdAt']),
+
   eventAvatarAssets: defineTable({
     category: eventAvatarCategoryValidator,
     assetId: v.string(),
