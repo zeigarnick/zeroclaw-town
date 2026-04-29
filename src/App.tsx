@@ -54,8 +54,10 @@ export default function Home() {
           <>
             <Game />
 
-            <div className="absolute right-4 top-4 z-20 flex items-center gap-2 pointer-events-none sm:right-5 sm:top-5">
+            <div className="absolute left-4 top-4 z-30 pointer-events-none sm:left-5 sm:top-5">
               <FreezeButton eventId={eventQrConfig.eventId} />
+            </div>
+            <div className="absolute right-4 top-4 z-20 pointer-events-none sm:right-5 sm:top-5">
               <MusicButton />
             </div>
             <EventQrOverlay
