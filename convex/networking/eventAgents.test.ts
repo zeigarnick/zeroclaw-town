@@ -146,6 +146,7 @@ describe('event agent handlers', () => {
     const registration = await registerEventAgentHandler(ctx as any, {
       eventId: ' Demo Event ',
       agentIdentifier: ' Attendee Agent ',
+      requesterKey: 'cf-ip:203.0.113.44',
       publicCard: publicCard(),
       avatarConfig: avatarConfig(),
     });
@@ -185,8 +186,12 @@ describe('event agent handlers', () => {
         eventId: 'demo-event',
         type: 'event_agent_registered',
         actorKind: 'public_requester',
-        actorKey: 'attendee-agent',
+        actorKey: 'cf-ip:203.0.113.44',
         eventAgentId: tables.eventAgents[0]._id,
+        metadata: {
+          agentIdentifier: 'attendee-agent',
+          hasAvatarConfig: true,
+        },
       }),
     ]);
     expect(tables.eventAgents[0]).toMatchObject({

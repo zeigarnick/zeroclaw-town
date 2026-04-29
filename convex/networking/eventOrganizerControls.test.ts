@@ -8,7 +8,6 @@ import {
   resumeEventRegistrationHandler,
   revokeEventAgentHandler,
   rotateEventSkillUrlHandler,
-  writeEventOrganizerAuditEvent,
 } from './eventOrganizerControls';
 
 type TableName =
@@ -281,10 +280,17 @@ describe('event organizer controls', () => {
   });
 
   test('lists suspicious registrations and high-volume audit requesters', async () => {
-    const { ctx } = createMockCtx();
+    const { ctx, tables } = createMockCtx();
     await registerEventAgentHandler(ctx as any, {
       eventId: 'demo-event',
       agentIdentifier: 'pending-one',
+      requesterKey: 'cf-ip:203.0.113.50',
+      publicCard: publicCard(),
+    });
+    await registerEventAgentHandler(ctx as any, {
+      eventId: 'demo-event',
+      agentIdentifier: 'pending-two',
+      requesterKey: 'cf-ip:203.0.113.50',
       publicCard: publicCard(),
     });
     const approved = await registerApprovedAgent(ctx, 'approved-one');
@@ -293,37 +299,37 @@ describe('event organizer controls', () => {
       eventAgentId: approved.eventAgentId as any,
       organizerToken: ORGANIZER_TOKEN,
     });
-    await writeEventOrganizerAuditEvent(ctx as any, {
-      eventId: 'demo-event',
-      type: 'event_agent_registered',
-      actorKind: 'public_requester',
-      actorKey: 'pending-one',
-    });
-    await writeEventOrganizerAuditEvent(ctx as any, {
-      eventId: 'demo-event',
-      type: 'event_agent_registered',
-      actorKind: 'public_requester',
-      actorKey: 'pending-one',
-    });
-
     const suspicious = await listSuspiciousRegistrationsHandler(ctx as any, {
       eventId: 'demo-event',
       organizerToken: ORGANIZER_TOKEN,
     });
     expect(suspicious.map((row) => row.reason).sort()).toEqual([
       'pending_owner_review',
+      'pending_owner_review',
       'revoked',
+    ]);
+    expect(
+      tables.eventOrganizerAuditEvents
+        .filter((event) => event.actorKind === 'public_requester')
+        .map((event) => ({
+          actorKey: event.actorKey,
+          agentIdentifier: event.metadata?.agentIdentifier,
+        })),
+    ).toEqual([
+      { actorKey: 'cf-ip:203.0.113.50', agentIdentifier: 'pending-one' },
+      { actorKey: 'cf-ip:203.0.113.50', agentIdentifier: 'pending-two' },
+      { actorKey: 'unknown-public-requester', agentIdentifier: 'approved-one' },
     ]);
 
     const highVolume = await listHighVolumeRequestersHandler(ctx as any, {
       eventId: 'demo-event',
       organizerToken: ORGANIZER_TOKEN,
-      threshold: 3,
+      threshold: 2,
     });
     expect(highVolume).toEqual([
       expect.objectContaining({
-        actorKey: 'pending-one',
-        count: 3,
+        actorKey: 'cf-ip:203.0.113.50',
+        count: 2,
         types: ['event_agent_registered'],
       }),
     ]);

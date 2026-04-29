@@ -70,10 +70,11 @@ export async function registerEventAgentHandler(
 ) {
   const eventId = normalizeEventId(args.eventId);
   const agentIdentifier = normalizeAgentIdentifier(args.agentIdentifier);
+  const requesterKey = normalizeRequesterKey(args.requesterKey) ?? 'unknown-public-requester';
   await enforceEventRateLimit(ctx, 'eventRegistrationPerRequester', [
     eventId,
     'requester',
-    normalizeRequesterKey(args.requesterKey) ?? 'unknown-public-requester',
+    requesterKey,
   ]);
   if (args.agentIdentifier !== undefined) {
     await enforceEventRateLimit(ctx, 'eventRegistrationPerRequester', [
@@ -145,9 +146,12 @@ export async function registerEventAgentHandler(
     eventId,
     type: 'event_agent_registered',
     actorKind: 'public_requester',
-    actorKey: agentIdentifier,
+    actorKey: requesterKey,
     eventAgentId,
-    metadata: { hasAvatarConfig: args.avatarConfig !== undefined },
+    metadata: {
+      agentIdentifier,
+      hasAvatarConfig: args.avatarConfig !== undefined,
+    },
     now,
   });
 
