@@ -24,11 +24,12 @@ type InitialRoute = {
 };
 
 function getInitialRoute(): InitialRoute {
-  const pathMatch = window.location.pathname.match(/^\/claim\/([^/?#]+)/);
+  const pathname = window.location.pathname.replace(/^\/ai-town(?=\/)/, '');
+  const pathMatch = pathname.match(/^\/claim\/([^/?#]+)/);
   if (pathMatch) {
     return { claimToken: decodeURIComponent(pathMatch[1]) };
   }
-  const eventReviewMatch = window.location.pathname.match(/^\/event-review\/([^/?#]+)\/([^/?#]+)/);
+  const eventReviewMatch = pathname.match(/^\/event-review\/([^/?#]+)\/([^/?#]+)/);
   if (eventReviewMatch) {
     return {
       claimToken: '',
