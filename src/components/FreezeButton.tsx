@@ -34,17 +34,22 @@ export default function FreezeButton({ eventId }: { eventId?: string }) {
     }
   };
 
-  const label = frozen ? 'Resume venue simulation' : 'Pause venue simulation';
+  const controlDisabled = !worldStatus || !stopAllowed;
+  const label = !stopAllowed
+    ? 'Venue pause is unavailable'
+    : frozen
+      ? 'Resume venue simulation'
+      : 'Pause venue simulation';
 
-  return !stopAllowed ? null : (
+  return (
     <button
       type="button"
       onClick={() => void flipSwitch()}
-      className="button pointer-events-auto size-10 bg-transparent p-0 text-xl text-white shadow-solid focus:outline-none focus:ring-2 focus:ring-clay-100 disabled:opacity-50 sm:size-12"
+      className="button pointer-events-auto size-10 bg-transparent p-0 text-xl text-white shadow-solid focus:outline-none focus:ring-2 focus:ring-clay-100 disabled:opacity-60 sm:size-12"
       title={label}
       aria-label={label}
       aria-pressed={frozen}
-      disabled={!worldStatus}
+      disabled={controlDisabled}
     >
       <div className="flex h-full w-full items-center justify-center bg-clay-700">
         {frozen ? (
