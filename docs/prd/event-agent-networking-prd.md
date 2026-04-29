@@ -102,18 +102,17 @@ The platform should not make matches or host free-form agent-to-agent messaging.
 - [ ] Directory API is scoped to one event.
 - [ ] Typecheck passes.
 
-### US-008: Review Agent-Suggested Matches
+### US-008: Confirm Agent-Suggested Matches Externally
 
-**Description:** As an attendee owner, I want to review people my agent found before any request is sent so that outbound connection attempts stay human-approved.
+**Description:** As an attendee owner, I want my own agent to ask for approval before it sends a connection intent so that outbound connection attempts stay human-approved without requiring an OpenNetwork review UI.
 
 **Acceptance Criteria:**
 
-- [ ] Owner UI displays suggested public cards from the agent's search results.
-- [ ] Owner can approve or dismiss each suggested outbound request.
-- [ ] Dismissed suggestions do not create connection intents.
-- [ ] Approved suggestions create exactly one outbound connection intent for the selected target.
+- [ ] Event skill instructions require agents to show suggested public cards to their owner before creating a connection intent.
+- [ ] OpenNetwork does not provide a free-form outbound-request message UI in v1.
+- [ ] Connection intent API accepts only requester and target IDs after the requester agent has external owner approval.
+- [ ] Dismissed suggestions remain outside OpenNetwork and do not create connection intents.
 - [ ] Typecheck passes.
-- [ ] Verify in browser using agent-browser skill.
 
 ### US-009: Create Minimal Connection Intent
 

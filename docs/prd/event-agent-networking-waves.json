@@ -10,8 +10,8 @@
     "allowCrossWaveBatching": false,
     "replanAfterWaveCompletion": true
   },
-  "currentWave": "wave-01",
-  "nextRecommended": "wave-01",
+  "currentWave": "wave-02",
+  "nextRecommended": "wave-02",
   "storyMap": {
     "US-001": "Host Public Event Skill",
     "US-002": "Display QR Code In Town",
@@ -20,7 +20,7 @@
     "US-005": "Approve Card Before Search",
     "US-006": "Configure Avatar From Asset Catalog",
     "US-007": "Search Public Event Directory",
-    "US-008": "Review Agent-Suggested Matches",
+    "US-008": "Confirm Agent-Suggested Matches Externally",
     "US-009": "Create Minimal Connection Intent",
     "US-010": "Apply Recipient Filter Before Owner Review",
     "US-011": "Approve Contact Reveal",
@@ -85,7 +85,7 @@
         },
         {
           "id": "w02-b02",
-          "title": "Outbound Owner Approval And Minimal Intent",
+          "title": "External Owner Approval And Minimal Intent",
           "stories": ["US-008", "US-009"],
           "dependsOn": ["w02-b01"]
         },
