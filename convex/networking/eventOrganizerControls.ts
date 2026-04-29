@@ -1,6 +1,6 @@
 import { v } from 'convex/values';
 import { Doc, Id } from '../_generated/dataModel';
-import { MutationCtx, QueryCtx, mutation, query } from '../_generated/server';
+import { MutationCtx, QueryCtx, mutation } from '../_generated/server';
 import { networkingError } from './auth';
 import { createEventWorld, ensureEventSpaceWorld } from './eventWorlds';
 import { enforceEventRateLimit } from './eventRateLimits';
@@ -96,7 +96,7 @@ export const removeEventAgent = mutation({
   handler: (ctx, args) => revokeEventAgentHandler(ctx, { ...args, remove: true }),
 });
 
-export const listSuspiciousRegistrations = query({
+export const listSuspiciousRegistrations = mutation({
   args: {
     eventId: v.string(),
     organizerToken: v.string(),
@@ -105,7 +105,7 @@ export const listSuspiciousRegistrations = query({
   handler: (ctx, args) => listSuspiciousRegistrationsHandler(ctx, args),
 });
 
-export const listHighVolumeRequesters = query({
+export const listHighVolumeRequesters = mutation({
   args: {
     eventId: v.string(),
     organizerToken: v.string(),
@@ -274,7 +274,7 @@ export async function revokeEventAgentHandler(
 }
 
 export async function listSuspiciousRegistrationsHandler(
-  ctx: QueryCtx,
+  ctx: MutationCtx,
   args: { eventId: string; organizerToken: string; limit?: number },
 ): Promise<SuspiciousEventRegistration[]> {
   assertOrganizerCapability(args.organizerToken);
@@ -307,7 +307,7 @@ export async function listSuspiciousRegistrationsHandler(
 }
 
 export async function listHighVolumeRequestersHandler(
-  ctx: QueryCtx,
+  ctx: MutationCtx,
   args: { eventId: string; organizerToken: string; threshold?: number; limit?: number },
 ): Promise<HighVolumeRequester[]> {
   assertOrganizerCapability(args.organizerToken);

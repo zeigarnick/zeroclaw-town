@@ -109,10 +109,10 @@ const functions = {
     removeEventAgent: makeFunctionReference<'mutation'>(
       'networking/eventOrganizerControls:removeEventAgent',
     ),
-    listSuspiciousRegistrations: makeFunctionReference<'query'>(
+    listSuspiciousRegistrations: makeFunctionReference<'mutation'>(
       'networking/eventOrganizerControls:listSuspiciousRegistrations',
     ),
-    listHighVolumeRequesters: makeFunctionReference<'query'>(
+    listHighVolumeRequesters: makeFunctionReference<'mutation'>(
       'networking/eventOrganizerControls:listHighVolumeRequesters',
     ),
   },
@@ -463,7 +463,7 @@ export async function handleNetworkingHttpRequest(
       route.length === 4
     ) {
       const limitRaw = optionalQueryParam(url.searchParams, 'limit');
-      const data = await ctx.runQuery(
+      const data = await ctx.runMutation(
         functions.eventOrganizerControls.listSuspiciousRegistrations,
         {
           eventId: requirePathId(route[2], 'eventId'),
@@ -483,7 +483,7 @@ export async function handleNetworkingHttpRequest(
     ) {
       const thresholdRaw = optionalQueryParam(url.searchParams, 'threshold');
       const limitRaw = optionalQueryParam(url.searchParams, 'limit');
-      const data = await ctx.runQuery(functions.eventOrganizerControls.listHighVolumeRequesters, {
+      const data = await ctx.runMutation(functions.eventOrganizerControls.listHighVolumeRequesters, {
         eventId: requirePathId(route[2], 'eventId'),
         organizerToken: requireOrganizerToken(request.headers.get('Authorization')),
         threshold: thresholdRaw === undefined ? undefined : parseInteger(thresholdRaw, 'threshold'),

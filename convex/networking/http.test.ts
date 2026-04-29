@@ -333,6 +333,62 @@ describe('networking HTTP helpers', () => {
     ]);
   });
 
+  test('routes organizer review lists through mutations for component rate limiting', async () => {
+    const calls: Array<{ kind: string; args: any }> = [];
+    const ctx = {
+      runMutation: async (_funcRef: unknown, args: any) => {
+        calls.push({ kind: 'mutation', args });
+        return [];
+      },
+      runQuery: async () => {
+        throw new Error('unexpected query');
+      },
+    };
+
+    const suspiciousResponse = await handleNetworkingHttpRequest(
+      ctx,
+      new Request(
+        'https://town.example/api/v1/admin/events/demo-event/suspicious-registrations?limit=10',
+        {
+          method: 'GET',
+          headers: { Authorization: 'Bearer organizer-secret' },
+        },
+      ),
+    );
+    const highVolumeResponse = await handleNetworkingHttpRequest(
+      ctx,
+      new Request(
+        'https://town.example/api/v1/admin/events/demo-event/high-volume-requesters?threshold=2&limit=5',
+        {
+          method: 'GET',
+          headers: { Authorization: 'Bearer organizer-secret' },
+        },
+      ),
+    );
+
+    expect(suspiciousResponse.status).toBe(200);
+    expect(highVolumeResponse.status).toBe(200);
+    expect(calls).toEqual([
+      {
+        kind: 'mutation',
+        args: {
+          eventId: 'demo-event',
+          organizerToken: 'organizer-secret',
+          limit: 10,
+        },
+      },
+      {
+        kind: 'mutation',
+        args: {
+          eventId: 'demo-event',
+          organizerToken: 'organizer-secret',
+          threshold: 2,
+          limit: 5,
+        },
+      },
+    ]);
+  });
+
   test('routes minimal event connection intents and rejects extra fields', async () => {
     const calls: Array<{ kind: string; args: any }> = [];
     const response = await handleNetworkingHttpRequest(
