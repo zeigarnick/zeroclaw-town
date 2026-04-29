@@ -60,6 +60,17 @@ const animatedSprite = {
 };
 export type AnimatedSprite = ObjectType<typeof animatedSprite>;
 
+const fixedSprite = {
+  url: v.string(),
+  x: v.number(),
+  y: v.number(),
+  width: v.number(),
+  height: v.number(),
+  layer: v.number(),
+  order: v.number(),
+};
+export type FixedSprite = ObjectType<typeof fixedSprite>;
+
 export const serializedWorldMap = {
   width: v.number(),
   height: v.number(),
@@ -74,6 +85,7 @@ export const serializedWorldMap = {
   bgTiles: v.array(v.array(v.array(v.number()))),
   objectTiles: v.array(tileLayer),
   animatedSprites: v.array(v.object(animatedSprite)),
+  fixedSprites: v.optional(v.array(v.object(fixedSprite))),
   visualLayers: v.optional(v.array(v.object(visualLayer))),
   collisionTiles: v.optional(tileLayer),
   aboveCharacterLayers: v.optional(v.array(v.object(aboveCharacterLayer))),
@@ -95,6 +107,7 @@ export class WorldMap {
   bgTiles: TileLayer[];
   objectTiles: TileLayer[];
   animatedSprites: AnimatedSprite[];
+  fixedSprites?: FixedSprite[];
   visualLayers?: VisualLayer[];
   collisionTiles?: TileLayer;
   aboveCharacterLayers?: AboveCharacterLayer[];
@@ -111,6 +124,7 @@ export class WorldMap {
     this.bgTiles = serialized.bgTiles;
     this.objectTiles = serialized.objectTiles;
     this.animatedSprites = serialized.animatedSprites;
+    this.fixedSprites = serialized.fixedSprites;
     this.visualLayers = serialized.visualLayers;
     this.collisionTiles = serialized.collisionTiles;
     this.aboveCharacterLayers = serialized.aboveCharacterLayers;
@@ -130,6 +144,9 @@ export class WorldMap {
       objectTiles: this.objectTiles,
       animatedSprites: this.animatedSprites,
     };
+    if (this.fixedSprites !== undefined) {
+      serialized.fixedSprites = this.fixedSprites;
+    }
     if (this.visualLayers !== undefined) {
       serialized.visualLayers = this.visualLayers;
     }

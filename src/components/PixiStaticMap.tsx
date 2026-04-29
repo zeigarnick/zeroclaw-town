@@ -1,6 +1,6 @@
 import { PixiComponent, applyDefaultProps } from '@pixi/react';
 import * as PIXI from 'pixi.js';
-import { AnimatedSprite, WorldMap } from '../../convex/aiTown/worldMap';
+import { AnimatedSprite, FixedSprite, WorldMap } from '../../convex/aiTown/worldMap';
 import * as campfire from '../../data/animations/campfire.json';
 import * as founderCafeSign from '../../data/animations/founder-cafe-sign.json';
 import * as gentlesparkle from '../../data/animations/gentlesparkle.json';
@@ -58,6 +58,7 @@ const resolveAnimationReference = (
 
 type StaticMapContainer = PIXI.Container & {
   _tileLayerContainer: PIXI.Container;
+  _fixedSpriteLayerContainer: PIXI.Container;
   _animatedLayerContainer: PIXI.Container;
   _animationGeneration: number;
 };
@@ -65,6 +66,26 @@ type StaticMapContainer = PIXI.Container & {
 const applyMapHitArea = (container: PIXI.Container, map: WorldMap): void => {
   container.interactive = true;
   container.hitArea = new PIXI.Rectangle(0, 0, map.width * map.tileDim, map.height * map.tileDim);
+};
+
+const renderFixedSprites = (container: StaticMapContainer, map: WorldMap): void => {
+  container._fixedSpriteLayerContainer.removeChildren();
+
+  const sprites = [...(map.fixedSprites ?? [])].sort((first, second) =>
+    first.layer - second.layer || first.order - second.order,
+  );
+  for (const sprite of sprites) {
+    const baseTexture = PIXI.BaseTexture.from(sprite.url, {
+      scaleMode: PIXI.SCALE_MODES.NEAREST,
+    });
+    const texture = new PIXI.Texture(baseTexture);
+    const pixiSprite = new PIXI.Sprite(texture);
+    pixiSprite.x = sprite.x;
+    pixiSprite.y = sprite.y;
+    pixiSprite.width = sprite.width;
+    pixiSprite.height = sprite.height;
+    container._fixedSpriteLayerContainer.addChild(pixiSprite);
+  }
 };
 
 const renderAnimatedSprites = (container: StaticMapContainer, map: WorldMap): void => {
@@ -119,6 +140,7 @@ const renderAnimatedSprites = (container: StaticMapContainer, map: WorldMap): vo
 
 const syncStaticMap = (container: StaticMapContainer, map: WorldMap): void => {
   renderTileLayers(container._tileLayerContainer, map, getBelowCharacterLayers(map));
+  renderFixedSprites(container, map);
   renderAnimatedSprites(container, map);
   applyMapHitArea(container, map);
 };
@@ -152,12 +174,44 @@ const areAnimatedSpritesEquivalent = (
   return true;
 };
 
+const areFixedSpritesEquivalent = (
+  first: FixedSprite[] | undefined,
+  second: FixedSprite[] | undefined,
+): boolean => {
+  const firstSprites = first ?? [];
+  const secondSprites = second ?? [];
+  if (firstSprites === secondSprites) {
+    return true;
+  }
+  if (firstSprites.length !== secondSprites.length) {
+    return false;
+  }
+
+  for (let i = 0; i < firstSprites.length; i++) {
+    const firstSprite = firstSprites[i];
+    const secondSprite = secondSprites[i];
+    if (
+      firstSprite.url !== secondSprite.url ||
+      firstSprite.x !== secondSprite.x ||
+      firstSprite.y !== secondSprite.y ||
+      firstSprite.width !== secondSprite.width ||
+      firstSprite.height !== secondSprite.height ||
+      firstSprite.layer !== secondSprite.layer ||
+      firstSprite.order !== secondSprite.order
+    ) {
+      return false;
+    }
+  }
+  return true;
+};
+
 const shouldSyncStaticMap = (previous: WorldMap, next: WorldMap): boolean =>
   didMapRenderGeometryChange(previous, next) ||
   !areLayerCollectionsEquivalent(
     getBelowCharacterLayers(previous),
     getBelowCharacterLayers(next),
   ) ||
+  !areFixedSpritesEquivalent(previous.fixedSprites, next.fixedSprites) ||
   !areAnimatedSpritesEquivalent(previous.animatedSprites, next.animatedSprites);
 
 export const PixiStaticMap = PixiComponent('StaticMap', {
@@ -165,10 +219,12 @@ export const PixiStaticMap = PixiComponent('StaticMap', {
     const map = props.map;
     const container = new PIXI.Container() as StaticMapContainer;
     container._tileLayerContainer = new PIXI.Container();
+    container._fixedSpriteLayerContainer = new PIXI.Container();
     container._animatedLayerContainer = new PIXI.Container();
     container._animationGeneration = 0;
 
     container.addChild(container._tileLayerContainer);
+    container.addChild(container._fixedSpriteLayerContainer);
     container.addChild(container._animatedLayerContainer);
     syncStaticMap(container, map);
 

@@ -190,6 +190,65 @@ describe('convertMap', () => {
     ).toThrow(/background tile layer/);
   });
 
+  test('converts fixed sprite object groups into serialized map data', async () => {
+    const module = await convertFixture({
+      width: 2,
+      height: 2,
+      tilewidth: 32,
+      tileheight: 32,
+      layers: [
+        {
+          name: 'Ground',
+          type: 'tilelayer',
+          width: 2,
+          height: 2,
+          data: [1, 1, 1, 1],
+          properties: [tiledProperty('role', 'background')],
+        },
+        {
+          name: 'Fixed Sprites',
+          type: 'objectgroup',
+          properties: [tiledProperty('role', 'fixedSprites')],
+          objects: [
+            {
+              name: 'ferry',
+              x: 16,
+              y: 24,
+              width: 96,
+              height: 64,
+              properties: [
+                tiledProperty('url', '/ai-town/assets/clawport-terminal/ferry.png'),
+                tiledProperty('layer', '2'),
+                tiledProperty('order', '10'),
+              ],
+            },
+            {
+              name: 'missing-url',
+              x: 0,
+              y: 0,
+              width: 32,
+              height: 32,
+              properties: [tiledProperty('layer', '3')],
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(module.fixedSprites).toEqual([
+      {
+        url: '/ai-town/assets/clawport-terminal/ferry.png',
+        x: 16,
+        y: 24,
+        width: 96,
+        height: 64,
+        layer: 2,
+        order: 10,
+      },
+    ]);
+    expect(module.serializedWorldMap.fixedSprites).toEqual(module.fixedSprites);
+  });
+
   test('does not infer background role from layer names', () => {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'convert-map-'));
     const fixturePath = path.join(tmpDir, 'fixture.tmj');

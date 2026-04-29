@@ -213,6 +213,9 @@ function normalizeObjectGroupRole(rawRole) {
   if (['animatedsprite', 'animatedsprites', 'animation', 'animations'].includes(normalized)) {
     return 'animatedSprites';
   }
+  if (['fixedsprite', 'fixedsprites', 'staticsprite', 'staticsprites'].includes(normalized)) {
+    return 'fixedSprites';
+  }
   return null;
 }
 
@@ -255,6 +258,9 @@ function resolveObjectGroupRole(layer, rawRole) {
   if (normalizedName.includes('anim')) {
     return 'animatedSprites';
   }
+  if (normalizedName.includes('fixed') && normalizedName.includes('sprite')) {
+    return 'fixedSprites';
+  }
   return null;
 }
 
@@ -289,6 +295,7 @@ const collisionLayerCandidates = [];
 const spawnPoints = [];
 const semanticZones = [];
 const animatedSprites = [];
+const fixedSprites = [];
 
 const allLayers = flattenLayers(tiledMapData.layers);
 for (const { layer, inheritedRole } of allLayers) {
@@ -389,6 +396,27 @@ for (const { layer, inheritedRole } of allLayers) {
         sheet,
         animation,
       });
+      continue;
+    }
+    if (objectGroupRole === 'fixedSprites') {
+      const url =
+        toOptionalString(objectProperties.url) ??
+        toOptionalString(objectProperties.src) ??
+        toOptionalString(objectProperties.source) ??
+        toOptionalString(objectProperties.image) ??
+        toOptionalString(objectProperties.texture);
+      if (!url) {
+        continue;
+      }
+      fixedSprites.push({
+        url,
+        x,
+        y,
+        width: Math.max(toNumber(object.width, tileDimension), tileDimension),
+        height: Math.max(toNumber(object.height, tileDimension), tileDimension),
+        layer: toNumber(objectProperties.layer, 1),
+        order: toNumber(objectProperties.order, fixedSprites.length),
+      });
     }
   }
 }
@@ -414,6 +442,7 @@ jsContent += `export const tilesetpxh = ${tilesetpxh};\n\n`;
 jsContent += exportConst('bgtiles', bgTiles);
 jsContent += exportConst('objmap', objectTiles);
 jsContent += exportConst('animatedsprites', animatedSprites);
+jsContent += exportConst('fixedSprites', fixedSprites);
 jsContent += "/** @type {import('../convex/aiTown/worldMap').VisualLayer[]} */\n";
 jsContent += exportConst('visualLayers', visualLayers);
 if (collisionTiles !== undefined) {
@@ -437,6 +466,7 @@ jsContent += `export const serializedWorldMap = {
   bgTiles: bgtiles,
   objectTiles: objmap,
   animatedSprites: animatedsprites,
+  ...(fixedSprites.length > 0 ? { fixedSprites } : {}),
   ...(visualLayers.length > 0 ? { visualLayers } : {}),
   ...(collisionTiles ? { collisionTiles } : {}),
   ...(aboveCharacterLayers.length > 0 ? { aboveCharacterLayers } : {}),
