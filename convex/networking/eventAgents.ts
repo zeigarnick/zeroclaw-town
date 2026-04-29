@@ -57,7 +57,6 @@ export const registerEventAgent = mutation({
   args: {
     eventId: v.string(),
     agentIdentifier: v.optional(v.string()),
-    requesterKey: v.optional(v.string()),
     publicCard: v.any(),
     avatarConfig: v.optional(v.any()),
   },

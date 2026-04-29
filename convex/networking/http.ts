@@ -178,7 +178,6 @@ export async function handleNetworkingHttpRequest(
       const data = await ctx.runMutation(functions.eventAgents.registerEventAgent, {
         eventId: requirePathId(route[1], 'eventId'),
         agentIdentifier: optionalString(body.agentIdentifier, 'agentIdentifier'),
-        requesterKey: publicRequesterKey(),
         publicCard: requireValue(body.publicCard, 'publicCard'),
         avatarConfig: body.avatarConfig,
       });
@@ -259,7 +258,6 @@ export async function handleNetworkingHttpRequest(
     ) {
       const data = await ctx.runMutation(functions.eventDirectory.searchEventDirectory, {
         eventId: requirePathId(route[1], 'eventId'),
-        requesterKey: publicRequesterKey(),
         filters: {
           q: optionalQueryParam(url.searchParams, 'q'),
           role: optionalQueryParam(url.searchParams, 'role'),
@@ -1019,10 +1017,6 @@ function optionalBoolean(value: unknown, fieldName: string) {
     throw new RouteError('invalid_request', `${fieldName} must be a boolean when provided.`, 400);
   }
   return value;
-}
-
-function publicRequesterKey() {
-  return 'unknown-public-requester';
 }
 
 function optionalStringArray(value: unknown, fieldName: string) {

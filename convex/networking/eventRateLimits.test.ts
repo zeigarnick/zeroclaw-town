@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { ConvexError } from 'convex/values';
 import { registerEventAgentHandler } from './eventAgents';
 import { createEventConnectionIntentHandler } from './eventConnectionIntents';
@@ -180,6 +182,24 @@ describe('event rate limits', () => {
     resetEventRateLimitTestState();
   });
 
+  test('public event mutations do not expose requester bucket arguments', () => {
+    const eventAgentsSource = readFileSync(
+      join(process.cwd(), 'convex/networking/eventAgents.ts'),
+      'utf8',
+    );
+    const eventDirectorySource = readFileSync(
+      join(process.cwd(), 'convex/networking/eventDirectory.ts'),
+      'utf8',
+    );
+
+    expect(publicMutationArgsBlock(eventAgentsSource, 'registerEventAgent')).not.toContain(
+      'requesterKey',
+    );
+    expect(publicMutationArgsBlock(eventDirectorySource, 'searchEventDirectory')).not.toContain(
+      'requesterKey',
+    );
+  });
+
   test('allows event registrations under the configured limit and blocks stable excess', async () => {
     const { ctx } = createMockCtx();
     setEventRateLimitTestOverride('eventRegistrationPerRequester', {
@@ -268,3 +288,13 @@ describe('event rate limits', () => {
     } satisfies Partial<ConvexError<{ code: string }>>);
   });
 });
+
+function publicMutationArgsBlock(source: string, exportName: string) {
+  const start = source.indexOf(`export const ${exportName} = mutation({`);
+  expect(start).toBeGreaterThanOrEqual(0);
+  const argsStart = source.indexOf('args: {', start);
+  expect(argsStart).toBeGreaterThanOrEqual(0);
+  const handlerStart = source.indexOf('handler:', argsStart);
+  expect(handlerStart).toBeGreaterThan(argsStart);
+  return source.slice(argsStart, handlerStart);
+}

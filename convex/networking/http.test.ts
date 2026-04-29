@@ -217,7 +217,6 @@ describe('networking HTTP helpers', () => {
       args: {
         eventId: 'demo-event',
         agentIdentifier: 'attendee-agent',
-        requesterKey: 'unknown-public-requester',
         avatarConfig: {
           hair: 'curly',
           skinTone: 'tone-3',
@@ -278,7 +277,6 @@ describe('networking HTTP helpers', () => {
       kind: 'mutation',
       args: {
         eventId: 'demo-event',
-        requesterKey: 'unknown-public-requester',
         filters: {
           q: 'climate',
           category: 'Climate',
@@ -326,10 +324,7 @@ describe('networking HTTP helpers', () => {
       }),
     );
 
-    expect(calls.map((call) => call.args.requesterKey)).toEqual([
-      'unknown-public-requester',
-      'unknown-public-requester',
-    ]);
+    expect(calls.map((call) => call.args.requesterKey)).toEqual([undefined, undefined]);
   });
 
   test('ignores spoofed platform-looking headers for public rate buckets', async () => {
@@ -373,10 +368,7 @@ describe('networking HTTP helpers', () => {
       }),
     );
 
-    expect(calls.map((call) => call.args.requesterKey)).toEqual([
-      'unknown-public-requester',
-      'unknown-public-requester',
-    ]);
+    expect(calls.map((call) => call.args.requesterKey)).toEqual([undefined, undefined]);
   });
 
   test('routes public event space reads for rotated skill URLs', async () => {

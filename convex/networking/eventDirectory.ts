@@ -27,7 +27,6 @@ export type SearchEventDirectoryArgs = {
 export const searchEventDirectory = mutation({
   args: {
     eventId: v.string(),
-    requesterKey: v.optional(v.string()),
     filters: v.optional(
       v.object({
         q: v.optional(v.string()),
