@@ -217,7 +217,7 @@ describe('networking HTTP helpers', () => {
       args: {
         eventId: 'demo-event',
         agentIdentifier: 'attendee-agent',
-        requesterKey: 'ip:203.0.113.10|ua:event-test-agent',
+        requesterKey: 'unknown-public-requester',
         avatarConfig: {
           hair: 'curly',
           skinTone: 'tone-3',
@@ -278,13 +278,88 @@ describe('networking HTTP helpers', () => {
       kind: 'mutation',
       args: {
         eventId: 'demo-event',
-        requesterKey: 'ip:203.0.113.20|ua:event-directory-test-agent',
+        requesterKey: 'unknown-public-requester',
         filters: {
           q: 'climate',
           category: 'Climate',
           offers: ['GTM', 'operator intros'],
           wants: ['seed feedback'],
         },
+      },
+    });
+  });
+
+  test('ignores caller-variable forwarded and user-agent headers for public rate buckets', async () => {
+    const calls: Array<{ kind: string; args: any }> = [];
+    const ctx = {
+      runMutation: async (_funcRef: unknown, args: any) => {
+        calls.push({ kind: 'mutation', args });
+        return [];
+      },
+      runQuery: async () => {
+        throw new Error('unexpected query');
+      },
+    };
+
+    await handleNetworkingHttpRequest(
+      ctx,
+      new Request('https://town.example/api/v1/events/demo-event/directory?q=climate', {
+        method: 'GET',
+        headers: {
+          'x-forwarded-for': '198.51.100.10',
+          forwarded: 'for=198.51.100.10',
+          'x-real-ip': '198.51.100.10',
+          'user-agent': 'spoof-one',
+        },
+      }),
+    );
+    await handleNetworkingHttpRequest(
+      ctx,
+      new Request('https://town.example/api/v1/events/demo-event/directory?q=energy', {
+        method: 'GET',
+        headers: {
+          'x-forwarded-for': '203.0.113.200',
+          forwarded: 'for=203.0.113.200',
+          'x-real-ip': '203.0.113.200',
+          'user-agent': 'spoof-two',
+        },
+      }),
+    );
+
+    expect(calls.map((call) => call.args.requesterKey)).toEqual([
+      'unknown-public-requester',
+      'unknown-public-requester',
+    ]);
+  });
+
+  test('uses trusted platform requester identity when a platform marker is present', async () => {
+    const calls: Array<{ kind: string; args: any }> = [];
+    const response = await handleNetworkingHttpRequest(
+      {
+        runMutation: async (_funcRef, args) => {
+          calls.push({ kind: 'mutation', args });
+          return [];
+        },
+        runQuery: async () => {
+          throw new Error('unexpected query');
+        },
+      },
+      new Request('https://town.example/api/v1/events/demo-event/directory?q=climate', {
+        method: 'GET',
+        headers: {
+          'cf-connecting-ip': '203.0.113.20',
+          'cf-ray': 'demo-edge-ray',
+          'user-agent': 'ignored-agent',
+        },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(calls[0]).toMatchObject({
+      kind: 'mutation',
+      args: {
+        eventId: 'demo-event',
+        requesterKey: 'cf-ip:203.0.113.20',
       },
     });
   });

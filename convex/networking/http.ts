@@ -1022,26 +1022,30 @@ function optionalBoolean(value: unknown, fieldName: string) {
 }
 
 function publicRequesterKey(request: Request) {
-  const ipAddress =
-    firstForwardedIp(request.headers.get('x-forwarded-for')) ??
-    parseForwardedFor(request.headers.get('forwarded')) ??
-    request.headers.get('cf-connecting-ip')?.trim() ??
-    request.headers.get('x-real-ip')?.trim() ??
-    'unknown-ip';
-  const userAgent = request.headers.get('user-agent')?.trim() || 'unknown-agent';
-  return `ip:${ipAddress}|ua:${userAgent}`.slice(0, 180);
+  return trustedPlatformRequesterKey(request.headers) ?? 'unknown-public-requester';
 }
 
 function firstForwardedIp(headerValue: string | null) {
   return headerValue?.split(',')[0]?.trim() || undefined;
 }
 
-function parseForwardedFor(headerValue: string | null) {
-  if (!headerValue) {
-    return undefined;
+function trustedPlatformRequesterKey(headers: Headers) {
+  const cloudflareIp = headers.get('cf-connecting-ip')?.trim();
+  if (cloudflareIp && headers.get('cf-ray')) {
+    return `cf-ip:${cloudflareIp}`.slice(0, 180);
   }
-  const match = headerValue.match(/(?:^|;)\s*for="?([^";,]+)"?/i);
-  return match?.[1]?.trim();
+
+  const flyIp = headers.get('fly-client-ip')?.trim();
+  if (flyIp && headers.get('fly-request-id')) {
+    return `fly-ip:${flyIp}`.slice(0, 180);
+  }
+
+  const vercelIp = firstForwardedIp(headers.get('x-vercel-forwarded-for'));
+  if (vercelIp && headers.get('x-vercel-id')) {
+    return `vercel-ip:${vercelIp}`.slice(0, 180);
+  }
+
+  return undefined;
 }
 
 function optionalStringArray(value: unknown, fieldName: string) {
