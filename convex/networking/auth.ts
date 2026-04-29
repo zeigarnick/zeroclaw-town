@@ -13,14 +13,17 @@ export type NetworkingErrorCode =
   | 'details_too_long'
   | 'duplicate_agent_slug'
   | 'empty_card_text'
+  | 'contact_field_not_public'
   | 'invalid_card_status'
   | 'invalid_card_type'
   | 'invalid_agent_slug'
   | 'invalid_api_key'
+  | 'invalid_avatar_asset'
   | 'invalid_conversation_status'
   | 'invalid_intro_candidate_text'
   | 'invalid_intro_candidate_status'
   | 'invalid_claim_status'
+  | 'invalid_public_field'
   | 'invalid_inbox_event_status'
   | 'invalid_meeting_status'
   | 'invalid_message_body'
@@ -41,6 +44,7 @@ export type NetworkingErrorCode =
   | 'recommendation_access_denied'
   | 'recommendation_not_actionable'
   | 'recommendation_not_found'
+  | 'sensitive_field_not_allowed'
   | 'summary_too_long';
 
 const API_KEY_PREFIX = 'town';

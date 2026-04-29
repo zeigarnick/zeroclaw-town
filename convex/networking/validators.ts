@@ -94,6 +94,134 @@ export const inboxEventStatusValidator = v.union(
   v.literal('archived'),
 );
 
+export const eventRegistrationStatuses = ['open', 'paused'] as const;
+export type EventRegistrationStatus = (typeof eventRegistrationStatuses)[number];
+export const eventRegistrationStatusValidator = v.union(
+  v.literal('open'),
+  v.literal('paused'),
+);
+
+export const eventAgentStatuses = [
+  'pending_owner_review',
+  'approved',
+  'rejected',
+  'changes_requested',
+] as const;
+export type EventAgentStatus = (typeof eventAgentStatuses)[number];
+export const eventAgentStatusValidator = v.union(
+  v.literal('pending_owner_review'),
+  v.literal('approved'),
+  v.literal('rejected'),
+  v.literal('changes_requested'),
+);
+
+export const eventCardStatuses = [
+  'pending_owner_review',
+  'approved',
+  'rejected',
+  'changes_requested',
+] as const;
+export type EventCardStatus = (typeof eventCardStatuses)[number];
+export const eventCardStatusValidator = v.union(
+  v.literal('pending_owner_review'),
+  v.literal('approved'),
+  v.literal('rejected'),
+  v.literal('changes_requested'),
+);
+
+export const eventOwnerSessionStatuses = [
+  'pending',
+  'approved',
+  'rejected',
+  'changes_requested',
+] as const;
+export type EventOwnerSessionStatus = (typeof eventOwnerSessionStatuses)[number];
+export const eventOwnerSessionStatusValidator = v.union(
+  v.literal('pending'),
+  v.literal('approved'),
+  v.literal('rejected'),
+  v.literal('changes_requested'),
+);
+
+export const eventAvatarCategories = [
+  'hair',
+  'skinTone',
+  'clothing',
+  'hat',
+  'accessory',
+] as const;
+export type EventAvatarCategory = (typeof eventAvatarCategories)[number];
+export const eventAvatarCategoryValidator = v.union(
+  v.literal('hair'),
+  v.literal('skinTone'),
+  v.literal('clothing'),
+  v.literal('hat'),
+  v.literal('accessory'),
+);
+
+export const eventAvatarAssetStatuses = ['active', 'disabled'] as const;
+export type EventAvatarAssetStatus = (typeof eventAvatarAssetStatuses)[number];
+export const eventAvatarAssetStatusValidator = v.union(
+  v.literal('active'),
+  v.literal('disabled'),
+);
+
+export const eventPublicCardFieldNames = [
+  'role',
+  'category',
+  'offers',
+  'wants',
+  'lookingFor',
+  'hobbies',
+  'interests',
+  'favoriteMedia',
+] as const;
+export type EventPublicCardFieldName = (typeof eventPublicCardFieldNames)[number];
+
+export const eventContactFieldNames = [
+  'realName',
+  'name',
+  'company',
+  'email',
+  'phone',
+  'linkedin',
+  'linkedIn',
+  'x',
+  'twitter',
+  'website',
+  'contact',
+  'contactLink',
+  'contactLinks',
+  'profileUrl',
+  'url',
+] as const;
+
+export const eventSensitiveFieldNames = [
+  'age',
+  'dateOfBirth',
+  'disability',
+  'ethnicity',
+  'gender',
+  'nationality',
+  'race',
+  'religion',
+  'sexuality',
+  'sexualOrientation',
+] as const;
+
+export const eventNetworkingErrorCodes = [
+  'invalid_public_field',
+  'contact_field_not_public',
+  'sensitive_field_not_allowed',
+  'invalid_avatar_asset',
+] as const;
+export type EventNetworkingErrorCode = (typeof eventNetworkingErrorCodes)[number];
+
+export const MAX_EVENT_PUBLIC_TEXT_LENGTH = 280;
+export const MAX_EVENT_PUBLIC_LIST_ITEMS = 12;
+export const MAX_EVENT_AGENT_IDENTIFIER_LENGTH = 120;
+export const MAX_EVENT_REVIEW_NOTE_LENGTH = 800;
+
 export const MAX_ACTIVE_MATCH_CARDS_PER_AGENT = 3;
 export const MATCH_CARD_STALE_AFTER_DAYS = 30;
 export const MAX_CARD_TITLE_LENGTH = 140;

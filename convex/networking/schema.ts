@@ -5,6 +5,12 @@ import {
   cardStatusValidator,
   cardTypeValidator,
   conversationStatusValidator,
+  eventAgentStatusValidator,
+  eventAvatarAssetStatusValidator,
+  eventAvatarCategoryValidator,
+  eventCardStatusValidator,
+  eventOwnerSessionStatusValidator,
+  eventRegistrationStatusValidator,
   introCandidateStatusValidator,
   inboxEventStatusValidator,
   inboxItemTypeValidator,
@@ -245,4 +251,89 @@ export const networkingTables = {
     .index('by_recipient_status_created_at', ['recipientAgentId', 'status', 'createdAt'])
     .index('by_recipient_type_created_at', ['recipientAgentId', 'type', 'createdAt'])
     .index('by_recipient_dedupe_key', ['recipientAgentId', 'dedupeKey']),
+
+  eventSpaces: defineTable({
+    eventId: v.string(),
+    title: v.string(),
+    registrationStatus: eventRegistrationStatusValidator,
+    skillUrl: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index('by_event_id', ['eventId'])
+    .index('by_registration_status', ['registrationStatus']),
+
+  eventAgents: defineTable({
+    eventId: v.string(),
+    agentIdentifier: v.string(),
+    displayName: v.string(),
+    avatarConfig: v.object({
+      hair: v.string(),
+      skinTone: v.string(),
+      clothing: v.string(),
+      hat: v.optional(v.string()),
+      accessory: v.optional(v.string()),
+    }),
+    approvalStatus: eventAgentStatusValidator,
+    ownerSessionId: v.optional(v.id('eventOwnerSessions')),
+    activeCardId: v.optional(v.id('eventNetworkingCards')),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    approvedAt: v.optional(v.number()),
+    rejectedAt: v.optional(v.number()),
+    changesRequestedAt: v.optional(v.number()),
+  })
+    .index('by_event_and_agent_identifier', ['eventId', 'agentIdentifier'])
+    .index('by_event_and_status', ['eventId', 'approvalStatus'])
+    .index('by_event_updated_at', ['eventId', 'updatedAt']),
+
+  eventNetworkingCards: defineTable({
+    eventId: v.string(),
+    eventAgentId: v.id('eventAgents'),
+    publicCard: v.object({
+      role: v.optional(v.string()),
+      category: v.optional(v.string()),
+      offers: v.array(v.string()),
+      wants: v.array(v.string()),
+      lookingFor: v.optional(v.string()),
+      hobbies: v.array(v.string()),
+      interests: v.array(v.string()),
+      favoriteMedia: v.array(v.string()),
+    }),
+    status: eventCardStatusValidator,
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    approvedAt: v.optional(v.number()),
+    rejectedAt: v.optional(v.number()),
+    changesRequestedAt: v.optional(v.number()),
+    reviewNote: v.optional(v.string()),
+  })
+    .index('by_event_and_status', ['eventId', 'status'])
+    .index('by_agent_and_status', ['eventAgentId', 'status'])
+    .index('by_event_updated_at', ['eventId', 'updatedAt']),
+
+  eventOwnerSessions: defineTable({
+    eventId: v.string(),
+    eventAgentId: v.id('eventAgents'),
+    cardId: v.id('eventNetworkingCards'),
+    sessionTokenHash: v.bytes(),
+    status: eventOwnerSessionStatusValidator,
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    decidedAt: v.optional(v.number()),
+  })
+    .index('by_session_token_hash', ['sessionTokenHash'])
+    .index('by_event_and_status', ['eventId', 'status'])
+    .index('by_agent', ['eventAgentId']),
+
+  eventAvatarAssets: defineTable({
+    category: eventAvatarCategoryValidator,
+    assetId: v.string(),
+    label: v.string(),
+    status: eventAvatarAssetStatusValidator,
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index('by_category_and_asset_id', ['category', 'assetId'])
+    .index('by_category_and_status', ['category', 'status']),
 };

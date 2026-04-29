@@ -48,6 +48,7 @@ import type * as networking_cardText from "../networking/cardText.js";
 import type * as networking_cards from "../networking/cards.js";
 import type * as networking_conversations from "../networking/conversations.js";
 import type * as networking_demoSeed from "../networking/demoSeed.js";
+import type * as networking_eventCards from "../networking/eventCards.js";
 import type * as networking_http from "../networking/http.js";
 import type * as networking_inbox from "../networking/inbox.js";
 import type * as networking_intros from "../networking/intros.js";
@@ -115,6 +116,7 @@ declare const fullApi: ApiFromModules<{
   "networking/cards": typeof networking_cards;
   "networking/conversations": typeof networking_conversations;
   "networking/demoSeed": typeof networking_demoSeed;
+  "networking/eventCards": typeof networking_eventCards;
   "networking/http": typeof networking_http;
   "networking/inbox": typeof networking_inbox;
   "networking/intros": typeof networking_intros;
