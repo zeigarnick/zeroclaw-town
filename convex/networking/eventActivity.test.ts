@@ -20,7 +20,10 @@ type TableName =
   | 'eventContactReveals'
   | 'eventActivityEvents'
   | 'eventActivityAggregates'
-  | 'eventOwnerSessions';
+  | 'eventOwnerSessions'
+  | 'eventSpaces'
+  | 'worldStatus'
+  | 'inputs';
 type Row = Record<string, any> & { _id: string };
 
 function createMockCtx() {
@@ -34,6 +37,9 @@ function createMockCtx() {
     eventActivityEvents: [],
     eventActivityAggregates: [],
     eventOwnerSessions: [],
+    eventSpaces: [],
+    worldStatus: [],
+    inputs: [],
   };
   const counters: Record<TableName, number> = {
     eventAgents: 0,
@@ -45,6 +51,9 @@ function createMockCtx() {
     eventActivityEvents: 0,
     eventActivityAggregates: 0,
     eventOwnerSessions: 0,
+    eventSpaces: 0,
+    worldStatus: 0,
+    inputs: 0,
   };
 
   const db = {
@@ -77,8 +86,15 @@ function createMockCtx() {
         );
         return {
           first: async () => rows[0] ?? null,
+          unique: async () => rows[0] ?? null,
           collect: async () => rows,
           order: (direction: 'asc' | 'desc') => ({
+            first: async () =>
+              [...rows].sort((left, right) =>
+                direction === 'desc'
+                  ? (right.number ?? right.createdAt ?? 0) - (left.number ?? left.createdAt ?? 0)
+                  : (left.number ?? left.createdAt ?? 0) - (right.number ?? right.createdAt ?? 0),
+              )[0] ?? null,
             take: async (limit: number) =>
               [...rows]
                 .sort((left, right) =>
@@ -122,7 +138,7 @@ async function insertAgentWithCard(
   ctx: ReturnType<typeof createMockCtx>['ctx'],
   label: string,
   cardOverrides: Partial<Row['publicCard']> = {},
-  options: { omitPublicMarkerSlug?: boolean } = {},
+  options: { omitPublicMarkerSlug?: boolean; townPlayerId?: string } = {},
 ) {
   const now = 1710000000000;
   const agentId = await ctx.db.insert('eventAgents', {
@@ -140,6 +156,7 @@ async function insertAgentWithCard(
       clothing: 'jacket',
     },
     approvalStatus: 'approved',
+    ...(options.townPlayerId ? { townPlayerId: options.townPlayerId } : {}),
     createdAt: now,
     updatedAt: now,
   });
@@ -296,6 +313,58 @@ describe('event activity', () => {
     expect(serialized).not.toContain('eventAgents:');
     expect(serialized).not.toContain('eventConnectionIntents');
     expect(serialized).not.toContain('event_owner_');
+  });
+
+  test('queues pathfinding movement for matched event town players', async () => {
+    const { ctx, tables } = createMockCtx();
+    await ctx.db.insert('eventSpaces', {
+      eventId: 'demo-event',
+      title: 'Demo Event',
+      worldId: 'worlds:event',
+      registrationStatus: 'open',
+      createdAt: 1710000000000,
+      updatedAt: 1710000000000,
+    });
+    await ctx.db.insert('worldStatus', {
+      worldId: 'worlds:event',
+      engineId: 'engines:event',
+      isDefault: false,
+      lastViewed: 1710000000000,
+      status: 'running',
+    });
+    const requester = await insertAgentWithCard(ctx, 'Cedar Scout', {}, { townPlayerId: 'p:1' });
+    const target = await insertAgentWithCard(ctx, 'Orbit Builder', {}, { townPlayerId: 'p:2' });
+    const intent = await createEventConnectionIntentHandler(ctx as any, {
+      eventId: 'demo-event',
+      requesterAgentId: requester.agentId as any,
+      targetAgentId: target.agentId as any,
+      requesterOwnerSessionToken: requester.ownerSessionToken,
+    });
+
+    await decideEventConnectionIntentHandler(ctx as any, {
+      eventId: 'demo-event',
+      intentId: intent.id as any,
+      ownerSessionToken: target.ownerSessionToken,
+      decision: 'approve',
+    });
+
+    expect(tables.inputs).toEqual([
+      expect.objectContaining({
+        engineId: 'engines:event',
+        number: 0,
+        name: 'moveEventMatchPair',
+        args: {
+          requesterPlayerId: 'p:1',
+          targetPlayerId: 'p:2',
+        },
+      }),
+    ]);
+    expect(tables.eventActivityEvents[0]).toMatchObject({
+      movementInputId: tables.inputs[0]._id,
+      movementQueuedAt: expect.any(Number),
+    });
+    expect(JSON.stringify(tables.inputs)).not.toContain('eventAgents:');
+    expect(JSON.stringify(tables.inputs)).not.toContain('event_owner_');
   });
 
   test('omits legacy hash-derived marker slugs from activity views until repaired', async () => {

@@ -1,14 +1,15 @@
 import { v } from 'convex/values';
-import { agentId, conversationId, parseGameId } from './ids';
+import { agentId, conversationId, parseGameId, playerId } from './ids';
 import { Player, activity } from './player';
 import { Conversation, conversationInputs } from './conversation';
-import { movePlayer } from './movement';
+import { blocked, movePlayer } from './movement';
 import { inputHandler } from './inputHandler';
 import { point } from '../util/types';
 import { Descriptions } from '../../data/characters';
 import { AgentDescription } from './agentDescription';
 import { Agent } from './agent';
 import { Id } from '../_generated/dataModel';
+import type { Game } from './game';
 
 export const agentInputs = {
   finishRememberConversation: inputHandler({
@@ -246,4 +247,64 @@ export const agentInputs = {
       return { agentId, playerId };
     },
   }),
+  moveEventMatchPair: inputHandler({
+    args: {
+      requesterPlayerId: playerId,
+      targetPlayerId: playerId,
+    },
+    handler: (game, now, args) => {
+      const requester = game.world.players.get(parseGameId('players', args.requesterPlayerId));
+      const target = game.world.players.get(parseGameId('players', args.targetPlayerId));
+      if (!requester || !target) {
+        return null;
+      }
+      const requesterDestination = nearestOpenNeighbor(game, now, target, requester);
+      const targetDestination = nearestOpenNeighbor(game, now, requester, target);
+      if (requesterDestination) {
+        movePlayer(game, now, requester, requesterDestination, true);
+      }
+      if (targetDestination) {
+        movePlayer(game, now, target, targetDestination, true);
+      }
+      const holdUntil = now + 10000;
+      requester.activity = {
+        description: 'Matched',
+        emoji: 'Match',
+        until: holdUntil,
+      };
+      target.activity = {
+        description: 'Matched',
+        emoji: 'Match',
+        until: holdUntil,
+      };
+      return null;
+    },
+  }),
 };
+
+function nearestOpenNeighbor(
+  game: Game,
+  now: number,
+  anchor: Player,
+  mover: Player,
+) {
+  const base = {
+    x: Math.floor(anchor.position.x),
+    y: Math.floor(anchor.position.y),
+  };
+  const candidates = [
+    { x: base.x + 1, y: base.y },
+    { x: base.x - 1, y: base.y },
+    { x: base.x, y: base.y + 1 },
+    { x: base.x, y: base.y - 1 },
+  ];
+  candidates.sort(
+    (left, right) =>
+      tileDistance(left, mover.position) - tileDistance(right, mover.position),
+  );
+  return candidates.find((candidate) => blocked(game, now, candidate, mover.id) === null);
+}
+
+function tileDistance(left: { x: number; y: number }, right: { x: number; y: number }) {
+  return Math.hypot(left.x - right.x, left.y - right.y);
+}

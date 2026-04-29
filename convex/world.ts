@@ -10,6 +10,7 @@ import { hashSecret, networkingError } from './networking/auth';
 import { Doc, Id } from './_generated/dataModel';
 import { pruneDefaultWorldNpcsHandler, pruneWorldNpcs, townNpcsEnabled } from './townNpcs';
 import { ensureEventWorldAvatars, syncEventWorldMapByWorldId } from './networking/eventWorlds';
+import { queuePendingEventMatchMovements } from './networking/eventActivity';
 
 const HUMAN_INPUT_NAMES = new Set([
   'moveTo',
@@ -94,6 +95,7 @@ export const heartbeatWorld = mutation({
         .first();
       if (eventSpace) {
         await ensureEventWorldAvatars(ctx, eventSpace, { now });
+        await queuePendingEventMatchMovements(ctx, eventSpace, { now });
       }
     }
   },

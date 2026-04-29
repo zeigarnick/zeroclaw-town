@@ -1,9 +1,11 @@
 import { v } from 'convex/values';
 import { Doc } from '../_generated/dataModel';
 import { MutationCtx, QueryCtx, mutation, query } from '../_generated/server';
+import { insertInput } from '../aiTown/insertInput';
 import { networkingError } from './auth';
 import { normalizeEventId } from './eventAgents';
 import { ensurePublicEventMarkerSlug } from './eventMarkerIdentity';
+import { ensureEventWorldAvatars } from './eventWorlds';
 import { EventActivityType } from './validators';
 
 const DEFAULT_EVENT_ACTIVITY_LIMIT = 12;
@@ -90,7 +92,38 @@ export async function createMatchActivityForApprovedIntent(
     throw networkingError('event_activity_not_found', 'The event activity could not be loaded.');
   }
   await incrementEventMatchActivityAggregate(ctx, intent.eventId, now);
+  await queueEventMatchMovementForActivity(ctx, activity, now);
   return toEventActivityView(activity);
+}
+
+export async function queuePendingEventMatchMovements(
+  ctx: MutationCtx,
+  eventSpace: Doc<'eventSpaces'>,
+  selection: { now?: number } = {},
+) {
+  const now = selection.now ?? Date.now();
+  const events = await ctx.db
+    .query('eventActivityEvents')
+    .withIndex('by_event_type_created_at', (q) =>
+      q.eq('eventId', eventSpace.eventId).eq('type', 'match_created'),
+    )
+    .order('desc')
+    .take(20);
+  let enqueued = 0;
+  let skipped = 0;
+  for (const event of events) {
+    if (event.movementQueuedAt) {
+      skipped += 1;
+      continue;
+    }
+    const queued = await queueEventMatchMovementForActivity(ctx, event, now);
+    if (queued) {
+      enqueued += 1;
+    } else {
+      skipped += 1;
+    }
+  }
+  return { enqueued, skipped };
 }
 
 export async function listRecentEventActivityHandler(
@@ -188,6 +221,53 @@ function toEventActivityView(activity: Doc<'eventActivityEvents'>): EventActivit
     createdAt: activity.createdAt,
     updatedAt: activity.updatedAt,
   };
+}
+
+async function queueEventMatchMovementForActivity(
+  ctx: MutationCtx,
+  activity: Doc<'eventActivityEvents'>,
+  now: number,
+) {
+  if (activity.type !== 'match_created' || activity.movementQueuedAt) {
+    return false;
+  }
+  const [eventSpace, intent] = await Promise.all([
+    ctx.db
+      .query('eventSpaces')
+      .withIndex('by_event_id', (q) => q.eq('eventId', activity.eventId))
+      .first(),
+    ctx.db.get(activity.sourceIntentId),
+  ]);
+  if (!eventSpace || !intent || intent.eventId !== activity.eventId) {
+    return false;
+  }
+  await ensureEventWorldAvatars(ctx, eventSpace, { now });
+  const refreshedEventSpace = await ctx.db.get(eventSpace._id);
+  if (!refreshedEventSpace?.worldId) {
+    return false;
+  }
+  const [requester, target] = await Promise.all([
+    ctx.db.get(intent.requesterAgentId),
+    ctx.db.get(intent.targetAgentId),
+  ]);
+  if (
+    !requester?.townPlayerId ||
+    !target?.townPlayerId ||
+    requester.eventId !== activity.eventId ||
+    target.eventId !== activity.eventId
+  ) {
+    return false;
+  }
+  const inputId = await insertInput(ctx, refreshedEventSpace.worldId, 'moveEventMatchPair', {
+    requesterPlayerId: requester.townPlayerId,
+    targetPlayerId: target.townPlayerId,
+  });
+  await ctx.db.patch(activity._id, {
+    movementInputId: inputId,
+    movementQueuedAt: now,
+    updatedAt: now,
+  });
+  return true;
 }
 
 function sanitizePublicEventMarkerSlug(markerSlug: string | undefined) {

@@ -429,6 +429,8 @@ export const networkingTables = {
     requesterMarkerSlug: v.optional(v.string()),
     targetMarkerSlug: v.optional(v.string()),
     sourceIntentId: v.id('eventConnectionIntents'),
+    movementInputId: v.optional(v.id('inputs')),
+    movementQueuedAt: v.optional(v.number()),
     payload: v.object({
       matchKind: v.literal('recipient_approved'),
     }),
