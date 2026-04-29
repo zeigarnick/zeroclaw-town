@@ -184,6 +184,74 @@ export interface ReviewIntroRequest {
   action: 'approve' | 'defer' | 'dismiss';
 }
 
+export type EventAvatarConfig = {
+  hair: string;
+  skinTone: string;
+  clothing: string;
+  hat?: string;
+  accessory?: string;
+};
+
+export type EventPublicCard = {
+  role?: string;
+  category?: string;
+  offers: string[];
+  wants: string[];
+  lookingFor?: string;
+  hobbies: string[];
+  interests: string[];
+  favoriteMedia: string[];
+};
+
+export type EventOwnerReviewStatus =
+  | 'pending'
+  | 'approved'
+  | 'rejected'
+  | 'changes_requested';
+
+export interface RegisterEventAgentRequest {
+  eventId: string;
+  agentIdentifier?: string;
+  publicCard: EventPublicCard;
+  avatarConfig?: EventAvatarConfig;
+}
+
+export interface EventAgentRegistration {
+  eventId: string;
+  eventAgentId: string;
+  agentIdentifier: string;
+  displayName: string;
+  avatarConfig: EventAvatarConfig;
+  publicCard: EventPublicCard;
+  approvalStatus: string;
+  cardId: string;
+  ownerReviewPath: string;
+  ownerSessionToken: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface EventOwnerReviewData {
+  eventId: string;
+  eventAgentId: string;
+  cardId: string;
+  sessionStatus: EventOwnerReviewStatus;
+  agentStatus: string;
+  displayName: string;
+  avatarConfig: EventAvatarConfig;
+  publicCard: EventPublicCard;
+  reviewNote?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface ReviewEventOwnerCardRequest {
+  eventId: string;
+  reviewToken: string;
+  action: 'approve' | 'reject' | 'request-changes';
+  reviewNote?: string;
+}
+
 export interface IApiAdapter {
   registerAgent(req: RegisterAgentRequest): Promise<ApiResponse<Agent>>;
   mockClaim(req: MockClaimRequest): Promise<ApiResponse<Agent>>;
@@ -205,6 +273,15 @@ export interface IApiAdapter {
   getIntros(apiKey: string): Promise<ApiResponse<IntroCandidate[]>>;
   createIntro(req: CreateIntroRequest): Promise<ApiResponse<IntroCandidate>>;
   reviewIntro(req: ReviewIntroRequest): Promise<ApiResponse<IntroCandidate>>;
+
+  registerEventAgent(req: RegisterEventAgentRequest): Promise<ApiResponse<EventAgentRegistration>>;
+  getEventOwnerReview(
+    eventId: string,
+    reviewToken: string,
+  ): Promise<ApiResponse<EventOwnerReviewData>>;
+  reviewEventOwnerCard(
+    req: ReviewEventOwnerCardRequest,
+  ): Promise<ApiResponse<EventOwnerReviewData>>;
 }
 
 type FetchLike = typeof fetch;
@@ -380,6 +457,72 @@ function normalizeIntroCandidate(value: unknown): IntroCandidate {
       typeof row.recommendedNextStep === 'string' ? row.recommendedNextStep : '',
     status: typeof row.status === 'string' ? row.status : '',
     createdByAgentId: typeof row.createdByAgentId === 'string' ? row.createdByAgentId : '',
+    createdAt: typeof row.createdAt === 'number' ? row.createdAt : 0,
+    updatedAt: typeof row.updatedAt === 'number' ? row.updatedAt : 0,
+  };
+}
+
+function normalizeAvatarConfig(value: unknown): EventAvatarConfig {
+  const row = asRecord(value);
+  return {
+    hair: typeof row.hair === 'string' ? row.hair : '',
+    skinTone: typeof row.skinTone === 'string' ? row.skinTone : '',
+    clothing: typeof row.clothing === 'string' ? row.clothing : '',
+    hat: typeof row.hat === 'string' ? row.hat : undefined,
+    accessory: typeof row.accessory === 'string' ? row.accessory : undefined,
+  };
+}
+
+function normalizeEventPublicCard(value: unknown): EventPublicCard {
+  const row = asRecord(value);
+  return {
+    role: typeof row.role === 'string' ? row.role : undefined,
+    category: typeof row.category === 'string' ? row.category : undefined,
+    offers: toArray(row.offers),
+    wants: toArray(row.wants),
+    lookingFor: typeof row.lookingFor === 'string' ? row.lookingFor : undefined,
+    hobbies: toArray(row.hobbies),
+    interests: toArray(row.interests),
+    favoriteMedia: toArray(row.favoriteMedia),
+  };
+}
+
+function normalizeEventRegistration(value: unknown): EventAgentRegistration {
+  const row = asRecord(value);
+  return {
+    eventId: typeof row.eventId === 'string' ? row.eventId : '',
+    eventAgentId: typeof row.eventAgentId === 'string' ? row.eventAgentId : '',
+    agentIdentifier: typeof row.agentIdentifier === 'string' ? row.agentIdentifier : '',
+    displayName: typeof row.displayName === 'string' ? row.displayName : '',
+    avatarConfig: normalizeAvatarConfig(row.avatarConfig),
+    publicCard: normalizeEventPublicCard(row.publicCard),
+    approvalStatus: typeof row.approvalStatus === 'string' ? row.approvalStatus : '',
+    cardId: typeof row.cardId === 'string' ? row.cardId : '',
+    ownerReviewPath: typeof row.ownerReviewPath === 'string' ? row.ownerReviewPath : '',
+    ownerSessionToken: typeof row.ownerSessionToken === 'string' ? row.ownerSessionToken : '',
+    createdAt: typeof row.createdAt === 'number' ? row.createdAt : 0,
+    updatedAt: typeof row.updatedAt === 'number' ? row.updatedAt : 0,
+  };
+}
+
+function normalizeEventOwnerReview(value: unknown): EventOwnerReviewData {
+  const row = asRecord(value);
+  const sessionStatus =
+    row.sessionStatus === 'approved' ||
+    row.sessionStatus === 'rejected' ||
+    row.sessionStatus === 'changes_requested'
+      ? row.sessionStatus
+      : 'pending';
+  return {
+    eventId: typeof row.eventId === 'string' ? row.eventId : '',
+    eventAgentId: typeof row.eventAgentId === 'string' ? row.eventAgentId : '',
+    cardId: typeof row.cardId === 'string' ? row.cardId : '',
+    sessionStatus,
+    agentStatus: typeof row.agentStatus === 'string' ? row.agentStatus : '',
+    displayName: typeof row.displayName === 'string' ? row.displayName : '',
+    avatarConfig: normalizeAvatarConfig(row.avatarConfig),
+    publicCard: normalizeEventPublicCard(row.publicCard),
+    reviewNote: typeof row.reviewNote === 'string' ? row.reviewNote : undefined,
     createdAt: typeof row.createdAt === 'number' ? row.createdAt : 0,
     updatedAt: typeof row.updatedAt === 'number' ? row.updatedAt : 0,
   };
@@ -637,6 +780,57 @@ export class HttpApiAdapter implements IApiAdapter {
       return response;
     }
     return { success: true, data: normalizeIntroCandidate(response.data) };
+  }
+
+  async registerEventAgent(
+    req: RegisterEventAgentRequest,
+  ): Promise<ApiResponse<EventAgentRegistration>> {
+    const response = await this.request<unknown>(`/events/${req.eventId}/register`, {
+      method: 'POST',
+      body: {
+        agentIdentifier: req.agentIdentifier,
+        publicCard: req.publicCard,
+        avatarConfig: req.avatarConfig,
+      },
+    });
+    if (!response.success) {
+      return response;
+    }
+    return { success: true, data: normalizeEventRegistration(response.data) };
+  }
+
+  async getEventOwnerReview(
+    eventId: string,
+    reviewToken: string,
+  ): Promise<ApiResponse<EventOwnerReviewData>> {
+    const response = await this.request<unknown>(
+      `/events/${eventId}/owner-sessions/${reviewToken}`,
+      {
+        method: 'GET',
+      },
+    );
+    if (!response.success) {
+      return response;
+    }
+    return { success: true, data: normalizeEventOwnerReview(response.data) };
+  }
+
+  async reviewEventOwnerCard(
+    req: ReviewEventOwnerCardRequest,
+  ): Promise<ApiResponse<EventOwnerReviewData>> {
+    const response = await this.request<unknown>(
+      `/events/${req.eventId}/owner-sessions/${req.reviewToken}/${req.action}`,
+      {
+        method: 'POST',
+        body: {
+          reviewNote: req.reviewNote,
+        },
+      },
+    );
+    if (!response.success) {
+      return response;
+    }
+    return { success: true, data: normalizeEventOwnerReview(response.data) };
   }
 
   private async request<T>(

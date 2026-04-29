@@ -9,21 +9,42 @@ import MusicButton from './components/buttons/MusicButton.tsx';
 import InteractButton from './components/buttons/InteractButton.tsx';
 import FreezeButton from './components/FreezeButton.tsx';
 import { OwnerDashboard } from './networking/OwnerDashboard.tsx';
+import { EventOwnerReview } from './networking/EventOwnerReview.tsx';
 import { apiAdapter } from './networking/api.ts';
 
-type AppView = 'town' | 'dashboard';
+type AppView = 'town' | 'dashboard' | 'eventReview';
 
-function getInitialClaimToken() {
+type InitialRoute = {
+  claimToken: string;
+  eventReview?: {
+    eventId: string;
+    reviewToken: string;
+  };
+};
+
+function getInitialRoute(): InitialRoute {
   const pathMatch = window.location.pathname.match(/^\/claim\/([^/?#]+)/);
   if (pathMatch) {
-    return decodeURIComponent(pathMatch[1]);
+    return { claimToken: decodeURIComponent(pathMatch[1]) };
   }
-  return new URLSearchParams(window.location.search).get('claimToken') ?? '';
+  const eventReviewMatch = window.location.pathname.match(/^\/event-review\/([^/?#]+)\/([^/?#]+)/);
+  if (eventReviewMatch) {
+    return {
+      claimToken: '',
+      eventReview: {
+        eventId: decodeURIComponent(eventReviewMatch[1]),
+        reviewToken: decodeURIComponent(eventReviewMatch[2]),
+      },
+    };
+  }
+  return { claimToken: new URLSearchParams(window.location.search).get('claimToken') ?? '' };
 }
 
 export default function Home() {
-  const initialClaimToken = getInitialClaimToken();
-  const [currentView, setCurrentView] = useState<AppView>(initialClaimToken ? 'dashboard' : 'town');
+  const initialRoute = getInitialRoute();
+  const [currentView, setCurrentView] = useState<AppView>(
+    initialRoute.eventReview ? 'eventReview' : initialRoute.claimToken ? 'dashboard' : 'town',
+  );
   return (
     <main className="relative overflow-hidden bg-black font-body" style={{ height: '100dvh' }}>
       {/*<div className="p-3 absolute top-0 right-0 z-10 text-2xl">
@@ -54,7 +75,7 @@ export default function Home() {
             </div>
             <ToastContainer position="bottom-right" autoClose={2000} closeOnClick theme="dark" />
           </>
-        ) : (
+        ) : currentView === 'dashboard' ? (
           <div className="relative flex h-full min-h-0 flex-col">
             <button
               onClick={() => setCurrentView('town')}
@@ -63,7 +84,28 @@ export default function Home() {
               Back to Town
             </button>
             <div className="min-h-0 flex-1 overflow-hidden pt-12">
-              <OwnerDashboard apiAdapter={apiAdapter} initialClaimToken={initialClaimToken} />
+              <OwnerDashboard
+                apiAdapter={apiAdapter}
+                initialClaimToken={initialRoute.claimToken}
+              />
+            </div>
+          </div>
+        ) : (
+          <div className="relative flex h-full min-h-0 flex-col">
+            <button
+              onClick={() => setCurrentView('town')}
+              className="absolute top-4 right-4 lg:top-8 lg:right-8 bg-clay-700 hover:bg-clay-500 text-white px-4 py-2 rounded font-bold text-sm z-10"
+            >
+              Back to Town
+            </button>
+            <div className="min-h-0 flex-1 overflow-hidden pt-12">
+              {initialRoute.eventReview && (
+                <EventOwnerReview
+                  apiAdapter={apiAdapter}
+                  eventId={initialRoute.eventReview.eventId}
+                  reviewToken={initialRoute.eventReview.reviewToken}
+                />
+              )}
             </div>
           </div>
         )}

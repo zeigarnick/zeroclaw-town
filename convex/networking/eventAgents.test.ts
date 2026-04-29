@@ -127,7 +127,7 @@ describe('event agent handlers', () => {
     expect(registration.displayName).toMatch(/^[A-Za-z]+ [A-Za-z]+ [0-9]{3}$/);
     expect(registration.displayName.toLowerCase()).not.toContain('attendee');
     expect(registration.approvalStatus).toBe('pending_owner_review');
-    expect(registration.ownerReviewPath).toMatch(/^\/event-review\/event_owner_/);
+    expect(registration.ownerReviewPath).toMatch(/^\/event-review\/demo-event\/event_owner_/);
     expect(registration.ownerSessionToken).toMatch(/^event_owner_/);
 
     expect(tables.eventSpaces).toHaveLength(1);

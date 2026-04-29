@@ -128,7 +128,7 @@ export async function registerEventAgentHandler(
     approvalStatus: 'pending_owner_review' as const,
     cardId,
     ownerSessionId,
-    ownerReviewPath: formatClaimUrl(getEventOwnerReviewBasePath(), ownerSessionToken),
+    ownerReviewPath: formatEventOwnerReviewPath(eventId, ownerSessionToken),
     ownerSessionToken,
     createdAt: now,
     updatedAt: now,
@@ -356,6 +356,10 @@ function titleizeEventId(eventId: string) {
 
 function getEventOwnerReviewBasePath() {
   return process.env.EVENT_OWNER_REVIEW_BASE_URL ?? DEFAULT_EVENT_OWNER_REVIEW_BASE_PATH;
+}
+
+function formatEventOwnerReviewPath(eventId: string, ownerSessionToken: string) {
+  return formatClaimUrl(formatClaimUrl(getEventOwnerReviewBasePath(), eventId), ownerSessionToken);
 }
 
 function generateRandomDisplayName() {
