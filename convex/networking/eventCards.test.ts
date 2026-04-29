@@ -54,6 +54,23 @@ describe('event public card validation', () => {
     }
   });
 
+  test('rejects contact values embedded in allowed text fields', () => {
+    for (const publicCard of [
+      { role: 'Founder', lookingFor: 'Email me at founder@example.com' },
+      { role: 'Founder', offers: ['Book time at https://example.com/cal'] },
+      { role: 'Founder', wants: ['Call +1 415 555 1212'] },
+      { role: 'Founder', interests: ['DM @private_founder'] },
+      { role: 'Founder', favoriteMedia: ['Read more at privatefounder.io'] },
+    ]) {
+      try {
+        normalizeEventPublicCard(publicCard);
+        throw new Error('Expected public card to reject contact value');
+      } catch (error) {
+        expectNetworkingCode(error, 'contact_field_not_public');
+      }
+    }
+  });
+
   test('rejects sensitive demographic public fields', () => {
     try {
       normalizeEventPublicCard({

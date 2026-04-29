@@ -51,6 +51,15 @@ const ALLOWED_AVATAR_ASSET_IDS: Record<keyof EventAvatarConfig, readonly string[
   accessory: ['none', 'glasses', 'earpiece'],
 };
 
+const CONTACT_VALUE_PATTERNS = [
+  /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i,
+  /\b(?:https?:\/\/|www\.)\S+/i,
+  /\b[a-z0-9-]+\.(?:ai|app|co|com|dev|io|me|net|org|xyz)(?:\/\S*)?\b/i,
+  /(?:^|[^\d])\+?\d[\d\s().-]{7,}\d(?:$|[^\d])/,
+  /(?:^|\s)@[a-z0-9_][a-z0-9_.-]{1,30}\b/i,
+  /\b(?:email|e-mail|call|text|phone|linkedin|twitter|x\.com|contact me|reach me)\b/i,
+] as const;
+
 export function normalizeEventPublicCard(input: unknown): EventPublicCard {
   if (!isPlainRecord(input)) {
     throw networkingError('invalid_public_field', 'publicCard must be an object.');
@@ -181,6 +190,7 @@ function optionalText(value: unknown, fieldName: string) {
       `${fieldName} must be ${MAX_EVENT_PUBLIC_TEXT_LENGTH} characters or fewer.`,
     );
   }
+  assertNoContactValue(normalized, fieldName);
   return normalized;
 }
 
@@ -216,9 +226,19 @@ function optionalTextList(value: unknown, fieldName: string) {
         `${fieldName} items must be ${MAX_EVENT_PUBLIC_TEXT_LENGTH} characters or fewer.`,
       );
     }
+    assertNoContactValue(item, fieldName);
   }
 
   return Array.from(new Set(normalized));
+}
+
+function assertNoContactValue(value: string, fieldName: string) {
+  if (CONTACT_VALUE_PATTERNS.some((pattern) => pattern.test(value))) {
+    throw networkingError(
+      'contact_field_not_public',
+      `${fieldName} contains contact information that cannot be included in the public event card.`,
+    );
+  }
 }
 
 function requireAvatarAsset(value: unknown, category: (typeof REQUIRED_AVATAR_CATEGORIES)[number]) {
