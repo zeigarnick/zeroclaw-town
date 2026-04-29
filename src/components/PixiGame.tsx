@@ -2,6 +2,7 @@ import * as PIXI from 'pixi.js';
 import { Container, Graphics, Text, useApp } from '@pixi/react';
 import { Player, SelectElement } from './Player.tsx';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Character } from './Character.tsx';
 import {
   hasAboveCharacterFixedSprites,
   PixiFixedSprites,
@@ -39,6 +40,7 @@ import {
   MapNavigationPointerStart,
   shouldCompleteMapNavigationPointer,
 } from './pixiMapNavigation.ts';
+import { characters } from '../../data/characters.ts';
 
 const NETWORKING_BADGE_META: Record<
   NetworkingTownStatus,
@@ -343,26 +345,26 @@ function EventAgentMarker({
   marker: EventTownMarker;
   onSelect?: (marker: EventTownMarker) => void;
 }) {
+  const character = useMemo(
+    () => characters.find((candidate) => candidate.name === marker.characterName) ?? characters[0],
+    [marker.characterName],
+  );
   const draw = useCallback(
     (g: PIXI.Graphics) => {
       g.clear();
-      g.beginFill(0x181425, 0.65);
+      g.beginFill(0x181425, 0.38);
+      g.drawEllipse(0, 12, 14, 5);
+      g.endFill();
+      g.beginFill(0x181425, 0.72);
       g.drawRoundedRect(-36, 18, 72, 16, 4);
       g.endFill();
       g.beginFill(marker.accent, 1);
-      g.drawCircle(0, 0, 15);
-      g.endFill();
-      g.beginFill(marker.fill, 1);
-      g.drawCircle(0, -3, 10);
-      g.endFill();
-      g.beginFill(0x181425, 1);
-      g.drawCircle(-4, -5, 1.4);
-      g.drawCircle(4, -5, 1.4);
+      g.drawRoundedRect(-34, 19, 68, 2, 1);
       g.endFill();
     },
-    [marker.accent, marker.fill],
+    [marker.accent],
   );
-  const hitArea = useMemo(() => new PIXI.Rectangle(-40, -22, 80, 60), []);
+  const hitArea = useMemo(() => new PIXI.Rectangle(-40, -26, 80, 64), []);
   const stopMarkerPropagation = useCallback((event: PIXI.FederatedPointerEvent) => {
     event.stopPropagation();
   }, []);
@@ -386,6 +388,15 @@ function EventAgentMarker({
       pointerupoutside={stopMarkerPropagation}
     >
       <Graphics draw={draw} />
+      <Character
+        x={0}
+        y={0}
+        orientation={180}
+        textureUrl={character.textureUrl}
+        spritesheetData={character.spritesheetData}
+        speed={character.speed}
+        onClick={() => undefined}
+      />
       <Text
         x={0}
         y={26}

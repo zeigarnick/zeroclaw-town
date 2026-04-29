@@ -7,12 +7,34 @@ export type EventTownMarker = {
   displayName: string;
   avatarConfig: EventAvatarConfig;
   avatarSummary: string;
+  characterName: EventTownMarkerCharacterName;
   publicCard: EventPublicCard;
   x: number;
   y: number;
   fill: number;
   accent: number;
 };
+
+export type EventTownMarkerCharacterName =
+  | 'f1'
+  | 'f2'
+  | 'f3'
+  | 'f4'
+  | 'f5'
+  | 'f6'
+  | 'f7'
+  | 'f8';
+
+const EVENT_MARKER_CHARACTER_NAMES: EventTownMarkerCharacterName[] = [
+  'f1',
+  'f2',
+  'f3',
+  'f4',
+  'f5',
+  'f6',
+  'f7',
+  'f8',
+];
 
 const SKIN_TONE_COLORS: Record<string, number> = {
   'tone-1': 0xf6d6bd,
@@ -57,6 +79,7 @@ export function buildEventTownMarkers({
       displayName: agent.displayName,
       avatarConfig,
       avatarSummary: describeAvatar(avatarConfig),
+      characterName: characterNameForAvatar(agent.slug, avatarConfig),
       publicCard: agent.publicCard!,
       x: position.x * tileDim + tileDim / 2,
       y: position.y * tileDim + tileDim / 2,
@@ -81,18 +104,36 @@ function describeAvatar(avatarConfig: EventAvatarConfig) {
   return details.join(' | ');
 }
 
+function characterNameForAvatar(
+  seed: string,
+  avatarConfig: EventAvatarConfig,
+): EventTownMarkerCharacterName {
+  const hash = hashString(
+    [
+      seed,
+      avatarConfig.hair,
+      avatarConfig.skinTone,
+      avatarConfig.clothing,
+      avatarConfig.hat ?? 'none',
+      avatarConfig.accessory ?? 'none',
+    ].join(':'),
+  );
+  return EVENT_MARKER_CHARACTER_NAMES[hash % EVENT_MARKER_CHARACTER_NAMES.length];
+}
+
 function deterministicTilePosition(
   seed: string,
   index: number,
   mapWidth: number,
   mapHeight: number,
 ) {
+  const minY = Math.min(Math.max(4, Math.floor(mapHeight / 3)), Math.max(0, mapHeight - 1));
   const usableWidth = Math.max(1, mapWidth - 8);
-  const usableHeight = Math.max(1, mapHeight - 8);
+  const usableHeight = Math.max(1, mapHeight - minY - 3);
   const hash = hashString(`${seed}:${index}`);
   return {
     x: 4 + (hash % usableWidth),
-    y: 4 + (Math.floor(hash / usableWidth) % usableHeight),
+    y: minY + (Math.floor(hash / usableWidth) % usableHeight),
   };
 }
 

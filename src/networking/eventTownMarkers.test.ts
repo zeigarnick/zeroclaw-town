@@ -51,6 +51,7 @@ describe('event town markers', () => {
       markerSlug: 'attendee-a',
       displayName: 'Cedar Scout 123',
       avatarSummary: 'Hair: curly | Skin tone: tone-3 | Clothing: jacket | Accessory: glasses',
+      characterName: expect.stringMatching(/^f[1-8]$/),
       publicCard: {
         role: 'Founder',
         category: 'Climate',
@@ -68,6 +69,62 @@ describe('event town markers', () => {
     expect(marker.y).toBeGreaterThan(0);
     expect(JSON.stringify(marker)).not.toContain('eventAgents:1');
     expect(JSON.stringify(marker)).not.toContain('person@example.com');
+  });
+
+  test('keeps unbound event avatar markers out of the top harbor band', () => {
+    const markers = buildEventTownMarkers({
+      agents: Array.from({ length: 12 }, (_, index) =>
+        eventAgent({
+          slug: `attendee-${index}`,
+        }),
+      ),
+      mapWidth: 24,
+      mapHeight: 18,
+      tileDim: 32,
+    });
+
+    expect(markers).toHaveLength(12);
+    for (const marker of markers) {
+      expect(marker.y).toBeGreaterThanOrEqual(6 * 32);
+    }
+  });
+
+  test('maps avatar config changes to stable AI Town character presets', () => {
+    const [firstMarker] = buildEventTownMarkers({
+      agents: [
+        eventAgent({
+          slug: 'attendee-a',
+          avatarConfig: {
+            hair: 'short',
+            skinTone: 'tone-1',
+            clothing: 'tee',
+          },
+        }),
+      ],
+      mapWidth: 32,
+      mapHeight: 32,
+      tileDim: 16,
+    });
+    const [secondMarker] = buildEventTownMarkers({
+      agents: [
+        eventAgent({
+          slug: 'attendee-a',
+          avatarConfig: {
+            hair: 'braids',
+            skinTone: 'tone-5',
+            clothing: 'blazer',
+            hat: 'beanie',
+          },
+        }),
+      ],
+      mapWidth: 32,
+      mapHeight: 32,
+      tileDim: 16,
+    });
+
+    expect(firstMarker.characterName).toMatch(/^f[1-8]$/);
+    expect(secondMarker.characterName).toMatch(/^f[1-8]$/);
+    expect(firstMarker.characterName).not.toBe(secondMarker.characterName);
   });
 
   test('copies only display-safe marker fields from unexpected source data', () => {
@@ -178,3 +235,43 @@ describe('event town markers', () => {
     ).toEqual([]);
   });
 });
+
+function eventAgent(
+  overrides: Partial<NetworkingTownAgent> = {},
+): NetworkingTownAgent {
+  return {
+    source: 'event',
+    eventId: 'demo-event',
+    agentId: 'eventAgents:fixture' as any,
+    slug: 'attendee-fixture',
+    displayName: 'Cedar Scout 123',
+    avatarConfig: {
+      hair: 'curly',
+      skinTone: 'tone-3',
+      clothing: 'jacket',
+    },
+    publicCard: {
+      role: 'Founder',
+      category: 'Climate',
+      offers: ['GTM help'],
+      wants: ['seed feedback'],
+      lookingFor: 'Climate operators',
+      hobbies: ['cycling'],
+      interests: ['energy'],
+      favoriteMedia: ['The Expanse'],
+    },
+    cards: [],
+    matchedAgents: [],
+    pendingMeetingAgents: [],
+    talkingAgents: [],
+    introReadyAgents: [],
+    counts: {
+      matched: 0,
+      pending_meeting: 0,
+      talking: 0,
+      intro_ready: 0,
+    },
+    updatedAt: 1,
+    ...overrides,
+  };
+}

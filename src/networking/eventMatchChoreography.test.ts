@@ -13,6 +13,7 @@ function marker(overrides: Partial<EventTownMarker>): EventTownMarker {
       clothing: 'jacket',
     },
     avatarSummary: 'Hair: curly | Skin tone: tone-3 | Clothing: jacket',
+    characterName: 'f1',
     publicCard: {
       role: 'Founder',
       offers: [],

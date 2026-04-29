@@ -14,6 +14,7 @@ function markerFixture(): EventTownMarker {
       accessory: 'glasses',
     },
     avatarSummary: 'Hair: curly | Skin tone: tone-3 | Clothing: jacket | Accessory: glasses',
+    characterName: 'f1',
     publicCard: {
       role: 'Founder',
       category: 'Climate',
