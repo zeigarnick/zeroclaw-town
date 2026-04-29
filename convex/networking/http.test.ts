@@ -227,6 +227,59 @@ describe('networking HTTP helpers', () => {
     });
   });
 
+  test('routes event directory search through the event API envelope', async () => {
+    const calls: Array<{ kind: string; args: any }> = [];
+    const response = await handleNetworkingHttpRequest(
+      {
+        runMutation: async () => {
+          throw new Error('unexpected mutation');
+        },
+        runQuery: async (_funcRef, args) => {
+          calls.push({ kind: 'query', args });
+          return [
+            {
+              eventId: args.eventId,
+              eventAgentId: 'eventAgents:1',
+              displayName: 'Cedar Scout 123',
+              publicCard: { role: 'Founder', offers: ['GTM help'] },
+            },
+          ];
+        },
+      },
+      new Request(
+        'https://town.example/api/v1/events/demo-event/directory?q=climate&category=Climate&offers=GTM,operator%20intros&wants=seed%20feedback',
+        {
+          method: 'GET',
+        },
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await readJson(response)).toEqual({
+      success: true,
+      data: [
+        {
+          eventId: 'demo-event',
+          eventAgentId: 'eventAgents:1',
+          displayName: 'Cedar Scout 123',
+          publicCard: { role: 'Founder', offers: ['GTM help'] },
+        },
+      ],
+    });
+    expect(calls[0]).toMatchObject({
+      kind: 'query',
+      args: {
+        eventId: 'demo-event',
+        filters: {
+          q: 'climate',
+          category: 'Climate',
+          offers: ['GTM', 'operator intros'],
+          wants: ['seed feedback'],
+        },
+      },
+    });
+  });
+
   test('wraps representative route errors in stable JSON envelopes', async () => {
     const response = await handleNetworkingHttpRequest(
       {

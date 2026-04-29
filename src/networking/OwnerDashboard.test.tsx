@@ -179,6 +179,60 @@ describe('OwnerDashboard HttpApiAdapter', () => {
     });
   });
 
+  test('searches the event directory with structured public filters only', async () => {
+    const fetchMock = createFetchMock({
+      body: {
+        success: true,
+        data: [
+          {
+            _id: 'eventNetworkingCards:1',
+            eventId: 'demo-event',
+            eventAgentId: 'eventAgents:1',
+            displayName: 'Cedar Scout 123',
+            avatarConfig: {
+              hair: 'curly',
+              skinTone: 'tone-3',
+              clothing: 'jacket',
+            },
+            publicCard: {
+              role: 'Founder',
+              category: 'Climate',
+              offers: ['GTM help'],
+              wants: ['seed feedback'],
+              lookingFor: 'Climate operators',
+              hobbies: ['cycling'],
+              interests: ['energy'],
+              favoriteMedia: ['The Expanse'],
+            },
+            approvedAt: 1710000000000,
+            updatedAt: 1710000000000,
+          },
+        ],
+      },
+    });
+    const adapter = new HttpApiAdapter('/api/v1', fetchMock as typeof fetch);
+
+    const response = await adapter.searchEventDirectory({
+      eventId: 'demo-event',
+      q: 'climate',
+      category: 'Climate',
+      offers: ['GTM help'],
+      wants: ['seed feedback'],
+    });
+
+    expect(isError(response)).toBe(false);
+    if (!isError(response)) {
+      expect(response.data[0].eventAgentId).toBe('eventAgents:1');
+      expect(response.data[0].publicCard.offers).toEqual(['GTM help']);
+      expect(JSON.stringify(response.data)).not.toContain('agentIdentifier');
+      expect(JSON.stringify(response.data)).not.toContain('email');
+    }
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      '/api/v1/events/demo-event/directory?q=climate&category=Climate&offers=GTM+help&wants=seed+feedback',
+    );
+    expect(getRequestInit(fetchMock).method).toBe('GET');
+  });
+
   test('maps meeting request/action routes to recommendationId and meetingId endpoints', async () => {
     const fetchMock = createFetchMock(
       {

@@ -312,7 +312,7 @@ function toOwnerReview(
   };
 }
 
-function normalizeEventId(eventId: string) {
+export function normalizeEventId(eventId: string) {
   const normalized = eventId.trim().toLowerCase().replace(/[^a-z0-9-]+/g, '-');
   if (!normalized) {
     throw networkingError('invalid_public_field', 'eventId is required.');

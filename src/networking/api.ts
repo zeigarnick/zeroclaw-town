@@ -203,6 +203,30 @@ export type EventPublicCard = {
   favoriteMedia: string[];
 };
 
+export interface EventDirectoryResult {
+  id: string;
+  eventId: string;
+  eventAgentId: string;
+  displayName: string;
+  avatarConfig: EventAvatarConfig;
+  publicCard: EventPublicCard;
+  approvedAt?: number;
+  updatedAt: number;
+}
+
+export interface SearchEventDirectoryRequest {
+  eventId: string;
+  q?: string;
+  role?: string;
+  category?: string;
+  offers?: string[];
+  wants?: string[];
+  lookingFor?: string;
+  hobbies?: string[];
+  interests?: string[];
+  favoriteMedia?: string[];
+}
+
 export type EventOwnerReviewStatus =
   | 'pending'
   | 'approved'
@@ -282,6 +306,9 @@ export interface IApiAdapter {
   reviewEventOwnerCard(
     req: ReviewEventOwnerCardRequest,
   ): Promise<ApiResponse<EventOwnerReviewData>>;
+  searchEventDirectory(
+    req: SearchEventDirectoryRequest,
+  ): Promise<ApiResponse<EventDirectoryResult[]>>;
 }
 
 type FetchLike = typeof fetch;
@@ -524,6 +551,20 @@ function normalizeEventOwnerReview(value: unknown): EventOwnerReviewData {
     publicCard: normalizeEventPublicCard(row.publicCard),
     reviewNote: typeof row.reviewNote === 'string' ? row.reviewNote : undefined,
     createdAt: typeof row.createdAt === 'number' ? row.createdAt : 0,
+    updatedAt: typeof row.updatedAt === 'number' ? row.updatedAt : 0,
+  };
+}
+
+function normalizeEventDirectoryResult(value: unknown): EventDirectoryResult {
+  const row = asRecord(value);
+  return {
+    id: normalizeId(row),
+    eventId: typeof row.eventId === 'string' ? row.eventId : '',
+    eventAgentId: typeof row.eventAgentId === 'string' ? row.eventAgentId : '',
+    displayName: typeof row.displayName === 'string' ? row.displayName : '',
+    avatarConfig: normalizeAvatarConfig(row.avatarConfig),
+    publicCard: normalizeEventPublicCard(row.publicCard),
+    approvedAt: typeof row.approvedAt === 'number' ? row.approvedAt : undefined,
     updatedAt: typeof row.updatedAt === 'number' ? row.updatedAt : 0,
   };
 }
@@ -833,6 +874,29 @@ export class HttpApiAdapter implements IApiAdapter {
     return { success: true, data: normalizeEventOwnerReview(response.data) };
   }
 
+  async searchEventDirectory(
+    req: SearchEventDirectoryRequest,
+  ): Promise<ApiResponse<EventDirectoryResult[]>> {
+    const response = await this.request<unknown[]>(`/events/${req.eventId}/directory`, {
+      method: 'GET',
+      query: {
+        q: req.q,
+        role: req.role,
+        category: req.category,
+        offers: joinQueryList(req.offers),
+        wants: joinQueryList(req.wants),
+        lookingFor: req.lookingFor,
+        hobbies: joinQueryList(req.hobbies),
+        interests: joinQueryList(req.interests),
+        favoriteMedia: joinQueryList(req.favoriteMedia),
+      },
+    });
+    if (!response.success) {
+      return response;
+    }
+    return { success: true, data: response.data.map((item) => normalizeEventDirectoryResult(item)) };
+  }
+
   private async request<T>(
     path: string,
     options: {
@@ -926,6 +990,10 @@ export class HttpApiAdapter implements IApiAdapter {
     const searchString = search.toString();
     return searchString ? `${base}?${searchString}` : base;
   }
+}
+
+function joinQueryList(values: string[] | undefined) {
+  return values?.length ? values.join(',') : undefined;
 }
 
 export function getClaimTokenFromUrl(claimUrl: string): string {

@@ -59,6 +59,11 @@ const functions = {
       'networking/eventAgents:listApprovedPublicCards',
     ),
   },
+  eventDirectory: {
+    searchEventDirectory: makeFunctionReference<'query'>(
+      'networking/eventDirectory:searchEventDirectory',
+    ),
+  },
   cards: {
     createCard: makeFunctionReference<'mutation'>('networking/cards:createCard'),
     listCards: makeFunctionReference<'query'>('networking/cards:listCards'),
@@ -169,6 +174,29 @@ export async function handleNetworkingHttpRequest(
     ) {
       const data = await ctx.runQuery(functions.eventAgents.listApprovedPublicCards, {
         eventId: requirePathId(route[1], 'eventId'),
+      });
+      return jsonSuccess(data);
+    }
+
+    if (
+      request.method === 'GET' &&
+      route[0] === 'events' &&
+      route[2] === 'directory' &&
+      route.length === 3
+    ) {
+      const data = await ctx.runQuery(functions.eventDirectory.searchEventDirectory, {
+        eventId: requirePathId(route[1], 'eventId'),
+        filters: {
+          q: optionalQueryParam(url.searchParams, 'q'),
+          role: optionalQueryParam(url.searchParams, 'role'),
+          category: optionalQueryParam(url.searchParams, 'category'),
+          offers: optionalQueryParamList(url.searchParams, 'offers'),
+          wants: optionalQueryParamList(url.searchParams, 'wants'),
+          lookingFor: optionalQueryParam(url.searchParams, 'lookingFor'),
+          hobbies: optionalQueryParamList(url.searchParams, 'hobbies'),
+          interests: optionalQueryParamList(url.searchParams, 'interests'),
+          favoriteMedia: optionalQueryParamList(url.searchParams, 'favoriteMedia'),
+        },
       });
       return jsonSuccess(data);
     }
@@ -507,6 +535,18 @@ function requirePathId(value: string | undefined, fieldName: string) {
 function optionalQueryParam(searchParams: URLSearchParams, key: string) {
   const value = searchParams.get(key);
   return value === null ? undefined : value;
+}
+
+function optionalQueryParamList(searchParams: URLSearchParams, key: string) {
+  const values = searchParams.getAll(key);
+  if (values.length === 0) {
+    return undefined;
+  }
+  const items = values
+    .flatMap((value) => value.split(','))
+    .map((value) => value.trim())
+    .filter(Boolean);
+  return items.length === 0 ? undefined : items;
 }
 
 function requireQueryParam(searchParams: URLSearchParams, key: string) {
