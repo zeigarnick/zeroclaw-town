@@ -16,7 +16,10 @@ type TableName =
   | 'eventContactReveals'
   | 'eventActivityEvents'
   | 'eventActivityAggregates'
-  | 'eventOwnerSessions';
+  | 'eventOwnerSessions'
+  | 'eventSpaces'
+  | 'worldStatus'
+  | 'inputs';
 type Row = Record<string, any> & { _id: string };
 
 function createMockCtx() {
@@ -30,6 +33,9 @@ function createMockCtx() {
     eventActivityEvents: [],
     eventActivityAggregates: [],
     eventOwnerSessions: [],
+    eventSpaces: [],
+    worldStatus: [],
+    inputs: [],
   };
   const counters: Record<TableName, number> = {
     eventAgents: 0,
@@ -41,6 +47,9 @@ function createMockCtx() {
     eventActivityEvents: 0,
     eventActivityAggregates: 0,
     eventOwnerSessions: 0,
+    eventSpaces: 0,
+    worldStatus: 0,
+    inputs: 0,
   };
 
   const db = {
@@ -73,7 +82,14 @@ function createMockCtx() {
         );
         return {
           first: async () => rows[0] ?? null,
+          unique: async () => rows[0] ?? null,
           collect: async () => rows,
+          order: (direction: 'asc' | 'desc') => ({
+            first: async () =>
+              [...rows].sort((left, right) =>
+                direction === 'desc' ? right.number - left.number : left.number - right.number,
+              )[0] ?? null,
+          }),
         };
       },
     }),

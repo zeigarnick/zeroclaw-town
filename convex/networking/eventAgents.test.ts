@@ -17,7 +17,8 @@ type TableName =
   | 'worlds'
   | 'worldStatus'
   | 'maps'
-  | 'engines';
+  | 'engines'
+  | 'inputs';
 type Row = Record<string, any> & { _id: string };
 
 function createMockCtx() {
@@ -31,6 +32,7 @@ function createMockCtx() {
     worldStatus: [],
     maps: [],
     engines: [],
+    inputs: [],
   };
   const counters: Record<TableName, number> = {
     eventSpaces: 0,
@@ -42,6 +44,7 @@ function createMockCtx() {
     worldStatus: 0,
     maps: 0,
     engines: 0,
+    inputs: 0,
   };
 
   const db = {
@@ -74,7 +77,14 @@ function createMockCtx() {
         );
         return {
           first: async () => rows[0] ?? null,
+          unique: async () => rows[0] ?? null,
           collect: async () => rows,
+          order: (direction: 'asc' | 'desc') => ({
+            first: async () =>
+              [...rows].sort((left, right) =>
+                direction === 'desc' ? right.number - left.number : left.number - right.number,
+              )[0] ?? null,
+          }),
         };
       },
     }),
