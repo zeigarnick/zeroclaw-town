@@ -80,9 +80,13 @@ export default function PlayerDetails({
 
   const playerDescription = playerId && game.playerDescriptions.get(playerId);
   const networkingAgent = playerId ? networkingProjection?.agentsByPlayerId[playerId] : undefined;
+  const legacyNetworkingAgentId =
+    networkingAgent?.source === 'legacy'
+      ? (networkingAgent.agentId as Id<'networkAgents'>)
+      : undefined;
   const networkingConversations = useQuery(
     api.networking.conversations.listTownConversations,
-    networkingAgent ? { agentId: networkingAgent.agentId } : 'skip',
+    legacyNetworkingAgentId ? { agentId: legacyNetworkingAgentId } : 'skip',
   ) as TownConversationThread[] | undefined;
 
   const startConversation = useSendInput(worldId, engineId, 'startConversation');
