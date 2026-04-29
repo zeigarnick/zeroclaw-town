@@ -2,7 +2,6 @@ import * as PIXI from 'pixi.js';
 import { Container, Graphics, Text, useApp } from '@pixi/react';
 import { Player, SelectElement } from './Player.tsx';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Character } from './Character.tsx';
 import {
   hasAboveCharacterFixedSprites,
   PixiFixedSprites,
@@ -28,19 +27,16 @@ import type {
 import { useHistoricalValue } from '../hooks/useHistoricalValue.ts';
 import { Location, locationFields, playerLocation } from '../../convex/aiTown/location.ts';
 import { Player as ServerPlayer } from '../../convex/aiTown/player.ts';
-import { buildEventTownMarkers } from '../networking/eventTownMarkers.ts';
-import type { EventTownMarker } from '../networking/eventTownMarkers.ts';
 import {
-  buildEventMatchChoreography,
-  hasActiveEventMatchChoreography,
-} from '../networking/eventMatchChoreography.ts';
-import type { EventMatchBubble } from '../networking/eventMatchChoreography.ts';
+  buildEventMatchBubbles,
+  hasActiveEventMatchBubbles,
+  type EventMatchBubble,
+} from '../networking/eventMatchBubbles.ts';
 import {
   beginMapNavigationPointer,
   MapNavigationPointerStart,
   shouldCompleteMapNavigationPointer,
 } from './pixiMapNavigation.ts';
-import { characters } from '../../data/characters.ts';
 
 const NETWORKING_BADGE_META: Record<
   NetworkingTownStatus,
@@ -60,7 +56,6 @@ export const PixiGame = (props: {
   width: number;
   height: number;
   setSelectedElement: SelectElement;
-  onSelectEventTownMarker?: (marker: EventTownMarker) => void;
   networkingProjection?: NetworkingTownProjection;
 }) => {
   // PIXI setup.
@@ -125,24 +120,14 @@ export const PixiGame = (props: {
     [props.game.worldMap.aboveCharacterLayers, props.game.worldMap.visualLayers],
   );
   const players = [...props.game.world.players.values()];
-  const eventTownMarkers = useMemo(
-    () =>
-      buildEventTownMarkers({
-        agents: props.networkingProjection?.agents ?? [],
-        mapWidth: width,
-        mapHeight: height,
-        tileDim,
-      }),
-    [props.networkingProjection?.agents, width, height, tileDim],
-  );
-  const [matchChoreographyNow, setMatchChoreographyNow] = useState(() => Date.now());
+  const [matchBubbleNow, setMatchBubbleNow] = useState(() => Date.now());
   const eventActivity = props.networkingProjection?.eventActivity;
   useEffect(() => {
     let frameId: number | undefined;
     const tick = () => {
       const nowMs = Date.now();
-      setMatchChoreographyNow(nowMs);
-      if (hasActiveEventMatchChoreography({ activity: eventActivity, nowMs })) {
+      setMatchBubbleNow(nowMs);
+      if (hasActiveEventMatchBubbles({ activity: eventActivity, nowMs })) {
         frameId = window.requestAnimationFrame(tick);
       }
     };
@@ -154,15 +139,16 @@ export const PixiGame = (props: {
       }
     };
   }, [eventActivity]);
-  const matchChoreography = useMemo(
+  const matchBubbles = useMemo(
     () =>
-      buildEventMatchChoreography({
-        markers: eventTownMarkers,
+      buildEventMatchBubbles({
+        players,
+        agents: props.networkingProjection?.agents ?? [],
         activity: eventActivity,
-        nowMs: matchChoreographyNow,
+        nowMs: matchBubbleNow,
         tileDim,
       }),
-    [eventActivity, eventTownMarkers, matchChoreographyNow, tileDim],
+    [eventActivity, players, props.networkingProjection?.agents, matchBubbleNow, tileDim],
   );
 
   // Zoom on the user’s avatar when it is created
@@ -214,14 +200,9 @@ export const PixiGame = (props: {
       {hasAboveCharacterFixedSprites(props.game.worldMap) && (
         <PixiFixedSprites map={props.game.worldMap} renderLayer="aboveCharacters" />
       )}
-      {matchChoreography.markers.map((marker) => (
-        <EventAgentMarker
-          key={marker.key}
-          marker={marker}
-          onSelect={props.onSelectEventTownMarker}
-        />
+      {matchBubbles.map((bubble) => (
+        <EventMatchBubbleMarker key={bubble.key} bubble={bubble} />
       ))}
-      {matchChoreography.bubble && <EventMatchBubbleMarker bubble={matchChoreography.bubble} />}
       {players.map((p) => {
         const networkingAgent = props.networkingProjection?.agentsByPlayerId[p.id];
         return networkingAgent?.primaryStatus ? (
@@ -331,83 +312,6 @@ function EventMatchBubbleMarker({ bubble }: { bubble: EventMatchBubble }) {
             fill: 0x181425,
             fontFamily: 'VCR OSD Mono, monospace',
             fontSize: 10,
-          })
-        }
-      />
-    </Container>
-  );
-}
-
-function EventAgentMarker({
-  marker,
-  onSelect,
-}: {
-  marker: EventTownMarker;
-  onSelect?: (marker: EventTownMarker) => void;
-}) {
-  const character = useMemo(
-    () => characters.find((candidate) => candidate.name === marker.characterName) ?? characters[0],
-    [marker.characterName],
-  );
-  const draw = useCallback(
-    (g: PIXI.Graphics) => {
-      g.clear();
-      g.beginFill(0x181425, 0.38);
-      g.drawEllipse(0, 12, 14, 5);
-      g.endFill();
-      g.beginFill(0x181425, 0.72);
-      g.drawRoundedRect(-36, 18, 72, 16, 4);
-      g.endFill();
-      g.beginFill(marker.accent, 1);
-      g.drawRoundedRect(-34, 19, 68, 2, 1);
-      g.endFill();
-    },
-    [marker.accent],
-  );
-  const hitArea = useMemo(() => new PIXI.Rectangle(-40, -26, 80, 64), []);
-  const stopMarkerPropagation = useCallback((event: PIXI.FederatedPointerEvent) => {
-    event.stopPropagation();
-  }, []);
-  const handlePointerUp = useCallback(
-    (event: PIXI.FederatedPointerEvent) => {
-      event.stopPropagation();
-      onSelect?.(marker);
-    },
-    [marker, onSelect],
-  );
-
-  return (
-    <Container
-      x={marker.x}
-      y={marker.y}
-      interactive={true}
-      cursor="pointer"
-      hitArea={hitArea}
-      pointerdown={stopMarkerPropagation}
-      pointerup={handlePointerUp}
-      pointerupoutside={stopMarkerPropagation}
-    >
-      <Graphics draw={draw} />
-      <Character
-        x={0}
-        y={0}
-        orientation={180}
-        textureUrl={character.textureUrl}
-        spritesheetData={character.spritesheetData}
-        speed={character.speed}
-        onClick={() => undefined}
-      />
-      <Text
-        x={0}
-        y={26}
-        text={marker.displayName}
-        anchor={{ x: 0.5, y: 0.5 }}
-        style={
-          new PIXI.TextStyle({
-            align: 'center',
-            fill: 0xffffff,
-            fontFamily: 'VCR OSD Mono, monospace',
-            fontSize: 8,
           })
         }
       />

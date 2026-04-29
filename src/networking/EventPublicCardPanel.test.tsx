@@ -1,11 +1,9 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { EventPublicCardPanel } from './EventPublicCardPanel';
-import type { EventTownMarker } from './eventTownMarkers';
+import type { NetworkingTownAgent } from '../../convex/networking/townProjection';
 
-function markerFixture(): EventTownMarker {
+function agentFixture(): Pick<NetworkingTownAgent, 'displayName' | 'avatarConfig' | 'publicCard'> {
   return {
-    key: 'demo-event:public-marker-42',
-    markerSlug: 'public-marker-42',
     displayName: 'Cedar Scout 123',
     avatarConfig: {
       hair: 'curly',
@@ -13,8 +11,6 @@ function markerFixture(): EventTownMarker {
       clothing: 'jacket',
       accessory: 'glasses',
     },
-    avatarSummary: 'Hair: curly | Skin tone: tone-3 | Clothing: jacket | Accessory: glasses',
-    characterName: 'f1',
     publicCard: {
       role: 'Founder',
       category: 'Climate',
@@ -25,28 +21,24 @@ function markerFixture(): EventTownMarker {
       interests: ['energy'],
       favoriteMedia: ['The Expanse'],
     },
-    x: 10,
-    y: 20,
-    fill: 0x8f563b,
-    accent: 0x3a4466,
   };
 }
 
 describe('EventPublicCardPanel', () => {
   test('renders only display-safe public-card fields and a close action', () => {
-    const marker = markerFixture() as EventTownMarker & {
+    const agent = agentFixture() as ReturnType<typeof agentFixture> & {
       eventAgentId?: string;
       ownerSessionToken?: string;
       email?: string;
-      publicCard: EventTownMarker['publicCard'] & { linkedin?: string };
+      publicCard: NonNullable<NetworkingTownAgent['publicCard']> & { linkedin?: string };
     };
-    marker.eventAgentId = 'eventAgents:private-raw-id';
-    marker.ownerSessionToken = 'event_owner_private';
-    marker.email = 'person@example.com';
-    marker.publicCard.linkedin = 'https://linkedin.com/in/private';
+    agent.eventAgentId = 'eventAgents:private-raw-id';
+    agent.ownerSessionToken = 'event_owner_private';
+    agent.email = 'person@example.com';
+    agent.publicCard.linkedin = 'https://linkedin.com/in/private';
 
     const markup = renderToStaticMarkup(
-      <EventPublicCardPanel marker={marker} onClose={() => undefined} />,
+      <EventPublicCardPanel agent={agent} onClose={() => undefined} />,
     );
 
     expect(markup).toContain('Cedar Scout 123');

@@ -1,26 +1,29 @@
-import type { EventTownMarker } from './eventTownMarkers';
+import type { NetworkingTownAgent } from '../../convex/networking/townProjection';
 
 export function EventPublicCardPanel({
-  marker,
+  agent,
   onClose,
 }: {
-  marker: EventTownMarker;
+  agent: Pick<NetworkingTownAgent, 'displayName' | 'avatarConfig' | 'publicCard'>;
   onClose: () => void;
 }) {
-  const card = marker.publicCard;
+  const card = agent.publicCard;
+  if (!card || !agent.avatarConfig) {
+    return null;
+  }
 
   return (
     <aside
-      aria-label={`${marker.displayName} public card`}
+      aria-label={`${agent.displayName} public card`}
       className="pointer-events-auto absolute inset-y-0 right-0 z-20 flex w-full max-w-md border-l-4 border-brown-900 bg-brown-900/95 text-white shadow-2xl sm:max-w-lg"
     >
       <div className="h-full w-full overflow-y-auto p-4 sm:p-5">
         <div className="mb-5 flex items-start justify-between gap-4">
           <div className="min-w-0">
             <p className="text-xs font-medium uppercase text-white/60">Event public card</p>
-            <h2 className="mt-1 text-2xl font-semibold text-balance">{marker.displayName}</h2>
+            <h2 className="mt-1 text-2xl font-semibold text-balance">{agent.displayName}</h2>
             <p className="mt-2 text-sm leading-6 text-white/70 text-pretty">
-              {marker.avatarSummary}
+              {describeAvatar(agent.avatarConfig)}
             </p>
           </div>
           <button
@@ -45,6 +48,21 @@ export function EventPublicCardPanel({
       </div>
     </aside>
   );
+}
+
+function describeAvatar(agent: NonNullable<NetworkingTownAgent['avatarConfig']>) {
+  const details = [
+    `Hair: ${agent.hair}`,
+    `Skin tone: ${agent.skinTone}`,
+    `Clothing: ${agent.clothing}`,
+  ];
+  if (agent.hat) {
+    details.push(`Hat: ${agent.hat}`);
+  }
+  if (agent.accessory) {
+    details.push(`Accessory: ${agent.accessory}`);
+  }
+  return details.join(' | ');
 }
 
 function Field({ label, value }: { label: string; value?: string }) {
