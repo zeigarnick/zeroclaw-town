@@ -5,6 +5,7 @@ import {
   listApprovedPublicCardsHandler,
   registerEventAgentHandler,
 } from './eventAgents';
+import { resetEventRateLimitTestState } from './eventRateLimits';
 
 type TableName =
   | 'eventSpaces'
@@ -131,6 +132,14 @@ function avatarConfig() {
 }
 
 describe('event agent handlers', () => {
+  beforeEach(() => {
+    resetEventRateLimitTestState();
+  });
+
+  afterEach(() => {
+    resetEventRateLimitTestState();
+  });
+
   test('registers an event-scoped pseudonymous agent with pending owner review', async () => {
     const { ctx, tables } = createMockCtx();
 

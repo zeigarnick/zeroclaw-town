@@ -15,7 +15,11 @@ type TableName =
   | 'eventOwnerSessions'
   | 'eventOrganizerAuditEvents'
   | 'eventConnectionIntents'
-  | 'eventRecipientRules';
+  | 'eventRecipientRules'
+  | 'worlds'
+  | 'worldStatus'
+  | 'maps'
+  | 'engines';
 type Row = Record<string, any> & { _id: string };
 
 function createMockCtx() {
@@ -27,6 +31,10 @@ function createMockCtx() {
     eventOrganizerAuditEvents: [],
     eventConnectionIntents: [],
     eventRecipientRules: [],
+    worlds: [],
+    worldStatus: [],
+    maps: [],
+    engines: [],
   };
   const counters: Record<TableName, number> = {
     eventSpaces: 0,
@@ -36,6 +44,10 @@ function createMockCtx() {
     eventOrganizerAuditEvents: 0,
     eventConnectionIntents: 0,
     eventRecipientRules: 0,
+    worlds: 0,
+    worldStatus: 0,
+    maps: 0,
+    engines: 0,
   };
 
   const db = {
@@ -74,7 +86,11 @@ function createMockCtx() {
     }),
   };
 
-  return { ctx: { db }, tables };
+  const scheduler = {
+    runAfter: async () => undefined,
+  };
+
+  return { ctx: { db, scheduler }, tables };
 }
 
 function findById(tables: Record<TableName, Row[]>, id: string) {
@@ -176,6 +192,7 @@ describe('event rate limits', () => {
       registerEventAgentHandler(ctx as any, {
         eventId: 'demo-event',
         agentIdentifier: 'attendee-agent',
+        requesterKey: 'ip:203.0.113.10|ua:test',
         publicCard: publicCard(),
       }),
     ).resolves.toMatchObject({ agentIdentifier: 'attendee-agent' });
@@ -183,7 +200,8 @@ describe('event rate limits', () => {
     await expect(
       registerEventAgentHandler(ctx as any, {
         eventId: 'demo-event',
-        agentIdentifier: 'attendee-agent',
+        agentIdentifier: 'different-attendee-agent',
+        requesterKey: 'ip:203.0.113.10|ua:test',
         publicCard: publicCard(),
       }),
     ).rejects.toMatchObject({
@@ -191,7 +209,7 @@ describe('event rate limits', () => {
     } satisfies Partial<ConvexError<{ code: string }>>);
   });
 
-  test('limits directory search by event and filter signature', async () => {
+  test('limits directory search by stable requester instead of filter signature', async () => {
     const { ctx } = createMockCtx();
     await insertApprovedAgent(ctx, 'requester');
     setEventRateLimitTestOverride('eventDirectorySearch', {
@@ -203,6 +221,7 @@ describe('event rate limits', () => {
     await expect(
       searchEventDirectoryHandler(ctx as any, {
         eventId: 'demo-event',
+        requesterKey: 'ip:203.0.113.20|ua:test',
         filters: { q: 'climate' },
       }),
     ).resolves.toHaveLength(1);
@@ -210,7 +229,8 @@ describe('event rate limits', () => {
     await expect(
       searchEventDirectoryHandler(ctx as any, {
         eventId: 'demo-event',
-        filters: { q: 'climate' },
+        requesterKey: 'ip:203.0.113.20|ua:test',
+        filters: { q: 'energy' },
       }),
     ).rejects.toMatchObject({
       data: { code: 'event_rate_limited' },
