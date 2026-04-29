@@ -31,7 +31,11 @@ export default function Home() {
   const initialRoute = getInitialRoute();
   const eventQrConfig = getEventQrConfig();
   const [currentView, setCurrentView] = useState<AppView>(
-    initialRoute.eventReview ? 'eventReview' : initialRoute.inboundReview ? 'inboundReview' : 'town',
+    initialRoute.eventReview
+      ? 'eventReview'
+      : initialRoute.inboundReview
+        ? 'inboundReview'
+        : 'town',
   );
   return (
     <main className="relative overflow-hidden bg-black font-body" style={{ height: '100dvh' }}>
@@ -50,10 +54,8 @@ export default function Home() {
           <>
             <Game />
 
-            <div className="absolute bottom-4 left-4 z-10 flex flex-wrap gap-3 pointer-events-none">
+            <div className="absolute right-4 top-4 z-20 flex items-center gap-2 pointer-events-none sm:right-5 sm:top-5">
               <FreezeButton eventId={eventQrConfig.eventId} />
-            </div>
-            <div className="absolute right-4 top-4 z-20 pointer-events-none sm:right-5 sm:top-5">
               <MusicButton />
             </div>
             <EventQrOverlay
