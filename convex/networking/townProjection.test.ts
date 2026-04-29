@@ -190,15 +190,18 @@ describe('networking town projection', () => {
       agentConversations: [],
       introCandidates: [],
       eventAgents: [
-        eventAgent(
-          'eventAgents:1',
-          'demo-event',
-          'founder-example-com',
-          'Cedar Scout 123',
-          'approved',
-          10,
-          'stored-public-cedar',
-        ),
+        {
+          ...eventAgent(
+            'eventAgents:1',
+            'demo-event',
+            'founder-example-com',
+            'Cedar Scout 123',
+            'approved',
+            10,
+            'stored-public-cedar',
+          ),
+          townPlayerId: 'p:event-1',
+        },
         eventAgent(
           'eventAgents:2',
           'demo-event',
@@ -265,6 +268,7 @@ describe('networking town projection', () => {
         eventId: 'demo-event',
         slug: 'stored-public-cedar',
         displayName: 'Cedar Scout 123',
+        playerId: 'p:event-1',
         avatarConfig: {
           hair: 'curly',
           skinTone: 'tone-3',
@@ -276,6 +280,13 @@ describe('networking town projection', () => {
         }),
       }),
     ]);
+    expect(projection.agentsByPlayerId['p:event-1']).toMatchObject({
+      source: 'event',
+      slug: 'stored-public-cedar',
+      publicCard: expect.objectContaining({
+        role: 'Founder',
+      }),
+    });
     expect(JSON.stringify(projection)).not.toContain('founder-example-com');
     expect(JSON.stringify(projection)).not.toContain('founder');
     expect(JSON.stringify(projection)).not.toContain('example');

@@ -95,6 +95,7 @@ export async function getTownProjectionHandler(
   if (args.eventId) {
     const projectedAgents = await collectApprovedEventAgents(ctx, args.eventId);
     const eventActivity = await collectEventActivitySummary(ctx, args.eventId);
+    const agentsByPlayerId = buildAgentsByPlayerId(projectedAgents);
     const updatedAt = Math.max(
       eventActivity.updatedAt,
       ...projectedAgents.map((agent) => agent.updatedAt),
@@ -102,7 +103,7 @@ export async function getTownProjectionHandler(
     );
     return {
       agents: projectedAgents.sort((left, right) => left.displayName.localeCompare(right.displayName)),
-      agentsByPlayerId: {},
+      agentsByPlayerId,
       statusCounts: createEmptyStatusCounts(),
       eventActivity,
       updatedAt,
@@ -307,12 +308,7 @@ export async function getTownProjectionHandler(
     })
     .sort((left, right) => left.displayName.localeCompare(right.displayName));
 
-  const agentsByPlayerId: Record<string, NetworkingTownAgent> = {};
-  for (const agent of projectedAgents) {
-    if (agent.playerId) {
-      agentsByPlayerId[agent.playerId] = agent;
-    }
-  }
+  const agentsByPlayerId = buildAgentsByPlayerId(projectedAgents);
 
   return {
     agents: projectedAgents,
@@ -320,6 +316,16 @@ export async function getTownProjectionHandler(
     statusCounts,
     updatedAt,
   };
+}
+
+function buildAgentsByPlayerId(projectedAgents: NetworkingTownAgent[]) {
+  const agentsByPlayerId: Record<string, NetworkingTownAgent> = {};
+  for (const agent of projectedAgents) {
+    if (agent.playerId) {
+      agentsByPlayerId[agent.playerId] = agent;
+    }
+  }
+  return agentsByPlayerId;
 }
 
 async function collectEventActivitySummary(ctx: QueryCtx, eventId: string) {
@@ -363,6 +369,7 @@ async function collectApprovedEventAgents(
       description: approvedCard.publicCard.category ?? approvedCard.publicCard.role,
       avatarConfig: agent.avatarConfig,
       publicCard: approvedCard.publicCard,
+      playerId: agent.townPlayerId as GameId<'players'> | undefined,
       cards: [],
       matchedAgents: [],
       pendingMeetingAgents: [],
