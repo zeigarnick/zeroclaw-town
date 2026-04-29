@@ -11,6 +11,7 @@ import {
   eventAvatarCategoryValidator,
   eventCardStatusValidator,
   eventConnectionIntentStatusValidator,
+  eventOrganizerAuditTypeValidator,
   eventOwnerSessionStatusValidator,
   eventRegistrationStatusValidator,
   introCandidateStatusValidator,
@@ -266,6 +267,8 @@ export const networkingTables = {
     title: v.string(),
     registrationStatus: eventRegistrationStatusValidator,
     skillUrl: v.optional(v.string()),
+    registrationPausedAt: v.optional(v.number()),
+    skillUrlRotatedAt: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -291,6 +294,8 @@ export const networkingTables = {
     approvedAt: v.optional(v.number()),
     rejectedAt: v.optional(v.number()),
     changesRequestedAt: v.optional(v.number()),
+    revokedAt: v.optional(v.number()),
+    revokedReason: v.optional(v.string()),
   })
     .index('by_event_and_agent_identifier', ['eventId', 'agentIdentifier'])
     .index('by_event_and_status', ['eventId', 'approvalStatus'])
@@ -315,6 +320,8 @@ export const networkingTables = {
     approvedAt: v.optional(v.number()),
     rejectedAt: v.optional(v.number()),
     changesRequestedAt: v.optional(v.number()),
+    revokedAt: v.optional(v.number()),
+    revokedReason: v.optional(v.string()),
     reviewNote: v.optional(v.string()),
   })
     .index('by_event_and_status', ['eventId', 'status'])
@@ -330,6 +337,7 @@ export const networkingTables = {
     createdAt: v.number(),
     updatedAt: v.number(),
     decidedAt: v.optional(v.number()),
+    revokedAt: v.optional(v.number()),
   })
     .index('by_session_token_hash', ['sessionTokenHash'])
     .index('by_event_and_status', ['eventId', 'status'])
@@ -380,6 +388,25 @@ export const networkingTables = {
     createdAt: v.number(),
     updatedAt: v.number(),
   }).index('by_event_id', ['eventId']),
+
+  eventOrganizerAuditEvents: defineTable({
+    eventId: v.string(),
+    type: eventOrganizerAuditTypeValidator,
+    actorKind: v.union(
+      v.literal('organizer'),
+      v.literal('event_agent'),
+      v.literal('public_requester'),
+      v.literal('system'),
+    ),
+    actorKey: v.optional(v.string()),
+    eventAgentId: v.optional(v.id('eventAgents')),
+    metadata: v.optional(v.any()),
+    createdAt: v.number(),
+  })
+    .index('by_event_created_at', ['eventId', 'createdAt'])
+    .index('by_event_type_created_at', ['eventId', 'type', 'createdAt'])
+    .index('by_event_actor_created_at', ['eventId', 'actorKey', 'createdAt'])
+    .index('by_event_agent_created_at', ['eventAgentId', 'createdAt']),
 
   eventRecipientRules: defineTable({
     eventId: v.string(),

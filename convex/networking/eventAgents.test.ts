@@ -10,7 +10,8 @@ type TableName =
   | 'eventSpaces'
   | 'eventAgents'
   | 'eventNetworkingCards'
-  | 'eventOwnerSessions';
+  | 'eventOwnerSessions'
+  | 'eventOrganizerAuditEvents';
 type Row = Record<string, any> & { _id: string };
 
 function createMockCtx() {
@@ -19,12 +20,14 @@ function createMockCtx() {
     eventAgents: [],
     eventNetworkingCards: [],
     eventOwnerSessions: [],
+    eventOrganizerAuditEvents: [],
   };
   const counters: Record<TableName, number> = {
     eventSpaces: 0,
     eventAgents: 0,
     eventNetworkingCards: 0,
     eventOwnerSessions: 0,
+    eventOrganizerAuditEvents: 0,
   };
 
   const db = {
@@ -134,6 +137,15 @@ describe('event agent handlers', () => {
     expect(tables.eventAgents).toHaveLength(1);
     expect(tables.eventNetworkingCards).toHaveLength(1);
     expect(tables.eventOwnerSessions).toHaveLength(1);
+    expect(tables.eventOrganizerAuditEvents).toEqual([
+      expect.objectContaining({
+        eventId: 'demo-event',
+        type: 'event_agent_registered',
+        actorKind: 'public_requester',
+        actorKey: 'attendee-agent',
+        eventAgentId: tables.eventAgents[0]._id,
+      }),
+    ]);
     expect(tables.eventAgents[0]).toMatchObject({
       eventId: 'demo-event',
       agentIdentifier: 'attendee-agent',

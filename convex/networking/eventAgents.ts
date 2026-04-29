@@ -11,6 +11,7 @@ import {
   normalizeEventPublicCard,
   toEventPublicCardView,
 } from './eventCards';
+import { writeEventOrganizerAuditEvent } from './eventOrganizerControls';
 import {
   EventAgentStatus,
   EventCardStatus,
@@ -123,6 +124,15 @@ export async function registerEventAgentHandler(
     activeCardId: cardId,
     updatedAt: now,
   });
+  await writeEventOrganizerAuditEvent(ctx, {
+    eventId,
+    type: 'event_agent_registered',
+    actorKind: 'public_requester',
+    actorKey: agentIdentifier,
+    eventAgentId,
+    metadata: { hasAvatarConfig: args.avatarConfig !== undefined },
+    now,
+  });
 
   return {
     eventId,
@@ -182,7 +192,7 @@ export const requestOwnerReviewChanges = mutation({
 export async function decideOwnerReviewHandler(
   ctx: MutationCtx,
   args: { reviewToken: string; reviewNote?: string },
-  decision: Exclude<EventCardStatus, 'pending_owner_review'>,
+  decision: Exclude<EventCardStatus, 'pending_owner_review' | 'revoked'>,
 ): Promise<EventOwnerReview> {
   const { session, agent, card } = await getOwnerReviewRows(ctx, args.reviewToken);
   if (
@@ -328,8 +338,14 @@ async function getOwnerReviewRows(ctx: QueryCtx | MutationCtx, reviewToken: stri
   if (!agent) {
     throw networkingError('event_agent_not_found', 'The event agent could not be loaded.');
   }
+  if (agent.approvalStatus === 'revoked') {
+    throw networkingError('event_agent_not_found', 'The event agent could not be loaded.');
+  }
   const card = await ctx.db.get(session.cardId);
   if (!card) {
+    throw networkingError('event_card_not_found', 'The event networking card could not be loaded.');
+  }
+  if (card.status === 'revoked') {
     throw networkingError('event_card_not_found', 'The event networking card could not be loaded.');
   }
   return { session, agent, card };
@@ -389,7 +405,9 @@ function normalizeReviewNote(reviewNote: string | undefined) {
   return normalized;
 }
 
-function timestampFieldForDecision(decision: Exclude<EventCardStatus, 'pending_owner_review'>) {
+function timestampFieldForDecision(
+  decision: Exclude<EventCardStatus, 'pending_owner_review' | 'revoked'>,
+) {
   if (decision === 'approved') {
     return 'approvedAt';
   }

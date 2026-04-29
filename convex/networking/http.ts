@@ -88,6 +88,29 @@ const functions = {
       'networking/eventContactReveal:getEventContactReveal',
     ),
   },
+  eventOrganizerControls: {
+    pauseEventRegistration: makeFunctionReference<'mutation'>(
+      'networking/eventOrganizerControls:pauseEventRegistration',
+    ),
+    resumeEventRegistration: makeFunctionReference<'mutation'>(
+      'networking/eventOrganizerControls:resumeEventRegistration',
+    ),
+    rotateEventSkillUrl: makeFunctionReference<'mutation'>(
+      'networking/eventOrganizerControls:rotateEventSkillUrl',
+    ),
+    revokeEventAgent: makeFunctionReference<'mutation'>(
+      'networking/eventOrganizerControls:revokeEventAgent',
+    ),
+    removeEventAgent: makeFunctionReference<'mutation'>(
+      'networking/eventOrganizerControls:removeEventAgent',
+    ),
+    listSuspiciousRegistrations: makeFunctionReference<'query'>(
+      'networking/eventOrganizerControls:listSuspiciousRegistrations',
+    ),
+    listHighVolumeRequesters: makeFunctionReference<'query'>(
+      'networking/eventOrganizerControls:listHighVolumeRequesters',
+    ),
+  },
   cards: {
     createCard: makeFunctionReference<'mutation'>('networking/cards:createCard'),
     listCards: makeFunctionReference<'query'>('networking/cards:listCards'),
@@ -326,6 +349,118 @@ export async function handleNetworkingHttpRequest(
         eventId: requirePathId(route[1], 'eventId'),
         intentId: requirePathId(route[3], 'intentId'),
         ownerSessionToken: requireEventOwnerToken(request.headers.get('Authorization')),
+      });
+      return jsonSuccess(data);
+    }
+
+    if (
+      request.method === 'POST' &&
+      route[0] === 'admin' &&
+      route[1] === 'events' &&
+      route[3] === 'registration' &&
+      route.length === 5
+    ) {
+      const body = await parseJsonObject(request);
+      const eventId = requirePathId(route[2], 'eventId');
+      const organizerToken = requireOrganizerToken(request.headers.get('Authorization'));
+      const reason = optionalString(body.reason, 'reason');
+      if (route[4] === 'pause') {
+        const data = await ctx.runMutation(
+          functions.eventOrganizerControls.pauseEventRegistration,
+          {
+            eventId,
+            organizerToken,
+            reason,
+          },
+        );
+        return jsonSuccess(data);
+      }
+      if (route[4] === 'resume') {
+        const data = await ctx.runMutation(
+          functions.eventOrganizerControls.resumeEventRegistration,
+          {
+            eventId,
+            organizerToken,
+            reason,
+          },
+        );
+        return jsonSuccess(data);
+      }
+    }
+
+    if (
+      request.method === 'POST' &&
+      route[0] === 'admin' &&
+      route[1] === 'events' &&
+      route[3] === 'skill-url' &&
+      route.length === 4
+    ) {
+      const body = await parseJsonObject(request);
+      const data = await ctx.runMutation(functions.eventOrganizerControls.rotateEventSkillUrl, {
+        eventId: requirePathId(route[2], 'eventId'),
+        organizerToken: requireOrganizerToken(request.headers.get('Authorization')),
+        skillUrl: requireString(body.skillUrl, 'skillUrl'),
+      });
+      return jsonSuccess(data);
+    }
+
+    if (
+      request.method === 'POST' &&
+      route[0] === 'admin' &&
+      route[1] === 'events' &&
+      route[3] === 'agents' &&
+      route.length === 6
+    ) {
+      const body = await parseJsonObject(request);
+      const args = {
+        eventId: requirePathId(route[2], 'eventId'),
+        eventAgentId: requirePathId(route[4], 'eventAgentId'),
+        organizerToken: requireOrganizerToken(request.headers.get('Authorization')),
+        reason: optionalString(body.reason, 'reason'),
+      };
+      if (route[5] === 'revoke') {
+        const data = await ctx.runMutation(functions.eventOrganizerControls.revokeEventAgent, args);
+        return jsonSuccess(data);
+      }
+      if (route[5] === 'remove') {
+        const data = await ctx.runMutation(functions.eventOrganizerControls.removeEventAgent, args);
+        return jsonSuccess(data);
+      }
+    }
+
+    if (
+      request.method === 'GET' &&
+      route[0] === 'admin' &&
+      route[1] === 'events' &&
+      route[3] === 'suspicious-registrations' &&
+      route.length === 4
+    ) {
+      const limitRaw = optionalQueryParam(url.searchParams, 'limit');
+      const data = await ctx.runQuery(
+        functions.eventOrganizerControls.listSuspiciousRegistrations,
+        {
+          eventId: requirePathId(route[2], 'eventId'),
+          organizerToken: requireOrganizerToken(request.headers.get('Authorization')),
+          limit: limitRaw === undefined ? undefined : parseInteger(limitRaw, 'limit'),
+        },
+      );
+      return jsonSuccess(data);
+    }
+
+    if (
+      request.method === 'GET' &&
+      route[0] === 'admin' &&
+      route[1] === 'events' &&
+      route[3] === 'high-volume-requesters' &&
+      route.length === 4
+    ) {
+      const thresholdRaw = optionalQueryParam(url.searchParams, 'threshold');
+      const limitRaw = optionalQueryParam(url.searchParams, 'limit');
+      const data = await ctx.runQuery(functions.eventOrganizerControls.listHighVolumeRequesters, {
+        eventId: requirePathId(route[2], 'eventId'),
+        organizerToken: requireOrganizerToken(request.headers.get('Authorization')),
+        threshold: thresholdRaw === undefined ? undefined : parseInteger(thresholdRaw, 'threshold'),
+        limit: limitRaw === undefined ? undefined : parseInteger(limitRaw, 'limit'),
       });
       return jsonSuccess(data);
     }
@@ -614,6 +749,27 @@ function requireEventOwnerToken(authorizationHeader: string | null) {
   return token;
 }
 
+function requireOrganizerToken(authorizationHeader: string | null) {
+  if (!authorizationHeader) {
+    throw new RouteError(
+      'invalid_event_organizer_token',
+      'Authorization header is required. Expected Bearer organizer token.',
+      401,
+    );
+  }
+
+  const [scheme, token, extra] = authorizationHeader.trim().split(/\s+/);
+  if (scheme !== 'Bearer' || !token || extra) {
+    throw new RouteError(
+      'invalid_event_organizer_token',
+      'Authorization header must be in the form: Bearer <organizer-token>.',
+      401,
+    );
+  }
+
+  return token;
+}
+
 function parseApiRoute(pathname: string) {
   const prefix = '/api/v1/';
   if (!pathname.startsWith(prefix)) {
@@ -890,7 +1046,7 @@ function statusForNetworkingError(code: NetworkingErrorCode) {
     return 401;
   }
 
-  if (code === 'invalid_event_owner_token') {
+  if (code === 'invalid_event_owner_token' || code === 'invalid_event_organizer_token') {
     return 401;
   }
 

@@ -102,6 +102,7 @@ export const eventAgentStatuses = [
   'approved',
   'rejected',
   'changes_requested',
+  'revoked',
 ] as const;
 export type EventAgentStatus = (typeof eventAgentStatuses)[number];
 export const eventAgentStatusValidator = v.union(
@@ -109,6 +110,7 @@ export const eventAgentStatusValidator = v.union(
   v.literal('approved'),
   v.literal('rejected'),
   v.literal('changes_requested'),
+  v.literal('revoked'),
 );
 
 export const eventCardStatuses = [
@@ -116,6 +118,7 @@ export const eventCardStatuses = [
   'approved',
   'rejected',
   'changes_requested',
+  'revoked',
 ] as const;
 export type EventCardStatus = (typeof eventCardStatuses)[number];
 export const eventCardStatusValidator = v.union(
@@ -123,6 +126,7 @@ export const eventCardStatusValidator = v.union(
   v.literal('approved'),
   v.literal('rejected'),
   v.literal('changes_requested'),
+  v.literal('revoked'),
 );
 
 export const eventOwnerSessionStatuses = [
@@ -130,6 +134,7 @@ export const eventOwnerSessionStatuses = [
   'approved',
   'rejected',
   'changes_requested',
+  'revoked',
 ] as const;
 export type EventOwnerSessionStatus = (typeof eventOwnerSessionStatuses)[number];
 export const eventOwnerSessionStatusValidator = v.union(
@@ -137,6 +142,25 @@ export const eventOwnerSessionStatusValidator = v.union(
   v.literal('approved'),
   v.literal('rejected'),
   v.literal('changes_requested'),
+  v.literal('revoked'),
+);
+
+export const eventOrganizerAuditTypes = [
+  'event_agent_registered',
+  'registration_paused',
+  'registration_resumed',
+  'skill_url_rotated',
+  'event_agent_revoked',
+  'event_agent_removed',
+] as const;
+export type EventOrganizerAuditType = (typeof eventOrganizerAuditTypes)[number];
+export const eventOrganizerAuditTypeValidator = v.union(
+  v.literal('event_agent_registered'),
+  v.literal('registration_paused'),
+  v.literal('registration_resumed'),
+  v.literal('skill_url_rotated'),
+  v.literal('event_agent_revoked'),
+  v.literal('event_agent_removed'),
 );
 
 export const eventConnectionIntentStatuses = [
