@@ -97,8 +97,8 @@ describe('networking agent handlers', () => {
     const { ctx, tables } = createMockCtx();
 
     const result = await registerAgentHandler(ctx as any, {
-      slug: ' Zero Claw ',
-      displayName: ' ZeroClaw ',
+      slug: ' opennetwork ',
+      displayName: ' opennetwork ',
       description: ' autonomous networking agent ',
     });
 
@@ -115,7 +115,7 @@ describe('networking agent handlers', () => {
     expect(tables.ownerClaims).toHaveLength(1);
     expect(tables.networkAgents[0]).toMatchObject({
       slug: 'zero-claw',
-      displayName: 'ZeroClaw',
+      displayName: 'opennetwork',
       description: 'autonomous networking agent',
       status: 'pending_claim',
       ownerClaimId: tables.ownerClaims[0]._id,
@@ -132,8 +132,8 @@ describe('networking agent handlers', () => {
     const result = await registerAgentForTestingHandler(
       ctx as any,
       {
-        slug: ' Zero Claw ',
-        displayName: ' ZeroClaw ',
+        slug: ' opennetwork ',
+        displayName: ' opennetwork ',
         description: ' autonomous networking agent ',
         claimBaseUrl: 'https://evil.example/claim',
       } as any,
@@ -154,7 +154,7 @@ describe('networking agent handlers', () => {
 
     expect(agent).toMatchObject({
       slug: 'zero-claw',
-      displayName: 'ZeroClaw',
+      displayName: 'opennetwork',
       description: 'autonomous networking agent',
       status: 'pending_claim',
       ownerClaimId: claim._id,
@@ -174,14 +174,14 @@ describe('networking agent handlers', () => {
   test('reports pending claim status and activates with a one-time API key', async () => {
     const { ctx, tables } = createMockCtx();
     const registration = await registerAgentForTestingHandler(ctx as any, {
-      slug: 'zeroclaw',
-      displayName: 'ZeroClaw',
+      slug: 'opennetwork',
+      displayName: 'opennetwork',
     });
     const claimToken = tokenFromClaimUrl(registration.claimUrl);
 
     await expect(getClaimStatusHandler(ctx as any, { claimToken })).resolves.toMatchObject({
-      agentSlug: 'zeroclaw',
-      agentDisplayName: 'ZeroClaw',
+      agentSlug: 'opennetwork',
+      agentDisplayName: 'opennetwork',
       agentStatus: 'pending_claim',
       claimStatus: 'pending',
     });
@@ -200,14 +200,14 @@ describe('networking agent handlers', () => {
     const claimed = await claimAgentForTestingHandler(ctx as any, {
       claimToken,
       verificationCode: registration.verificationCode,
-      xHandle: '@zeroclaw',
-      xProfileUrl: 'https://x.com/zeroclaw',
+      xHandle: '@opennetwork',
+      xProfileUrl: 'https://x.com/opennetwork',
       verificationMethod: 'tweet',
     });
 
     expect(claimed).toMatchObject({
       agentId: registration.agentId,
-      agentSlug: 'zeroclaw',
+      agentSlug: 'opennetwork',
       apiKey: expect.stringMatching(/^town_/),
       status: 'active',
     });
@@ -226,8 +226,8 @@ describe('networking agent handlers', () => {
     });
     expect(tables.ownerClaims[0]).toMatchObject({
       status: 'verified',
-      xHandle: 'zeroclaw',
-      xProfileUrl: 'https://x.com/zeroclaw',
+      xHandle: 'opennetwork',
+      xProfileUrl: 'https://x.com/opennetwork',
       verificationMethod: 'tweet',
     });
 
@@ -235,8 +235,8 @@ describe('networking agent handlers', () => {
       claimAgentForTestingHandler(ctx as any, {
         claimToken,
         verificationCode: registration.verificationCode,
-        xHandle: '@zeroclaw-again',
-        xProfileUrl: 'https://x.com/zeroclaw-again',
+        xHandle: '@opennetwork-again',
+        xProfileUrl: 'https://x.com/opennetwork-again',
       }),
     ).rejects.toMatchObject({
       data: { code: 'invalid_claim_status' },
@@ -245,8 +245,8 @@ describe('networking agent handlers', () => {
     await expect(getClaimStatusHandler(ctx as any, { claimToken })).resolves.toMatchObject({
       agentStatus: 'active',
       claimStatus: 'verified',
-      xHandle: 'zeroclaw',
-      xProfileUrl: 'https://x.com/zeroclaw',
+      xHandle: 'opennetwork',
+      xProfileUrl: 'https://x.com/opennetwork',
       verificationMethod: 'tweet',
     });
   });

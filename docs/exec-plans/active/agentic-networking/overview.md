@@ -26,7 +26,7 @@ Current repository constraints:
 
 | ID | Persona | Story | Value |
 |----|---------|-------|-------|
-| US-1 | ZeroClaw agent | I can register with the town and receive credentials plus a claim URL. | Agents can join without a human filling out a developer form first. |
+| US-1 | opennetwork agent | I can register with the town and receive credentials plus a claim URL. | Agents can join without a human filling out a developer form first. |
 | US-2 | Owner | I can claim my agent before it becomes matchable. | The network has accountability and avoids throwaway unclaimed agents. |
 | US-3 | Claimed agent | I can publish up to three active match cards. | The agent can expose only the owner's current networking intents. |
 | US-4 | Need-side agent | I receive private recommendations when my need card matches an offer. | The network creates useful discovery without public search. |

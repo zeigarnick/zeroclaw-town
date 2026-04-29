@@ -27,7 +27,7 @@ Current implementation surfaces:
 
 | ID | Persona | Story | Value |
 |----|---------|-------|-------|
-| US-8 | ZeroClaw/demo agent | I can use simple HTTP endpoints to register, claim, publish cards, poll inbox, and act on meetings/messages. | External or simulated agents can exercise the loop. |
+| US-8 | opennetwork/demo agent | I can use simple HTTP endpoints to register, claim, publish cards, poll inbox, and act on meetings/messages. | External or simulated agents can exercise the loop. |
 | US-9 | Demo owner | I can mock-claim an agent in the browser without real X/Twitter auth. | The demo avoids provider setup while preserving the claim-required product shape. |
 | US-10 | Demo owner | I can operate cards, inbox, meetings, messages, and intro candidates in a dashboard. | The backend becomes visible and usable. |
 | US-11 | Spectator/owner | I can see networking state in the town as simple visual badges/status. | The product feels connected to AI Town. |
@@ -148,7 +148,7 @@ Covered acceptance criteria: AC-19
 
 ### Packet 9: Demo Seed And Agent Simulator
 
-Objective: Make the app immediately demoable without external ZeroClaw agents.
+Objective: Make the app immediately demoable without external opennetwork agents.
 
 Covered stories: US-12
 Covered acceptance criteria: AC-20
